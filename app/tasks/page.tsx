@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   CalendarDays,
@@ -54,7 +54,7 @@ const priorityOrder: Record<Task["priority"], number> = {
   low: 3,
 };
 
-export default function TasksPage() {
+function TasksPageContent() {
   const searchParams = useSearchParams();
   const taskIdFromUrl = searchParams.get("task");
 
@@ -2104,5 +2104,23 @@ export default function TasksPage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function TasksPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#f5f5f4]">
+          <div className="flex min-h-screen items-center justify-center">
+            <p className="text-sm text-neutral-400">
+              Загрузка...
+            </p>
+          </div>
+        </main>
+      }
+    >
+      <TasksPageContent />
+    </Suspense>
   );
 }
