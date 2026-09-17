@@ -62,15 +62,17 @@ export const translations = {
     },
 
     navigation: {
-      dashboard: "Главная",
-      goals: "Цели",
-      ideas: "Идеи",
-      tasks: "Задачи",
-      deadlines: "Сроки",
-      calendar: "Календарь",
-      knowledge: "Знания",
-      team: "Команда",
-    },
+  dashboard: "Главная",
+  goals: "Цели",
+  ideas: "Идеи",
+  tasks: "Задачи",
+  deadlines: "Сроки",
+  calendar: "Календарь",
+  schedule: "Расписание",
+  materials: "Материалы",
+  team: "Команда",
+  teens: "Подростки",
+},
   },
 
   de: {
@@ -136,15 +138,17 @@ export const translations = {
     },
 
     navigation: {
-      dashboard: "Dashboard",
-      goals: "Ziele",
-      ideas: "Ideen",
-      tasks: "Aufgaben",
-      deadlines: "Termine",
-      calendar: "Kalender",
-      knowledge: "Wissen",
-      team: "Team",
-    },
+  dashboard: "Dashboard",
+  goals: "Ziele",
+  ideas: "Ideen",
+  tasks: "Aufgaben",
+  deadlines: "Fristen",
+  calendar: "Kalender",
+  schedule: "Dienstplan",
+  materials: "Materialien",
+  team: "Team",
+  teens: "Teenager",
+},
   },
 } as const;
 

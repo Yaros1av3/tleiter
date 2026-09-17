@@ -8,6 +8,7 @@ import {
   Trash2,
   UserRound,
   X,
+  RotateCcw,
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
@@ -33,18 +34,18 @@ type Teen = {
 type AgeFilter = "all" | number;
 type GenderFilter = "all" | Gender;
 type LanguageFilter = "all" | TeenLanguage;
+type StatusFilter = "active" | "all" | "inactive";
 
 export default function TeensPage() {
-  const [language, setLanguage] =
-    useState<Language>("ru");
+  const [language, setLanguage] = useState<Language>("ru");
 
   const [teens, setTeens] = useState<Teen[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
 
-  const [showInactive, setShowInactive] =
-    useState(false);
+  const [statusFilter, setStatusFilter] =
+    useState<StatusFilter>("active");
 
   const [genderFilter, setGenderFilter] =
     useState<GenderFilter>("all");
@@ -55,8 +56,7 @@ export default function TeensPage() {
   const [ageFilter, setAgeFilter] =
     useState<AgeFilter>("all");
 
-  const [isModalOpen, setIsModalOpen] =
-    useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] =
     useState(false);
@@ -64,23 +64,13 @@ export default function TeensPage() {
   const [editingTeen, setEditingTeen] =
     useState<Teen | null>(null);
 
-  const [saving, setSaving] =
-    useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  const [deleting, setDeleting] =
-    useState(false);
-
-  const [firstName, setFirstName] =
-    useState("");
-
-  const [lastName, setLastName] =
-    useState("");
-
-  const [birthDate, setBirthDate] =
-    useState("");
-
-  const [phone, setPhone] =
-    useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [phone, setPhone] = useState("");
 
   const [gender, setGender] =
     useState<Gender | "">("");
@@ -88,8 +78,7 @@ export default function TeensPage() {
   const [selectedLanguages, setSelectedLanguages] =
     useState<TeenLanguage[]>([]);
 
-  const [isActive, setIsActive] =
-    useState(true);
+  const [isActive, setIsActive] = useState(true);
 
   const t = translations[language];
 
@@ -103,19 +92,11 @@ export default function TeensPage() {
     const { data, error } = await supabase
       .from("teens")
       .select("*")
-      .order("last_name", {
-        ascending: true,
-      })
-      .order("first_name", {
-        ascending: true,
-      });
+      .order("last_name", { ascending: true })
+      .order("first_name", { ascending: true });
 
     if (error) {
-      console.error(
-        "Error loading teens:",
-        error
-      );
-
+      console.error("Error loading teens:", error);
       setTeens([]);
     } else {
       setTeens(data ?? []);
@@ -124,13 +105,8 @@ export default function TeensPage() {
     setLoading(false);
   }
 
-  function calculateAge(
-    birthDate: string
-  ) {
-    const birth = new Date(
-      `${birthDate}T00:00:00`
-    );
-
+  function calculateAge(birthDate: string) {
+    const birth = new Date(`${birthDate}T00:00:00`);
     const today = new Date();
 
     let age =
@@ -144,8 +120,7 @@ export default function TeensPage() {
     if (
       monthDifference < 0 ||
       (monthDifference === 0 &&
-        today.getDate() <
-          birth.getDate())
+        today.getDate() < birth.getDate())
     ) {
       age--;
     }
@@ -157,9 +132,7 @@ export default function TeensPage() {
     return new Date(
       `${date}T00:00:00`
     ).toLocaleDateString(
-      language === "ru"
-        ? "ru-RU"
-        : "de-DE",
+      language === "ru" ? "ru-RU" : "de-DE",
       {
         day: "2-digit",
         month: "2-digit",
@@ -168,9 +141,7 @@ export default function TeensPage() {
     );
   }
 
-  function getGenderLabel(
-    value: Gender | null
-  ) {
+  function getGenderLabel(value: Gender | null) {
     if (value === "male") {
       return language === "ru"
         ? "Мальчик"
@@ -188,9 +159,7 @@ export default function TeensPage() {
       : "Nicht angegeben";
   }
 
-  function getLanguageLabel(
-    value: TeenLanguage
-  ) {
+  function getLanguageLabel(value: TeenLanguage) {
     return value === "de"
       ? "Deutsch"
       : "Русский";
@@ -206,100 +175,137 @@ export default function TeensPage() {
     }
 
     return languages
-      .map((item) =>
-        getLanguageLabel(item)
-      )
+      .map((item) => getLanguageLabel(item))
       .join(" + ");
   }
 
-  function toggleLanguage(
-    value: TeenLanguage
-  ) {
-    setSelectedLanguages(
-      (current) => {
-        if (current.includes(value)) {
-          return current.filter(
-            (item) => item !== value
-          );
-        }
-
-        return [...current, value];
+  function toggleLanguage(value: TeenLanguage) {
+    setSelectedLanguages((current) => {
+      if (current.includes(value)) {
+        return current.filter(
+          (item) => item !== value
+        );
       }
-    );
+
+      return [...current, value];
+    });
   }
 
   const filteredTeens = useMemo(() => {
     const normalizedSearch =
-      search.trim().toLowerCase();
+      search.trim().toLocaleLowerCase();
 
-    return teens.filter((teen) => {
-      if (
-        !showInactive &&
-        !teen.is_active
-      ) {
-        return false;
-      }
-
-      if (
-        genderFilter !== "all" &&
-        teen.gender !== genderFilter
-      ) {
-        return false;
-      }
-
-      if (
-        languageFilter !== "all" &&
-        !(teen.languages ?? []).includes(
-          languageFilter
-        )
-      ) {
-        return false;
-      }
-
-      if (ageFilter !== "all") {
-        const age = calculateAge(
-          teen.birth_date
-        );
-
-        if (age !== ageFilter) {
+    return teens
+      .filter((teen) => {
+        // STATUS
+        if (
+          statusFilter === "active" &&
+          !teen.is_active
+        ) {
           return false;
         }
-      }
 
-      if (!normalizedSearch) {
+        if (
+          statusFilter === "inactive" &&
+          teen.is_active
+        ) {
+          return false;
+        }
+
+        // GENDER
+        if (
+          genderFilter !== "all" &&
+          teen.gender !== genderFilter
+        ) {
+          return false;
+        }
+
+        // LANGUAGE
+        if (
+          languageFilter !== "all" &&
+          !(teen.languages ?? []).includes(
+            languageFilter
+          )
+        ) {
+          return false;
+        }
+
+        // AGE
+        if (ageFilter !== "all") {
+          const age = calculateAge(
+            teen.birth_date
+          );
+
+          if (age !== ageFilter) {
+            return false;
+          }
+        }
+
+        // SEARCH
+        if (normalizedSearch) {
+          const fullName =
+            `${teen.first_name} ${teen.last_name}`
+              .toLocaleLowerCase();
+
+          const reverseName =
+            `${teen.last_name} ${teen.first_name}`
+              .toLocaleLowerCase();
+
+          const phoneValue =
+            (teen.phone ?? "")
+              .toLocaleLowerCase();
+
+          if (
+            !fullName.includes(
+              normalizedSearch
+            ) &&
+            !reverseName.includes(
+              normalizedSearch
+            ) &&
+            !phoneValue.includes(
+              normalizedSearch
+            )
+          ) {
+            return false;
+          }
+        }
+
         return true;
-      }
+      })
+      .sort((a, b) => {
+        const lastNameCompare =
+          a.last_name.localeCompare(
+            b.last_name,
+            language === "ru"
+              ? "ru"
+              : "de",
+            {
+              sensitivity: "base",
+            }
+          );
 
-      const fullName =
-        `${teen.first_name} ${teen.last_name}`.toLowerCase();
+        if (lastNameCompare !== 0) {
+          return lastNameCompare;
+        }
 
-      const reverseName =
-        `${teen.last_name} ${teen.first_name}`.toLowerCase();
-
-      const phoneValue =
-        (
-          teen.phone ?? ""
-        ).toLowerCase();
-
-      return (
-        fullName.includes(
-          normalizedSearch
-        ) ||
-        reverseName.includes(
-          normalizedSearch
-        ) ||
-        phoneValue.includes(
-          normalizedSearch
-        )
-      );
-    });
+        return a.first_name.localeCompare(
+          b.first_name,
+          language === "ru"
+            ? "ru"
+            : "de",
+          {
+            sensitivity: "base",
+          }
+        );
+      });
   }, [
     teens,
     search,
-    showInactive,
+    statusFilter,
     genderFilter,
     languageFilter,
     ageFilter,
+    language,
   ]);
 
   const activeCount = teens.filter(
@@ -321,22 +327,20 @@ export default function TeensPage() {
       teen.is_active
   ).length;
 
-  const filteredActiveCount =
-    filteredTeens.filter(
-      (teen) => teen.is_active
-    ).length;
+  const hasActiveFilters =
+    search.trim() !== "" ||
+    statusFilter !== "active" ||
+    ageFilter !== "all" ||
+    genderFilter !== "all" ||
+    languageFilter !== "all";
 
-  const filteredBoysCount =
-    filteredTeens.filter(
-      (teen) =>
-        teen.gender === "male"
-    ).length;
-
-  const filteredGirlsCount =
-    filteredTeens.filter(
-      (teen) =>
-        teen.gender === "female"
-    ).length;
+  function resetFilters() {
+    setSearch("");
+    setStatusFilter("active");
+    setAgeFilter("all");
+    setGenderFilter("all");
+    setLanguageFilter("all");
+  }
 
   function resetForm() {
     setFirstName("");
@@ -354,47 +358,24 @@ export default function TeensPage() {
     setIsModalOpen(true);
   }
 
-  function openEditModal(
-    teen: Teen
-  ) {
+  function openEditModal(teen: Teen) {
     setEditingTeen(teen);
 
-    setFirstName(
-      teen.first_name
-    );
-
-    setLastName(
-      teen.last_name
-    );
-
-    setBirthDate(
-      teen.birth_date
-    );
-
-    setPhone(
-      teen.phone ?? ""
-    );
-
-    setGender(
-      teen.gender ?? ""
-    );
-
+    setFirstName(teen.first_name);
+    setLastName(teen.last_name);
+    setBirthDate(teen.birth_date);
+    setPhone(teen.phone ?? "");
+    setGender(teen.gender ?? "");
     setSelectedLanguages(
       teen.languages ?? []
     );
-
-    setIsActive(
-      teen.is_active
-    );
+    setIsActive(teen.is_active);
 
     setIsModalOpen(true);
   }
 
   function closeModal() {
-    if (
-      saving ||
-      deleting
-    ) {
+    if (saving || deleting) {
       return;
     }
 
@@ -425,26 +406,13 @@ export default function TeensPage() {
     setSaving(true);
 
     const teenData = {
-      first_name:
-        cleanFirstName,
-
-      last_name:
-        cleanLastName,
-
-      birth_date:
-        birthDate,
-
-      phone:
-        cleanPhone || null,
-
-      gender:
-        gender || null,
-
-      languages:
-        selectedLanguages,
-
-      is_active:
-        isActive,
+      first_name: cleanFirstName,
+      last_name: cleanLastName,
+      birth_date: birthDate,
+      phone: cleanPhone || null,
+      gender: gender || null,
+      languages: selectedLanguages,
+      is_active: isActive,
     };
 
     if (editingTeen) {
@@ -452,10 +420,7 @@ export default function TeensPage() {
         await supabase
           .from("teens")
           .update(teenData)
-          .eq(
-            "id",
-            editingTeen.id
-          )
+          .eq("id", editingTeen.id)
           .select()
           .single();
 
@@ -469,15 +434,12 @@ export default function TeensPage() {
         return;
       }
 
-      setTeens(
-        (current) =>
-          current.map(
-            (teen) =>
-              teen.id ===
-              editingTeen.id
-                ? data
-                : teen
-          )
+      setTeens((current) =>
+        current.map((teen) =>
+          teen.id === editingTeen.id
+            ? data
+            : teen
+        )
       );
     } else {
       const { data, error } =
@@ -497,12 +459,10 @@ export default function TeensPage() {
         return;
       }
 
-      setTeens(
-        (current) => [
-          ...current,
-          data,
-        ]
-      );
+      setTeens((current) => [
+        ...current,
+        data,
+      ]);
     }
 
     setSaving(false);
@@ -511,10 +471,7 @@ export default function TeensPage() {
   }
 
   async function deleteTeen() {
-    if (
-      !editingTeen ||
-      deleting
-    ) {
+    if (!editingTeen || deleting) {
       return;
     }
 
@@ -524,10 +481,7 @@ export default function TeensPage() {
       await supabase
         .from("teens")
         .delete()
-        .eq(
-          "id",
-          editingTeen.id
-        );
+        .eq("id", editingTeen.id);
 
     if (error) {
       console.error(
@@ -539,13 +493,11 @@ export default function TeensPage() {
       return;
     }
 
-    setTeens(
-      (current) =>
-        current.filter(
-          (teen) =>
-            teen.id !==
-            editingTeen.id
-        )
+    setTeens((current) =>
+      current.filter(
+        (teen) =>
+          teen.id !== editingTeen.id
+      )
     );
 
     setDeleting(false);
@@ -556,155 +508,142 @@ export default function TeensPage() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-neutral-100 text-neutral-900">
-      <Sidebar
-        language={language}
-      />
+      <Sidebar language={language} />
 
       <div className="ml-[72px] min-h-screen min-w-0">
         <Header
           language={language}
-          setLanguage={
-            setLanguage
-          }
+          setLanguage={setLanguage}
         />
 
         <div className="mx-auto w-full max-w-[1280px] px-4 pb-12 sm:px-6 sm:pb-16 lg:px-8 lg:pb-20">
+
           {/* HEADER */}
 
-          <section className="pb-8 pt-10 sm:pb-10 sm:pt-14 lg:pt-16">
-            <p className="mb-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-neutral-400 sm:mb-4 sm:text-[10px] sm:tracking-[0.18em]">
+          <section className="pb-7 pt-9 sm:pb-8 sm:pt-12">
+            <p className="mb-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-neutral-400">
               {t.common.teamWorkspace}
             </p>
 
             <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h1 className="text-4xl font-bold tracking-[-0.055em] text-neutral-950 sm:text-5xl lg:text-6xl">
-                  {language ===
-                  "ru"
+                <h1 className="text-4xl font-bold tracking-[-0.055em] text-neutral-950 sm:text-5xl">
+                  {language === "ru"
                     ? "Подростки"
-                    : "Teens"}
+                    : "Teenager"}
                 </h1>
 
-                <p className="mt-3 max-w-xl text-sm leading-6 text-neutral-500 sm:text-base">
-                  {language ===
-                  "ru"
+                <p className="mt-2.5 max-w-xl text-sm leading-6 text-neutral-500">
+                  {language === "ru"
                     ? "Обзор подростков нашей группы."
                     : "Übersicht über die Jugendlichen unserer Gruppe."}
                 </p>
               </div>
 
               <button
-                onClick={
-                  openCreateModal
-                }
-                className="flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-neutral-900 px-5 text-sm font-semibold text-white transition hover:bg-neutral-800 active:scale-[0.99] sm:w-auto"
+                onClick={openCreateModal}
+                className="flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 text-xs font-semibold text-white transition hover:bg-neutral-800 active:scale-[0.99] sm:w-auto"
               >
                 <Plus
-                  size={16}
+                  size={15}
                   strokeWidth={2}
                 />
 
-                {language ===
-                "ru"
+                {language === "ru"
                   ? "Добавить подростка"
                   : "Teenager hinzufügen"}
               </button>
             </div>
           </section>
 
-          {/* STATISTICS */}
+          {/* COMPACT STATISTICS */}
 
-          <section className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                {language ===
-                "ru"
+          <section className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
+              <span className="text-[10px] font-medium text-neutral-400">
+                {language === "ru"
                   ? "Всего"
                   : "Gesamt"}
-              </p>
+              </span>
 
-              <p className="mt-2 text-2xl font-bold tracking-tight text-neutral-950">
+              <span className="text-lg font-bold tracking-tight text-neutral-900">
                 {teens.length}
-              </p>
+              </span>
             </div>
 
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                {language ===
-                "ru"
+            <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
+              <span className="text-[10px] font-medium text-neutral-400">
+                {language === "ru"
                   ? "Активные"
                   : "Aktiv"}
-              </p>
+              </span>
 
-              <p className="mt-2 text-2xl font-bold tracking-tight text-emerald-600">
+              <span className="text-lg font-bold tracking-tight text-emerald-600">
                 {activeCount}
-              </p>
+              </span>
             </div>
 
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                {language ===
-                "ru"
+            <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
+              <span className="text-[10px] font-medium text-neutral-400">
+                {language === "ru"
                   ? "Мальчики"
                   : "Jungen"}
-              </p>
+              </span>
 
-              <p className="mt-2 text-2xl font-bold tracking-tight text-blue-600">
+              <span className="text-lg font-bold tracking-tight text-blue-600">
                 {boysCount}
-              </p>
+              </span>
             </div>
 
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                {language ===
-                "ru"
+            <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
+              <span className="text-[10px] font-medium text-neutral-400">
+                {language === "ru"
                   ? "Девочки"
                   : "Mädchen"}
-              </p>
+              </span>
 
-              <p className="mt-2 text-2xl font-bold tracking-tight text-pink-500">
+              <span className="text-lg font-bold tracking-tight text-pink-500">
                 {girlsCount}
-              </p>
+              </span>
             </div>
 
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                {language ===
-                "ru"
+            <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
+              <span className="text-[10px] font-medium text-neutral-400">
+                {language === "ru"
                   ? "В выборке"
-                  : "Gefiltert"}
-              </p>
+                  : "Auswahl"}
+              </span>
 
-              <p className="mt-2 text-2xl font-bold tracking-tight text-neutral-950">
+              <span className="text-lg font-bold tracking-tight text-neutral-900">
                 {filteredTeens.length}
-              </p>
+              </span>
             </div>
 
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                {language ===
-                "ru"
+            <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
+              <span className="text-[10px] font-medium text-neutral-400">
+                {language === "ru"
                   ? "Неактивные"
                   : "Inaktiv"}
-              </p>
+              </span>
 
-              <p className="mt-2 text-2xl font-bold tracking-tight text-neutral-500">
+              <span className="text-lg font-bold tracking-tight text-neutral-400">
                 {inactiveCount}
-              </p>
+              </span>
             </div>
           </section>
 
           {/* FILTERS */}
 
-          <section className="mb-4 rounded-2xl border border-neutral-200 bg-white p-3 sm:p-4">
-            <div className="flex flex-col gap-3">
+          <section className="mb-4 rounded-xl border border-neutral-200 bg-white p-2.5 sm:p-3">
+            <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
+
               {/* SEARCH */}
 
-              <div className="relative">
+              <div className="relative min-w-0 flex-1">
                 <Search
-                  size={16}
+                  size={15}
                   strokeWidth={1.8}
-                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
                 />
 
                 <input
@@ -712,97 +651,83 @@ export default function TeensPage() {
                   value={search}
                   onChange={(event) =>
                     setSearch(
-                      event.target
-                        .value
+                      event.target.value
                     )
                   }
                   placeholder={
-                    language ===
-                    "ru"
-                      ? "Поиск по имени или телефону..."
-                      : "Nach Name oder Telefonnummer suchen..."
+                    language === "ru"
+                      ? "Поиск по имени, фамилии или телефону..."
+                      : "Nach Name, Nachname oder Telefonnummer suchen..."
                   }
-                  className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 pl-10 pr-4 text-sm outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:bg-white"
+                  className="h-9 w-full rounded-lg border border-neutral-200 bg-neutral-50 pl-9 pr-3 text-xs outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:bg-white"
                 />
               </div>
 
-              {/* FILTER ROW */}
+              {/* FILTERS */}
 
-              <div className="flex flex-wrap items-center gap-2">
-                {/* ACTIVE */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:shrink-0">
+                {/* STATUS */}
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowInactive(
-                      (current) =>
-                        !current
+                <select
+                  value={statusFilter}
+                  onChange={(event) =>
+                    setStatusFilter(
+                      event.target
+                        .value as StatusFilter
                     )
                   }
-                  className={`h-9 rounded-lg border px-3 text-xs font-medium transition ${
-                    showInactive
-                      ? "border-neutral-900 bg-neutral-900 text-white"
-                      : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-white hover:text-neutral-900"
-                  }`}
+                  className="h-9 min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 text-xs font-medium text-neutral-600 outline-none transition focus:border-neutral-400 focus:bg-white lg:w-[115px]"
                 >
-                  {showInactive
-                    ? language ===
-                      "ru"
-                      ? "Все"
-                      : "Alle"
-                    : language ===
-                        "ru"
+                  <option value="active">
+                    {language === "ru"
                       ? "Активные"
                       : "Aktive"}
-                </button>
+                  </option>
+
+                  <option value="all">
+                    {language === "ru"
+                      ? "Все"
+                      : "Alle"}
+                  </option>
+
+                  <option value="inactive">
+                    {language === "ru"
+                      ? "Неактивные"
+                      : "Inaktive"}
+                  </option>
+                </select>
 
                 {/* AGE */}
 
                 <select
                   value={
-                    ageFilter ===
-                    "all"
+                    ageFilter === "all"
                       ? "all"
-                      : String(
-                          ageFilter
-                        )
+                      : String(ageFilter)
                   }
-                  onChange={(
-                    event
-                  ) => {
+                  onChange={(event) => {
                     const value =
-                      event.target
-                        .value;
+                      event.target.value;
 
                     setAgeFilter(
-                      value ===
-                        "all"
+                      value === "all"
                         ? "all"
-                        : Number(
-                            value
-                          )
+                        : Number(value)
                     );
                   }}
-                  className="h-9 rounded-lg border border-neutral-200 bg-neutral-50 px-3 text-xs font-medium text-neutral-600 outline-none transition focus:border-neutral-400"
+                  className="h-9 min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 text-xs font-medium text-neutral-600 outline-none transition focus:border-neutral-400 focus:bg-white lg:w-[120px]"
                 >
                   <option value="all">
-                    {language ===
-                    "ru"
+                    {language === "ru"
                       ? "Все возраста"
                       : "Alle Alter"}
                   </option>
 
                   {Array.from(
-                    {
-                      length: 9,
-                    },
-                    (
-                      _,
-                      index
-                    ) => {
+                    { length: 9 },
+                    (_, index) => {
                       const age =
-                        index +
-                        10;
+                        index + 10;
 
                       return (
                         <option
@@ -810,8 +735,7 @@ export default function TeensPage() {
                           value={age}
                         >
                           {age}{" "}
-                          {language ===
-                          "ru"
+                          {language === "ru"
                             ? "лет"
                             : "Jahre"}
                         </option>
@@ -822,290 +746,246 @@ export default function TeensPage() {
 
                 {/* GENDER */}
 
-                <button
-                  type="button"
-                  onClick={() =>
+                <select
+                  value={genderFilter}
+                  onChange={(event) =>
                     setGenderFilter(
-                      "all"
+                      event.target
+                        .value as GenderFilter
                     )
                   }
-                  className={`h-9 rounded-lg border px-3 text-xs font-medium transition ${
-                    genderFilter ===
-                    "all"
-                      ? "border-neutral-900 bg-neutral-900 text-white"
-                      : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-white hover:text-neutral-900"
-                  }`}
+                  className="h-9 min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 text-xs font-medium text-neutral-600 outline-none transition focus:border-neutral-400 focus:bg-white lg:w-[125px]"
                 >
-                  {language ===
-                  "ru"
-                    ? "Все"
-                    : "Alle"}
-                </button>
+                  <option value="all">
+                    {language === "ru"
+                      ? "Все"
+                      : "Alle"}
+                  </option>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setGenderFilter(
-                      "male"
-                    )
-                  }
-                  className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
-                    genderFilter ===
-                    "male"
-                      ? "border-blue-200 bg-blue-50 text-blue-700"
-                      : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-blue-50 hover:text-blue-700"
-                  }`}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  <option value="male">
+                    {language === "ru"
+                      ? "Мальчики"
+                      : "Jungen"}
+                  </option>
 
-                  {language ===
-                  "ru"
-                    ? "Мальчики"
-                    : "Jungen"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setGenderFilter(
-                      "female"
-                    )
-                  }
-                  className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition ${
-                    genderFilter ===
-                    "female"
-                      ? "border-pink-200 bg-pink-50 text-pink-700"
-                      : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-pink-50 hover:text-pink-700"
-                  }`}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-pink-500" />
-
-                  {language ===
-                  "ru"
-                    ? "Девочки"
-                    : "Mädchen"}
-                </button>
+                  <option value="female">
+                    {language === "ru"
+                      ? "Девочки"
+                      : "Mädchen"}
+                  </option>
+                </select>
 
                 {/* LANGUAGE */}
 
-                <button
-                  type="button"
-                  onClick={() =>
+                <select
+                  value={languageFilter}
+                  onChange={(event) =>
                     setLanguageFilter(
-                      "all"
+                      event.target
+                        .value as LanguageFilter
                     )
                   }
-                  className={`h-9 rounded-lg border px-3 text-xs font-medium transition ${
-                    languageFilter ===
-                    "all"
-                      ? "border-neutral-900 bg-neutral-900 text-white"
-                      : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-white hover:text-neutral-900"
-                  }`}
+                  className="h-9 min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 text-xs font-medium text-neutral-600 outline-none transition focus:border-neutral-400 focus:bg-white lg:w-[130px]"
                 >
-                  {language ===
-                  "ru"
-                    ? "Все языки"
-                    : "Alle Sprachen"}
-                </button>
+                  <option value="all">
+                    {language === "ru"
+                      ? "Все языки"
+                      : "Alle Sprachen"}
+                  </option>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setLanguageFilter(
-                      "de"
-                    )
-                  }
-                  className={`h-9 rounded-lg border px-3 text-xs font-medium transition ${
-                    languageFilter ===
-                    "de"
-                      ? "border-neutral-900 bg-neutral-900 text-white"
-                      : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-white hover:text-neutral-900"
-                  }`}
-                >
-                  Deutsch
-                </button>
+                  <option value="de">
+                    Deutsch
+                  </option>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setLanguageFilter(
-                      "ru"
-                    )
-                  }
-                  className={`h-9 rounded-lg border px-3 text-xs font-medium transition ${
-                    languageFilter ===
-                    "ru"
-                      ? "border-neutral-900 bg-neutral-900 text-white"
-                      : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-white hover:text-neutral-900"
-                  }`}
-                >
-                  Русский
-                </button>
+                  <option value="ru">
+                    Русский
+                  </option>
+                </select>
               </div>
             </div>
 
-            {/* FILTER RESULT */}
+            {/* FILTER FOOTER */}
 
-            {(ageFilter !==
-              "all" ||
-              genderFilter !==
-                "all" ||
-              languageFilter !==
-                "all" ||
-              search ||
-              showInactive) && (
-              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-3">
-                <span className="text-xs text-neutral-400">
-                  {language ===
-                  "ru"
-                    ? "Результат:"
-                    : "Ergebnis:"}
+            <div className="mt-2.5 flex min-h-[24px] items-center justify-between gap-3 border-t border-neutral-100 pt-2.5">
+              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                <span className="text-[10px] text-neutral-400">
+                  {language === "ru"
+                    ? "Показано:"
+                    : "Angezeigt:"}
                 </span>
 
-                <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-700">
+                <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-700">
                   {filteredTeens.length}
                 </span>
 
-                {ageFilter !==
-                  "all" && (
-                  <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs text-neutral-500">
+                {statusFilter !== "active" && (
+                  <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-500">
+                    {statusFilter ===
+                    "inactive"
+                      ? language === "ru"
+                        ? "Неактивные"
+                        : "Inaktive"
+                      : language === "ru"
+                        ? "Все"
+                        : "Alle"}
+                  </span>
+                )}
+
+                {ageFilter !== "all" && (
+                  <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-500">
                     {ageFilter}{" "}
-                    {language ===
-                    "ru"
+                    {language === "ru"
                       ? "лет"
                       : "Jahre"}
                   </span>
                 )}
 
-                {genderFilter ===
-                  "male" && (
-                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs text-blue-600">
-                    {language ===
-                    "ru"
-                      ? "Мальчики"
-                      : "Jungen"}
+                {genderFilter !== "all" && (
+                  <span
+                    className={`rounded-md px-2 py-0.5 text-[10px] ${
+                      genderFilter === "male"
+                        ? "bg-blue-50 text-blue-600"
+                        : "bg-pink-50 text-pink-600"
+                    }`}
+                  >
+                    {genderFilter === "male"
+                      ? language === "ru"
+                        ? "Мальчики"
+                        : "Jungen"
+                      : language === "ru"
+                        ? "Девочки"
+                        : "Mädchen"}
                   </span>
                 )}
 
-                {genderFilter ===
-                  "female" && (
-                  <span className="rounded-full bg-pink-50 px-2.5 py-1 text-xs text-pink-600">
-                    {language ===
-                    "ru"
-                      ? "Девочки"
-                      : "Mädchen"}
-                  </span>
-                )}
-
-                {languageFilter !==
-                  "all" && (
-                  <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs text-neutral-600">
-                    {languageFilter ===
-                    "de"
+                {languageFilter !== "all" && (
+                  <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-500">
+                    {languageFilter === "de"
                       ? "Deutsch"
                       : "Русский"}
                   </span>
                 )}
               </div>
-            )}
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-medium text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+                >
+                  <RotateCcw
+                    size={12}
+                    strokeWidth={1.8}
+                  />
+
+                  {language === "ru"
+                    ? "Сбросить"
+                    : "Zurücksetzen"}
+                </button>
+              )}
+            </div>
           </section>
 
           {/* TABLE */}
 
-          <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+          <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
             {loading ? (
-              <div className="flex min-h-[260px] items-center justify-center">
+              <div className="flex min-h-[240px] items-center justify-center">
                 <p className="text-sm text-neutral-400">
-                  {language ===
-                  "ru"
+                  {language === "ru"
                     ? "Загрузка подростков..."
                     : "Teenager werden geladen..."}
                 </p>
               </div>
-            ) : filteredTeens.length ===
-              0 ? (
-              <div className="flex min-h-[280px] flex-col items-center justify-center px-5 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-400">
+            ) : filteredTeens.length === 0 ? (
+              <div className="flex min-h-[260px] flex-col items-center justify-center px-5 text-center">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-100 text-neutral-400">
                   <UserRound
-                    size={20}
-                    strokeWidth={
-                      1.7
-                    }
+                    size={19}
+                    strokeWidth={1.7}
                   />
                 </div>
 
                 <h3 className="mt-4 text-sm font-semibold text-neutral-900">
-                  {language ===
-                  "ru"
+                  {language === "ru"
                     ? "Никого не найдено"
                     : "Keine Teenager gefunden"}
                 </h3>
 
                 <p className="mt-1 max-w-sm text-xs leading-5 text-neutral-400">
-                  {language ===
-                  "ru"
+                  {language === "ru"
                     ? "Попробуйте изменить фильтры или поисковый запрос."
                     : "Versuche die Filter oder den Suchbegriff zu ändern."}
                 </p>
+
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-neutral-800"
+                  >
+                    <RotateCcw
+                      size={12}
+                      strokeWidth={1.8}
+                    />
+
+                    {language === "ru"
+                      ? "Сбросить фильтры"
+                      : "Filter zurücksetzen"}
+                  </button>
+                )}
               </div>
             ) : (
               <>
                 {/* DESKTOP */}
 
                 <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full min-w-[1050px] border-collapse">
+                  <table className="w-full min-w-[1000px] border-collapse">
                     <thead>
                       <tr className="border-b border-neutral-200 bg-neutral-50">
-                        <th className="px-5 py-3.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language ===
-                          "ru"
+                        <th className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
+                          {language === "ru"
                             ? "Имя"
                             : "Name"}
                         </th>
 
-                        <th className="px-5 py-3.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language ===
-                          "ru"
+                        <th className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
+                          {language === "ru"
                             ? "Пол"
                             : "Geschlecht"}
                         </th>
 
-                        <th className="px-5 py-3.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language ===
-                          "ru"
+                        <th className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
+                          {language === "ru"
                             ? "Рождение"
                             : "Geburt"}
                         </th>
 
-                        <th className="px-5 py-3.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language ===
-                          "ru"
+                        <th className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
+                          {language === "ru"
                             ? "Возраст"
                             : "Alter"}
                         </th>
 
-                        <th className="px-5 py-3.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language ===
-                          "ru"
+                        <th className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
+                          {language === "ru"
                             ? "Язык"
                             : "Sprache"}
                         </th>
 
-                        <th className="px-5 py-3.5 text-left text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language ===
-                          "ru"
+                        <th className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
+                          {language === "ru"
                             ? "Телефон"
                             : "Telefon"}
                         </th>
 
-                        <th className="px-5 py-3.5 text-right text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language ===
-                          "ru"
+                        <th className="px-5 py-3 text-right text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
+                          {language === "ru"
                             ? "Статус"
                             : "Status"}
                         </th>
 
-                        <th className="w-12 px-3 py-3.5" />
+                        <th className="w-12 px-3 py-3" />
                       </tr>
                     </thead>
 
@@ -1113,27 +993,21 @@ export default function TeensPage() {
                       {filteredTeens.map(
                         (teen) => (
                           <tr
-                            key={
-                              teen.id
-                            }
+                            key={teen.id}
                             className="group transition hover:bg-neutral-50"
                           >
-                            <td className="px-5 py-4">
-                              <div className="font-medium text-neutral-900">
-                                {
-                                  teen.first_name
-                                }{" "}
-                                {
-                                  teen.last_name
-                                }
+                            <td className="px-5 py-3.5">
+                              <div className="font-medium text-sm text-neutral-900">
+                                {teen.last_name}{" "}
+                                {teen.first_name}
                               </div>
                             </td>
 
-                            <td className="px-5 py-4">
+                            <td className="px-5 py-3.5">
                               {teen.gender ? (
                                 <span className="inline-flex items-center gap-2">
                                   <span
-                                    className={`h-2 w-2 rounded-full ${
+                                    className={`h-1.5 w-1.5 rounded-full ${
                                       teen.gender ===
                                       "male"
                                         ? "bg-blue-500"
@@ -1142,7 +1016,7 @@ export default function TeensPage() {
                                   />
 
                                   <span
-                                    className={`text-sm font-medium ${
+                                    className={`text-xs font-medium ${
                                       teen.gender ===
                                       "male"
                                         ? "text-blue-600"
@@ -1155,34 +1029,33 @@ export default function TeensPage() {
                                   </span>
                                 </span>
                               ) : (
-                                <span className="text-sm text-neutral-400">
+                                <span className="text-xs text-neutral-400">
                                   —
                                 </span>
                               )}
                             </td>
 
-                            <td className="px-5 py-4 text-sm text-neutral-500">
+                            <td className="px-5 py-3.5 text-xs text-neutral-500">
                               {formatDate(
                                 teen.birth_date
                               )}
                             </td>
 
-                            <td className="px-5 py-4">
-                              <span className="inline-flex min-w-[34px] items-center justify-center rounded-lg bg-neutral-100 px-2 py-1 text-sm font-semibold text-neutral-800">
+                            <td className="px-5 py-3.5">
+                              <span className="inline-flex min-w-[30px] items-center justify-center rounded-md bg-neutral-100 px-1.5 py-0.5 text-xs font-semibold text-neutral-800">
                                 {calculateAge(
                                   teen.birth_date
                                 )}
                               </span>
                             </td>
 
-                            <td className="px-5 py-4">
-                              <div className="flex flex-wrap gap-1.5">
+                            <td className="px-5 py-3.5">
+                              <div className="flex flex-wrap gap-1">
                                 {(
                                   teen.languages ??
                                   []
-                                ).length ===
-                                0 ? (
-                                  <span className="text-sm text-neutral-400">
+                                ).length === 0 ? (
+                                  <span className="text-xs text-neutral-400">
                                     —
                                   </span>
                                 ) : (
@@ -1190,14 +1063,10 @@ export default function TeensPage() {
                                     teen.languages ??
                                     []
                                   ).map(
-                                    (
-                                      lang
-                                    ) => (
+                                    (lang) => (
                                       <span
-                                        key={
-                                          lang
-                                        }
-                                        className="rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] font-semibold text-neutral-600"
+                                        key={lang}
+                                        className="rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] font-semibold text-neutral-600"
                                       >
                                         {getLanguageLabel(
                                           lang
@@ -1209,14 +1078,14 @@ export default function TeensPage() {
                               </div>
                             </td>
 
-                            <td className="px-5 py-4 text-sm text-neutral-500">
+                            <td className="px-5 py-3.5 text-xs text-neutral-500">
                               {teen.phone ||
                                 "—"}
                             </td>
 
-                            <td className="px-5 py-4 text-right">
+                            <td className="px-5 py-3.5 text-right">
                               <span
-                                className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                                className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold ${
                                   teen.is_active
                                     ? "bg-emerald-50 text-emerald-600"
                                     : "bg-neutral-100 text-neutral-400"
@@ -1234,7 +1103,7 @@ export default function TeensPage() {
                               </span>
                             </td>
 
-                            <td className="px-3 py-4">
+                            <td className="px-3 py-3.5">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -1242,12 +1111,10 @@ export default function TeensPage() {
                                     teen
                                   )
                                 }
-                                className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-400 opacity-0 transition hover:bg-white hover:text-neutral-900 group-hover:opacity-100"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-300 opacity-0 transition hover:bg-white hover:text-neutral-900 group-hover:opacity-100"
                               >
                                 <Pencil
-                                  size={
-                                    15
-                                  }
+                                  size={14}
                                   strokeWidth={
                                     1.8
                                   }
@@ -1267,37 +1134,27 @@ export default function TeensPage() {
                   {filteredTeens.map(
                     (teen) => (
                       <button
-                        key={
-                          teen.id
-                        }
+                        key={teen.id}
                         type="button"
                         onClick={() =>
                           openEditModal(
                             teen
                           )
                         }
-                        className="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-neutral-50"
+                        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-neutral-50"
                       >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
                           <UserRound
-                            size={
-                              17
-                            }
-                            strokeWidth={
-                              1.7
-                            }
+                            size={16}
+                            strokeWidth={1.7}
                           />
                         </div>
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <p className="truncate text-sm font-semibold text-neutral-900">
-                              {
-                                teen.first_name
-                              }{" "}
-                              {
-                                teen.last_name
-                              }
+                              {teen.last_name}{" "}
+                              {teen.first_name}
                             </p>
 
                             <span
@@ -1309,13 +1166,12 @@ export default function TeensPage() {
                             />
                           </div>
 
-                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-400">
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-neutral-400">
                             <span className="font-semibold text-neutral-700">
                               {calculateAge(
                                 teen.birth_date
                               )}{" "}
-                              {language ===
-                              "ru"
+                              {language === "ru"
                                 ? "лет"
                                 : "Jahre"}
                             </span>
@@ -1344,8 +1200,7 @@ export default function TeensPage() {
                             {(
                               teen.languages ??
                               []
-                            ).length >
-                              0 && (
+                            ).length > 0 && (
                               <>
                                 <span>
                                   ·
@@ -1362,21 +1217,15 @@ export default function TeensPage() {
                           </div>
 
                           {teen.phone && (
-                            <p className="mt-0.5 truncate text-xs text-neutral-400">
-                              {
-                                teen.phone
-                              }
+                            <p className="mt-0.5 truncate text-[11px] text-neutral-400">
+                              {teen.phone}
                             </p>
                           )}
                         </div>
 
                         <Pencil
-                          size={
-                            15
-                          }
-                          strokeWidth={
-                            1.8
-                          }
+                          size={14}
+                          strokeWidth={1.8}
                           className="shrink-0 text-neutral-300"
                         />
                       </button>
@@ -1388,26 +1237,20 @@ export default function TeensPage() {
           </section>
 
           {!loading &&
-            filteredTeens.length >
-              0 && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-neutral-400">
+            filteredTeens.length > 0 && (
+              <div className="mt-2.5 flex items-center justify-between text-[10px] text-neutral-400">
                 <span>
                   {filteredTeens.length}{" "}
-                  {language ===
-                  "ru"
-                    ? "показано"
-                    : "angezeigt"}
+                  {language === "ru"
+                    ? "подростков показано"
+                    : "Teenager angezeigt"}
                 </span>
 
-                {ageFilter !==
-                  "all" && (
-                  <span>
-                    {language ===
-                    "ru"
-                      ? `${filteredTeens.length} подростков в возрасте ${ageFilter} лет`
-                      : `${filteredTeens.length} Teenager im Alter von ${ageFilter} Jahren`}
-                  </span>
-                )}
+                <span className="hidden sm:block">
+                  {language === "ru"
+                    ? "Сортировка: фамилия А–Я"
+                    : "Sortierung: Nachname A–Z"}
+                </span>
               </div>
             )}
         </div>
@@ -1418,15 +1261,11 @@ export default function TeensPage() {
       {isModalOpen && (
         <div
           className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/30 px-3 py-3 backdrop-blur-sm sm:items-center sm:px-4 sm:py-6"
-          onClick={
-            closeModal
-          }
+          onClick={closeModal}
         >
           <div
             className="max-h-[calc(100dvh-24px)] w-full max-w-lg overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xl sm:max-h-[calc(100dvh-48px)] sm:p-6"
-            onClick={(
-              event
-            ) =>
+            onClick={(event) =>
               event.stopPropagation()
             }
           >
@@ -1438,68 +1277,50 @@ export default function TeensPage() {
 
                 <h2 className="text-xl font-semibold tracking-tight text-neutral-950 sm:text-2xl">
                   {editingTeen
-                    ? language ===
-                      "ru"
+                    ? language === "ru"
                       ? "Редактировать подростка"
                       : "Teenager bearbeiten"
-                    : language ===
-                        "ru"
+                    : language === "ru"
                       ? "Новый подросток"
                       : "Neuer Teenager"}
                 </h2>
               </div>
 
               <button
-                onClick={
-                  closeModal
-                }
-                disabled={
-                  saving ||
-                  deleting
-                }
+                onClick={closeModal}
+                disabled={saving || deleting}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-40"
               >
                 <X
-                  size={
-                    19
-                  }
-                  strokeWidth={
-                    1.8
-                  }
+                  size={19}
+                  strokeWidth={1.8}
                 />
               </button>
             </div>
 
             <div className="mt-7 space-y-5">
+
               {/* NAME */}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-xs font-semibold text-neutral-700">
-                    {language ===
-                    "ru"
+                    {language === "ru"
                       ? "Имя"
                       : "Vorname"}
                   </label>
 
                   <input
                     type="text"
-                    value={
-                      firstName
-                    }
-                    onChange={(
-                      event
-                    ) =>
+                    value={firstName}
+                    onChange={(event) =>
                       setFirstName(
-                        event
-                          .target
-                          .value
+                        event.target.value
                       )
                     }
                     className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 text-sm outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:bg-white"
                     placeholder={
-                      language ===
-                      "ru"
+                      language === "ru"
                         ? "Например: Max"
                         : "z. B. Max"
                     }
@@ -1508,30 +1329,22 @@ export default function TeensPage() {
 
                 <div>
                   <label className="mb-2 block text-xs font-semibold text-neutral-700">
-                    {language ===
-                    "ru"
+                    {language === "ru"
                       ? "Фамилия"
                       : "Nachname"}
                   </label>
 
                   <input
                     type="text"
-                    value={
-                      lastName
-                    }
-                    onChange={(
-                      event
-                    ) =>
+                    value={lastName}
+                    onChange={(event) =>
                       setLastName(
-                        event
-                          .target
-                          .value
+                        event.target.value
                       )
                     }
                     className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 text-sm outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:bg-white"
                     placeholder={
-                      language ===
-                      "ru"
+                      language === "ru"
                         ? "Например: Mustermann"
                         : "z. B. Mustermann"
                     }
@@ -1543,8 +1356,7 @@ export default function TeensPage() {
 
               <div>
                 <label className="mb-2 block text-xs font-semibold text-neutral-700">
-                  {language ===
-                  "ru"
+                  {language === "ru"
                     ? "Пол"
                     : "Geschlecht"}
                 </label>
@@ -1553,21 +1365,17 @@ export default function TeensPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      setGender(
-                        "male"
-                      )
+                      setGender("male")
                     }
                     className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition ${
-                      gender ===
-                      "male"
+                      gender === "male"
                         ? "border-blue-200 bg-blue-50 text-blue-700"
                         : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-white hover:text-neutral-900"
                     }`}
                   >
                     <span className="h-2 w-2 rounded-full bg-blue-500" />
 
-                    {language ===
-                    "ru"
+                    {language === "ru"
                       ? "Мальчик"
                       : "Junge"}
                   </button>
@@ -1575,21 +1383,17 @@ export default function TeensPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      setGender(
-                        "female"
-                      )
+                      setGender("female")
                     }
                     className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition ${
-                      gender ===
-                      "female"
+                      gender === "female"
                         ? "border-pink-200 bg-pink-50 text-pink-700"
                         : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-white hover:text-neutral-900"
                     }`}
                   >
                     <span className="h-2 w-2 rounded-full bg-pink-500" />
 
-                    {language ===
-                    "ru"
+                    {language === "ru"
                       ? "Девочка"
                       : "Mädchen"}
                   </button>
@@ -1600,24 +1404,17 @@ export default function TeensPage() {
 
               <div>
                 <label className="mb-2 block text-xs font-semibold text-neutral-700">
-                  {language ===
-                  "ru"
+                  {language === "ru"
                     ? "Дата рождения"
                     : "Geburtsdatum"}
                 </label>
 
                 <input
                   type="date"
-                  value={
-                    birthDate
-                  }
-                  onChange={(
-                    event
-                  ) =>
+                  value={birthDate}
+                  onChange={(event) =>
                     setBirthDate(
-                      event
-                        .target
-                        .value
+                      event.target.value
                     )
                   }
                   className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 text-sm text-neutral-700 outline-none transition focus:border-neutral-400 focus:bg-white"
@@ -1625,8 +1422,7 @@ export default function TeensPage() {
 
                 {birthDate && (
                   <p className="mt-2 text-xs text-neutral-400">
-                    {language ===
-                    "ru"
+                    {language === "ru"
                       ? `Возраст сейчас: ${calculateAge(
                           birthDate
                         )} лет`
@@ -1642,15 +1438,13 @@ export default function TeensPage() {
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <label className="block text-xs font-semibold text-neutral-700">
-                    {language ===
-                    "ru"
+                    {language === "ru"
                       ? "Язык"
                       : "Sprache"}
                   </label>
 
                   <span className="text-[10px] text-neutral-400">
-                    {language ===
-                    "ru"
+                    {language === "ru"
                       ? "Можно выбрать оба"
                       : "Mehrere möglich"}
                   </span>
@@ -1660,9 +1454,7 @@ export default function TeensPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      toggleLanguage(
-                        "de"
-                      )
+                      toggleLanguage("de")
                     }
                     className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition ${
                       selectedLanguages.includes(
@@ -1682,9 +1474,7 @@ export default function TeensPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      toggleLanguage(
-                        "ru"
-                      )
+                      toggleLanguage("ru")
                     }
                     className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition ${
                       selectedLanguages.includes(
@@ -1705,8 +1495,7 @@ export default function TeensPage() {
                 {selectedLanguages.length >
                   0 && (
                   <p className="mt-2 text-xs text-neutral-400">
-                    {language ===
-                    "ru"
+                    {language === "ru"
                       ? `Выбрано: ${getLanguagesLabel(
                           selectedLanguages
                         )}`
@@ -1721,8 +1510,7 @@ export default function TeensPage() {
 
               <div>
                 <label className="mb-2 block text-xs font-semibold text-neutral-700">
-                  {language ===
-                  "ru"
+                  {language === "ru"
                     ? "Номер телефона"
                     : "Telefonnummer"}
                 </label>
@@ -1730,13 +1518,9 @@ export default function TeensPage() {
                 <input
                   type="tel"
                   value={phone}
-                  onChange={(
-                    event
-                  ) =>
+                  onChange={(event) =>
                     setPhone(
-                      event
-                        .target
-                        .value
+                      event.target.value
                     )
                   }
                   placeholder="+49 ..."
@@ -1750,15 +1534,13 @@ export default function TeensPage() {
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-xs font-semibold text-neutral-700">
-                      {language ===
-                      "ru"
+                      {language === "ru"
                         ? "Статус"
                         : "Status"}
                     </p>
 
                     <p className="mt-1 text-[11px] text-neutral-400">
-                      {language ===
-                      "ru"
+                      {language === "ru"
                         ? "Неактивных можно скрыть из списка."
                         : "Inaktive können ausgeblendet werden."}
                     </p>
@@ -1808,16 +1590,11 @@ export default function TeensPage() {
                       className="flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium text-red-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40 sm:w-auto"
                     >
                       <Trash2
-                        size={
-                          15
-                        }
-                        strokeWidth={
-                          1.8
-                        }
+                        size={15}
+                        strokeWidth={1.8}
                       />
 
-                      {language ===
-                      "ru"
+                      {language === "ru"
                         ? "Удалить"
                         : "Löschen"}
                     </button>
@@ -1827,26 +1604,21 @@ export default function TeensPage() {
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <button
                     type="button"
-                    onClick={
-                      closeModal
-                    }
+                    onClick={closeModal}
                     disabled={
                       saving ||
                       deleting
                     }
                     className="h-11 w-full rounded-xl px-5 text-sm font-medium text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-40 sm:w-auto"
                   >
-                    {language ===
-                    "ru"
+                    {language === "ru"
                       ? "Отмена"
                       : "Abbrechen"}
                   </button>
 
                   <button
                     type="button"
-                    onClick={
-                      saveTeen
-                    }
+                    onClick={saveTeen}
                     disabled={
                       !firstName.trim() ||
                       !lastName.trim() ||
@@ -1857,17 +1629,14 @@ export default function TeensPage() {
                     className="h-11 w-full rounded-xl bg-neutral-900 px-5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-300 sm:w-auto"
                   >
                     {saving
-                      ? language ===
-                        "ru"
+                      ? language === "ru"
                         ? "Сохранение..."
                         : "Wird gespeichert..."
                       : editingTeen
-                        ? language ===
-                          "ru"
+                        ? language === "ru"
                           ? "Сохранить"
                           : "Speichern"
-                        : language ===
-                            "ru"
+                        : language === "ru"
                           ? "Добавить"
                           : "Hinzufügen"}
                   </button>
@@ -1894,33 +1663,25 @@ export default function TeensPage() {
           >
             <div
               className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 shadow-2xl"
-              onClick={(
-                event
-              ) =>
+              onClick={(event) =>
                 event.stopPropagation()
               }
             >
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-500">
                 <Trash2
-                  size={
-                    19
-                  }
-                  strokeWidth={
-                    1.8
-                  }
+                  size={19}
+                  strokeWidth={1.8}
                 />
               </div>
 
               <h3 className="mt-5 text-lg font-semibold tracking-tight text-neutral-950">
-                {language ===
-                "ru"
+                {language === "ru"
                   ? "Удалить подростка?"
                   : "Teenager löschen?"}
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-neutral-500">
-                {language ===
-                "ru"
+                {language === "ru"
                   ? `Ты действительно хочешь удалить ${editingTeen.first_name} ${editingTeen.last_name}? Это действие нельзя отменить.`
                   : `Möchtest du ${editingTeen.first_name} ${editingTeen.last_name} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`}
               </p>
@@ -1933,43 +1694,30 @@ export default function TeensPage() {
                       false
                     )
                   }
-                  disabled={
-                    deleting
-                  }
+                  disabled={deleting}
                   className="h-11 rounded-xl px-5 text-sm font-medium text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-40"
                 >
-                  {language ===
-                  "ru"
+                  {language === "ru"
                     ? "Отмена"
                     : "Abbrechen"}
                 </button>
 
                 <button
                   type="button"
-                  onClick={
-                    deleteTeen
-                  }
-                  disabled={
-                    deleting
-                  }
+                  onClick={deleteTeen}
+                  disabled={deleting}
                   className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-5 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Trash2
-                    size={
-                      15
-                    }
-                    strokeWidth={
-                      1.8
-                    }
+                    size={15}
+                    strokeWidth={1.8}
                   />
 
                   {deleting
-                    ? language ===
-                      "ru"
+                    ? language === "ru"
                       ? "Удаление..."
                       : "Wird gelöscht..."
-                    : language ===
-                        "ru"
+                    : language === "ru"
                       ? "Удалить"
                       : "Löschen"}
                 </button>
