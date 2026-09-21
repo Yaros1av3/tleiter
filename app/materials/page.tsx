@@ -18,21 +18,11 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import Link from "next/link";
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-} from "react";
-
-import Sidebar from "@/components/Sidebar";
-import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { type Language } from "@/lib/translations";
-
-type ContentLanguage = "de" | "ru" | null;
 
 type MaterialFolder = {
   id: number;
@@ -83,15 +73,7 @@ type FolderForm = {
 type MaterialForm = {
   title: string;
   description: string;
-  material_type:
-    | "pdf"
-    | "word"
-    | "powerpoint"
-    | "excel"
-    | "image"
-    | "text"
-    | "link"
-    | "other";
+  material_type: Material["material_type"];
   external_url: string;
   notes: string;
 };
@@ -101,21 +83,12 @@ type Breadcrumb = {
   name: string;
 };
 
+type ContentLanguage = "de" | "ru" | null;
+
 function normalize(value: string | null | undefined) {
   return (value ?? "").trim().toLocaleLowerCase();
 }
 
-/**
- * Extracts the first number from a folder name.
- *
- * Examples:
- * "1. Jahr" -> 1
- * "2. Год" -> 2
- * "10. Genesis" -> 10
- * "66. Offenbarung" -> 66
- *
- * Folders without a number are sorted after numbered folders.
- */
 function getFolderNumber(folder: MaterialFolder) {
   const names = [
     folder.name_de,
@@ -134,57 +107,6 @@ function getFolderNumber(folder: MaterialFolder) {
   return null;
 }
 
-/**
- * Sort folders naturally by the number written in their name.
- *
- * 1, 2, 3, 10, 11
- * instead of
- * 1, 10, 11, 2, 3
- */
-function compareFoldersByNumber(
-  a: MaterialFolder,
-  b: MaterialFolder,
-  language: Language,
-  folders: MaterialFolder[],
-) {
-  const numberA = getFolderNumber(a);
-  const numberB = getFolderNumber(b);
-
-  if (numberA !== null && numberB !== null) {
-    if (numberA !== numberB) {
-      return numberA - numberB;
-    }
-  } else if (numberA !== null) {
-    return -1;
-  } else if (numberB !== null) {
-    return 1;
-  }
-
-  return getFolderName(
-    a,
-    language,
-    folders,
-  ).localeCompare(
-    getFolderName(
-      b,
-      language,
-      folders,
-    ),
-    language === "ru" ? "ru" : "de",
-    {
-      numeric: true,
-      sensitivity: "base",
-    },
-  );
-}
-
-/**
- * Determines whether a folder belongs to the German or Russian branch.
- *
- * The language is inherited from the nearest ancestor named:
- * - Deutsch / Немецкий
- * - Russisch / Русский
- */
 function getOwnFolderLanguage(
   folder: MaterialFolder,
 ): ContentLanguage {
@@ -223,13 +145,11 @@ function getFolderContentLanguage(
     return null;
   }
 
-  let current = folders.find(
-    (folder) => folder.id === folderId,
-  );
+  let current =
+    folders.find((folder) => folder.id === folderId) ?? null;
 
   while (current) {
-    const ownLanguage =
-      getOwnFolderLanguage(current);
+    const ownLanguage = getOwnFolderLanguage(current);
 
     if (ownLanguage) {
       return ownLanguage;
@@ -239,10 +159,10 @@ function getFolderContentLanguage(
       break;
     }
 
-    current = folders.find(
-      (folder) =>
-        folder.id === current?.parent_id,
-    );
+    current =
+      folders.find(
+        (folder) => folder.id === current?.parent_id,
+      ) ?? null;
   }
 
   return null;
@@ -253,11 +173,10 @@ function getFolderName(
   uiLanguage: Language,
   folders: MaterialFolder[],
 ) {
-  const contentLanguage =
-    getFolderContentLanguage(
-      folder.id,
-      folders,
-    );
+  const contentLanguage = getFolderContentLanguage(
+    folder.id,
+    folders,
+  );
 
   if (contentLanguage === "de") {
     return (
@@ -290,6 +209,37 @@ function getFolderName(
   );
 }
 
+function compareFolders(
+  a: MaterialFolder,
+  b: MaterialFolder,
+  language: Language,
+  folders: MaterialFolder[],
+) {
+  const aNumber = getFolderNumber(a);
+  const bNumber = getFolderNumber(b);
+
+  if (aNumber !== null && bNumber !== null) {
+    return aNumber - bNumber;
+  }
+
+  if (aNumber !== null) {
+    return -1;
+  }
+
+  if (bNumber !== null) {
+    return 1;
+  }
+
+  return getFolderName(a, language, folders).localeCompare(
+    getFolderName(b, language, folders),
+    language === "ru" ? "ru" : "de",
+    {
+      numeric: true,
+      sensitivity: "base",
+    },
+  );
+}
+
 function formatFileSize(size: number | null) {
   if (!size || size <= 0) {
     return "—";
@@ -314,135 +264,108 @@ function formatFileSize(size: number | null) {
 }
 
 function formatDate(
-  date: string,
+  value: string,
   language: Language,
 ) {
   return new Intl.DateTimeFormat(
-    language === "ru"
-      ? "ru-RU"
-      : "de-DE",
+    language === "ru" ? "ru-RU" : "de-DE",
     {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     },
-  ).format(new Date(date));
+  ).format(new Date(value));
 }
 
 function getMaterialIcon(
   type: Material["material_type"],
-  size = 19,
+  size = 18,
 ) {
-  if (type === "pdf") {
-    return (
-      <FileText
-        size={size}
-        strokeWidth={1.8}
-      />
-    );
-  }
+  switch (type) {
+    case "pdf":
+    case "word":
+    case "powerpoint":
+    case "text":
+      return (
+        <FileText
+          size={size}
+          strokeWidth={1.8}
+        />
+      );
 
-  if (type === "word") {
-    return (
-      <FileText
-        size={size}
-        strokeWidth={1.8}
-      />
-    );
-  }
+    case "excel":
+      return (
+        <FileSpreadsheet
+          size={size}
+          strokeWidth={1.8}
+        />
+      );
 
-  if (type === "powerpoint") {
-    return (
-      <FileText
-        size={size}
-        strokeWidth={1.8}
-      />
-    );
-  }
+    case "image":
+      return (
+        <FileImage
+          size={size}
+          strokeWidth={1.8}
+        />
+      );
 
-  if (type === "excel") {
-    return (
-      <FileSpreadsheet
-        size={size}
-        strokeWidth={1.8}
-      />
-    );
-  }
+    case "link":
+      return (
+        <LinkIcon
+          size={size}
+          strokeWidth={1.8}
+        />
+      );
 
-  if (type === "image") {
-    return (
-      <FileImage
-        size={size}
-        strokeWidth={1.8}
-      />
-    );
+    default:
+      return (
+        <File
+          size={size}
+          strokeWidth={1.8}
+        />
+      );
   }
-
-  if (type === "link") {
-    return (
-      <LinkIcon
-        size={size}
-        strokeWidth={1.8}
-      />
-    );
-  }
-
-  if (type === "text") {
-    return (
-      <FileText
-        size={size}
-        strokeWidth={1.8}
-      />
-    );
-  }
-
-  return (
-    <File
-      size={size}
-      strokeWidth={1.8}
-    />
-  );
 }
 
-function getMaterialTypeLabel(
+function materialTypeLabel(
   type: Material["material_type"],
   language: Language,
 ) {
   const labels: Record<
     Material["material_type"],
-    { ru: string; de: string }
+    { de: string; ru: string }
   > = {
     pdf: {
-      ru: "PDF",
       de: "PDF",
+      ru: "PDF",
     },
     word: {
-      ru: "Word",
       de: "Word",
+      ru: "Word",
     },
     powerpoint: {
-      ru: "PowerPoint",
       de: "PowerPoint",
+      ru: "PowerPoint",
     },
     excel: {
-      ru: "Excel",
       de: "Excel",
+      ru: "Excel",
     },
     image: {
-      ru: "Изображение",
       de: "Bild",
+      ru: "Изображение",
     },
     text: {
-      ru: "Текст",
       de: "Text",
+      ru: "Текст",
     },
     link: {
-      ru: "Ссылка",
       de: "Link",
+      ru: "Ссылка",
     },
     other: {
-      ru: "Файл",
       de: "Datei",
+      ru: "Файл",
     },
   };
 
@@ -450,39 +373,38 @@ function getMaterialTypeLabel(
 }
 
 export default function MaterialsPage() {
-  const [language, setLanguage] =
-    useState<Language>("ru");
+  const language: Language = "de";
 
-  const [folders, setFolders] =
-    useState<MaterialFolder[]>([]);
-
-  const [materials, setMaterials] =
-    useState<Material[]>([]);
+  const [folders, setFolders] = useState<MaterialFolder[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
 
   const [currentFolderId, setCurrentFolderId] =
     useState<number | null>(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [search, setSearch] =
-    useState("");
+  /*
+   * WICHTIG:
+   * Admin wird nicht mehr über den profiles-SELECT
+   * erkannt, sondern über die SECURITY DEFINER Funktion
+   * public.is_admin().
+   */
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminChecking, setAdminChecking] = useState(true);
+
+  const [search, setSearch] = useState("");
 
   const [folderModalOpen, setFolderModalOpen] =
     useState(false);
 
-  const [
-    materialModalOpen,
-    setMaterialModalOpen,
-  ] = useState(false);
+  const [materialModalOpen, setMaterialModalOpen] =
+    useState(false);
 
   const [editingFolder, setEditingFolder] =
     useState<MaterialFolder | null>(null);
 
-  const [
-    editingMaterial,
-    setEditingMaterial,
-  ] = useState<Material | null>(null);
+  const [editingMaterial, setEditingMaterial] =
+    useState<Material | null>(null);
 
   const [folderForm, setFolderForm] =
     useState<FolderForm>({
@@ -503,236 +425,165 @@ export default function MaterialsPage() {
   const [selectedFile, setSelectedFile] =
     useState<File | null>(null);
 
-  const [saving, setSaving] =
-    useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  const [
-    deleteFolderTarget,
-    setDeleteFolderTarget,
-  ] = useState<MaterialFolder | null>(null);
+  const [deleteFolderTarget, setDeleteFolderTarget] =
+    useState<MaterialFolder | null>(null);
 
-  const [
-    deleteMaterialTarget,
-    setDeleteMaterialTarget,
-  ] = useState<Material | null>(null);
+  const [deleteMaterialTarget, setDeleteMaterialTarget] =
+    useState<Material | null>(null);
 
-  const [
-    deleteAllFoldersOpen,
-    setDeleteAllFoldersOpen,
-  ] = useState(false);
-
-  const [deleting, setDeleting] =
+  const [deleteAllFoldersOpen, setDeleteAllFoldersOpen] =
     useState(false);
 
   const fileInputRef =
     useRef<HTMLInputElement | null>(null);
 
   const ui = {
-    title:
-      language === "ru"
-        ? "Материалы"
-        : "Materialien",
-
+    title: "Materialien",
     subtitle:
-      language === "ru"
-        ? "Материалы для служения подростков"
-        : "Materialien für den Teeniedienst",
+      "Materialien für den Teeniedienst",
 
     search:
-      language === "ru"
-        ? "Поиск материалов и папок..."
-        : "Materialien und Ordner suchen...",
+      "Materialien und Ordner suchen...",
 
     root: "Teeniedienst",
 
-    back:
-      language === "ru"
-        ? "Назад"
-        : "Zurück",
+    back: "Zurück",
+    newFolder: "Neuer Ordner",
+    upload: "Material hinzufügen",
 
-    newFolder:
-      language === "ru"
-        ? "Новая папка"
-        : "Neuer Ordner",
-
-    upload:
-      language === "ru"
-        ? "Добавить материал"
-        : "Material hinzufügen",
-
-    deleteAllFolders:
-      language === "ru"
-        ? "Удалить все папки"
-        : "Alle Ordner löschen",
-
-    deleteAllFoldersTitle:
-      language === "ru"
-        ? "Удалить все папки?"
-        : "Alle Ordner löschen?",
-
-    deleteAllFoldersText:
-      language === "ru"
-        ? "Все папки внутри текущей папки, все вложенные папки и материалы будут удалены без возможности восстановления. Текущая папка останется."
-        : "Alle Ordner innerhalb des aktuellen Ordners, alle Unterordner und Materialien werden dauerhaft gelöscht. Der aktuelle Ordner bleibt erhalten.",
-
-    deleteAllFoldersConfirm:
-      language === "ru"
-        ? "Удалить всё"
-        : "Alles löschen",
-
-    folders:
-      language === "ru"
-        ? "Папки"
-        : "Ordner",
-
-    files:
-      language === "ru"
-        ? "Материалы"
-        : "Materialien",
+    folders: "Ordner",
+    files: "Materialien",
 
     empty:
-      language === "ru"
-        ? "В этой папке пока ничего нет"
-        : "Dieser Ordner ist noch leer",
+      "Dieser Ordner ist noch leer",
 
     noResults:
-      language === "ru"
-        ? "Ничего не найдено"
-        : "Keine Ergebnisse gefunden",
+      "Keine Ergebnisse gefunden",
 
-    folder:
-      language === "ru"
-        ? "Папка"
-        : "Ordner",
+    folder: "Ordner",
+    file: "Material",
 
-    file:
-      language === "ru"
-        ? "Материал"
-        : "Material",
+    edit: "Bearbeiten",
+    delete: "Löschen",
 
-    edit:
-      language === "ru"
-        ? "Редактировать"
-        : "Bearbeiten",
+    cancel: "Abbrechen",
+    save: "Speichern",
+    create: "Erstellen",
 
-    delete:
-      language === "ru"
-        ? "Удалить"
-        : "Löschen",
+    nameGerman: "Deutscher Name",
+    nameRussian: "Russischer Name",
+    description: "Beschreibung",
 
-    cancel:
-      language === "ru"
-        ? "Отмена"
-        : "Abbrechen",
+    titleField: "Titel",
+    materialType: "Materialtyp",
 
-    save:
-      language === "ru"
-        ? "Сохранить"
-        : "Speichern",
+    externalLink: "Externer Link",
+    notes: "Notizen",
 
-    create:
-      language === "ru"
-        ? "Создать"
-        : "Erstellen",
-
-    nameGerman:
-      language === "ru"
-        ? "Название на немецком"
-        : "Deutscher Name",
-
-    nameRussian:
-      language === "ru"
-        ? "Название на русском"
-        : "Russischer Name",
-
-    description:
-      language === "ru"
-        ? "Описание"
-        : "Beschreibung",
-
-    titleField:
-      language === "ru"
-        ? "Название"
-        : "Titel",
-
-    materialType:
-      language === "ru"
-        ? "Тип материала"
-        : "Materialtyp",
-
-    externalLink:
-      language === "ru"
-        ? "Внешняя ссылка"
-        : "Externer Link",
-
-    notes:
-      language === "ru"
-        ? "Заметки"
-        : "Notizen",
-
-    chooseFile:
-      language === "ru"
-        ? "Выбрать файл"
-        : "Datei auswählen",
-
-    noFile:
-      language === "ru"
-        ? "Файл не выбран"
-        : "Keine Datei ausgewählt",
-
-    uploadFile:
-      language === "ru"
-        ? "Загрузить файл"
-        : "Datei hochladen",
+    chooseFile: "Datei auswählen",
+    uploadFile: "Datei hochladen",
+    noFile: "Keine Datei ausgewählt",
 
     deleteFolderTitle:
-      language === "ru"
-        ? "Удалить папку?"
-        : "Ordner löschen?",
+      "Ordner löschen?",
 
     deleteMaterialTitle:
-      language === "ru"
-        ? "Удалить материал?"
-        : "Material löschen?",
+      "Material löschen?",
 
     deleteFolderText:
-      language === "ru"
-        ? "Папка и все её вложенные элементы будут удалены."
-        : "Der Ordner und alle darin enthaltenen Elemente werden gelöscht.",
+      "Der Ordner und alle darin enthaltenen Elemente werden gelöscht.",
 
     deleteMaterialText:
-      language === "ru"
-        ? "Материал будет удалён без возможности восстановления."
-        : "Das Material wird dauerhaft gelöscht.",
+      "Das Material wird dauerhaft gelöscht.",
 
-    deleting:
-      language === "ru"
-        ? "Удаление..."
-        : "Wird gelöscht...",
+    deleteAllFolders:
+      "Alle Ordner löschen",
 
-    deletingAll:
-      language === "ru"
-        ? "Удаление всех папок..."
-        : "Alle Ordner werden gelöscht...",
+    deleteAllFoldersTitle:
+      "Alle Ordner löschen?",
+
+    deleteAllFoldersText:
+      "Alle Ordner innerhalb des aktuellen Ordners, alle Unterordner und Materialien werden dauerhaft gelöscht. Der aktuelle Ordner bleibt erhalten.",
+
+    deleteAllFoldersConfirm:
+      "Alles löschen",
 
     saving:
-      language === "ru"
-        ? "Сохранение..."
-        : "Wird gespeichert...",
+      "Wird gespeichert...",
+
+    deleting:
+      "Wird gelöscht...",
+
+    deletingAll:
+      "Alle Ordner werden gelöscht...",
   };
+
+  /*
+   * ============================================
+   * ADMIN CHECK
+   * ============================================
+   *
+   * Используем:
+   *
+   * supabase.rpc("is_admin")
+   *
+   * а не:
+   *
+   * from("profiles").select(...)
+   *
+   * Поэтому RLS profiles больше не мешает
+   * определить администратора.
+   */
+  async function checkAdmin() {
+    setAdminChecking(true);
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+
+      const {
+        data,
+        error,
+      } = await supabase.rpc("is_admin");
+
+      if (error) {
+        console.error(
+          "is_admin RPC error:",
+          error,
+        );
+
+        setIsAdmin(false);
+        return;
+      }
+
+      setIsAdmin(data === true);
+    } catch (error) {
+      console.error(
+        "Admin check failed:",
+        error,
+      );
+
+      setIsAdmin(false);
+    } finally {
+      setAdminChecking(false);
+    }
+  }
 
   async function loadData() {
     setLoading(true);
 
     const [
-      {
-        data: folderData,
-        error: folderError,
-      },
-      {
-        data: materialData,
-        error: materialError,
-      },
+      folderResult,
+      materialResult,
     ] = await Promise.all([
       supabase
         .from("material_folders")
@@ -755,22 +606,41 @@ export default function MaterialsPage() {
         }),
     ]);
 
-    if (folderError) {
-      console.error(folderError);
+    if (folderResult.error) {
+      console.error(
+        "Folders:",
+        folderResult.error,
+      );
     }
 
-    if (materialError) {
-      console.error(materialError);
+    if (materialResult.error) {
+      console.error(
+        "Materials:",
+        materialResult.error,
+      );
     }
 
-    setFolders(folderData ?? []);
-    setMaterials(materialData ?? []);
+    setFolders(folderResult.data ?? []);
+    setMaterials(materialResult.data ?? []);
 
     setLoading(false);
   }
 
   useEffect(() => {
+    checkAdmin();
     loadData();
+
+    const {
+      data: authListener,
+    } = supabase.auth.onAuthStateChange(
+      () => {
+        checkAdmin();
+      },
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const currentFolder = useMemo(() => {
@@ -785,8 +655,8 @@ export default function MaterialsPage() {
       ) ?? null
     );
   }, [
-    currentFolderId,
     folders,
+    currentFolderId,
   ]);
 
   const currentContentLanguage =
@@ -813,7 +683,7 @@ export default function MaterialsPage() {
               (folder) =>
                 folder.id ===
                 currentFolderId,
-            );
+            ) ?? null;
 
       while (current) {
         result.unshift({
@@ -825,101 +695,92 @@ export default function MaterialsPage() {
           ),
         });
 
-        if (
-          current.parent_id == null
-        ) {
+        if (current.parent_id == null) {
           break;
         }
 
-        current = folders.find(
-          (folder) =>
-            folder.id ===
-            current?.parent_id,
-        );
+        current =
+          folders.find(
+            (folder) =>
+              folder.id ===
+              current?.parent_id,
+          ) ?? null;
       }
 
       return result;
     }, [
       currentFolderId,
       folders,
-      language,
     ]);
 
-  const visibleFolders =
-    useMemo(() => {
-      const result = folders.filter(
-        (folder) =>
-          folder.parent_id ===
-          currentFolderId,
-      );
+  const visibleFolders = useMemo(() => {
+    const query =
+      search.trim().toLocaleLowerCase();
 
-      const query = search
-        .trim()
-        .toLocaleLowerCase();
+    const result = folders.filter(
+      (folder) =>
+        folder.parent_id ===
+        currentFolderId,
+    );
 
-      const filtered = query
-        ? result.filter((folder) => {
-            const text = [
-              folder.name,
-              folder.name_de,
-              folder.name_ru,
-              folder.description,
-            ]
-              .filter(Boolean)
-              .join(" ")
-              .toLocaleLowerCase();
+    const filtered = query
+      ? result.filter((folder) =>
+          [
+            folder.name,
+            folder.name_de,
+            folder.name_ru,
+            folder.description,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLocaleLowerCase()
+            .includes(query),
+        )
+      : result;
 
-            return text.includes(query);
-          })
-        : result;
-
-      return [...filtered].sort(
-        (a, b) =>
-          compareFoldersByNumber(
-            a,
-            b,
-            language,
-            folders,
-          ),
-      );
-    }, [
-      folders,
-      currentFolderId,
-      search,
-      language,
-    ]);
+    return [...filtered].sort(
+      (a, b) =>
+        compareFolders(
+          a,
+          b,
+          language,
+          folders,
+        ),
+    );
+  }, [
+    folders,
+    currentFolderId,
+    search,
+  ]);
 
   const visibleMaterials =
     useMemo(() => {
-      const result = materials.filter(
-        (material) =>
-          material.folder_id ===
-          currentFolderId,
-      );
+      const query =
+        search.trim().toLocaleLowerCase();
 
-      const query = search
-        .trim()
-        .toLocaleLowerCase();
+      const result =
+        materials.filter(
+          (material) =>
+            material.folder_id ===
+            currentFolderId,
+        );
 
       if (!query) {
         return result;
       }
 
-      return result.filter(
-        (material) => {
-          const text = [
-            material.title,
-            material.description,
-            material.file_name,
-            material.notes,
-            material.source,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLocaleLowerCase();
-
-          return text.includes(query);
-        },
+      return result.filter((material) =>
+        [
+          material.title,
+          material.description,
+          material.file_name,
+          material.notes,
+          material.source,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLocaleLowerCase()
+          .includes(query),
       );
     }, [
       materials,
@@ -931,8 +792,13 @@ export default function MaterialsPage() {
     visibleFolders.length +
     visibleMaterials.length;
 
-  function goToFolder(folderId: number) {
-    setCurrentFolderId(folderId);
+  function goToFolder(id: number) {
+    setCurrentFolderId(id);
+    setSearch("");
+  }
+
+  function goHome() {
+    setCurrentFolderId(null);
     setSearch("");
   }
 
@@ -948,7 +814,17 @@ export default function MaterialsPage() {
     setSearch("");
   }
 
+  /*
+   * ============================================
+   * FOLDER
+   * ============================================
+   */
+
   function openCreateFolderModal() {
+    if (!isAdmin || currentFolderId == null) {
+      return;
+    }
+
     setEditingFolder(null);
 
     setFolderForm({
@@ -963,13 +839,15 @@ export default function MaterialsPage() {
   function openEditFolderModal(
     folder: MaterialFolder,
   ) {
+    if (!isAdmin) {
+      return;
+    }
+
     setEditingFolder(folder);
 
     setFolderForm({
-      name_de:
-        folder.name_de ?? "",
-      name_ru:
-        folder.name_ru ?? "",
+      name_de: folder.name_de ?? "",
+      name_ru: folder.name_ru ?? "",
       description:
         folder.description ?? "",
     });
@@ -987,6 +865,10 @@ export default function MaterialsPage() {
   }
 
   async function saveFolder() {
+    if (!isAdmin) {
+      return;
+    }
+
     const nameDe =
       folderForm.name_de.trim();
 
@@ -1006,17 +888,21 @@ export default function MaterialsPage() {
             .from("material_folders")
             .update({
               name:
-                nameRu ||
-                nameDe,
+                nameDe ||
+                nameRu,
+
               name_de:
                 nameDe ||
                 nameRu,
+
               name_ru:
                 nameRu ||
                 nameDe,
+
               description:
                 folderForm.description.trim() ||
                 null,
+
               updated_at:
                 new Date().toISOString(),
             })
@@ -1029,24 +915,35 @@ export default function MaterialsPage() {
           throw error;
         }
       } else {
+        if (currentFolderId == null) {
+          throw new Error(
+            "Folders can only be created inside another folder.",
+          );
+        }
+
         const { error } =
           await supabase
             .from("material_folders")
             .insert({
               name:
-                nameRu ||
-                nameDe,
+                nameDe ||
+                nameRu,
+
               name_de:
                 nameDe ||
                 nameRu,
+
               name_ru:
                 nameRu ||
                 nameDe,
+
               description:
                 folderForm.description.trim() ||
                 null,
+
               parent_id:
                 currentFolderId,
+
               icon: "folder",
               sort_order: 0,
             });
@@ -1062,9 +959,7 @@ export default function MaterialsPage() {
       console.error(error);
 
       alert(
-        language === "ru"
-          ? "Не удалось сохранить папку."
-          : "Der Ordner konnte nicht gespeichert werden.",
+        "Der Ordner konnte nicht gespeichert werden.",
       );
     } finally {
       setSaving(false);
@@ -1072,25 +967,35 @@ export default function MaterialsPage() {
   }
 
   async function deleteFolder() {
-    if (!deleteFolderTarget) {
+    if (
+      !isAdmin ||
+      !deleteFolderTarget
+    ) {
       return;
     }
 
     setDeleting(true);
 
     try {
-      const { error } =
-        await supabase
-          .from("material_folders")
-          .delete()
-          .eq(
-            "id",
-            deleteFolderTarget.id,
-          );
+      const {
+        error,
+      } = await supabase
+        .from("material_folders")
+        .delete()
+        .eq(
+          "id",
+          deleteFolderTarget.id,
+        );
 
       if (error) {
         throw error;
       }
+
+      const deletedId =
+        deleteFolderTarget.id;
+
+      const parentId =
+        deleteFolderTarget.parent_id;
 
       setDeleteFolderTarget(null);
 
@@ -1098,63 +1003,40 @@ export default function MaterialsPage() {
 
       if (
         currentFolderId ===
-        deleteFolderTarget.id
+        deletedId
       ) {
         setCurrentFolderId(
-          deleteFolderTarget.parent_id,
+          parentId,
         );
       }
     } catch (error) {
       console.error(error);
 
       alert(
-        language === "ru"
-          ? "Не удалось удалить папку."
-          : "Der Ordner konnte nicht gelöscht werden.",
+        "Der Ordner konnte nicht gelöscht werden.",
       );
     } finally {
       setDeleting(false);
     }
   }
 
-  /**
-   * Returns all descendant folder IDs,
-   * including the selected child folders.
-   *
-   * Example:
-   *
-   * Current folder
-   * ├── 1. Jahr
-   * │   ├── 1. Mose
-   * │   └── 2. Mose
-   * └── 2. Jahr
-   *     ├── 1. Mose
-   *     └── 2. Mose
-   *
-   * When deleting all folders from Current folder,
-   * every folder shown above is returned.
-   */
-  function getAllDescendantFolderIds(
+  function getDescendantFolderIds(
     parentId: number,
   ) {
     const result: number[] = [];
-    const queue: number[] = [parentId];
+    const queue = [parentId];
 
     while (queue.length > 0) {
-      const currentId =
-        queue.shift();
+      const id = queue.shift();
 
-      if (
-        currentId === undefined
-      ) {
+      if (id == null) {
         continue;
       }
 
       const children =
         folders.filter(
           (folder) =>
-            folder.parent_id ===
-            currentId,
+            folder.parent_id === id,
         );
 
       for (const child of children) {
@@ -1166,18 +1048,11 @@ export default function MaterialsPage() {
     return result;
   }
 
-  /**
-   * Deletes all child folders of the current folder.
-   *
-   * Important:
-   * - The current folder itself stays.
-   * - All nested folders are deleted.
-   * - All DB materials inside them are deleted.
-   * - Files belonging to those materials are also
-   *   removed from Supabase Storage.
-   */
   async function deleteAllChildFolders() {
-    if (currentFolderId == null) {
+    if (
+      !isAdmin ||
+      currentFolderId == null
+    ) {
       return;
     }
 
@@ -1192,35 +1067,31 @@ export default function MaterialsPage() {
               currentFolderId,
           )
           .map(
-            (folder) => folder.id,
+            (folder) =>
+              folder.id,
           );
 
       if (
-        childFolderIds.length === 0
+        childFolderIds.length ===
+        0
       ) {
-        setDeleteAllFoldersOpen(false);
-        setDeleting(false);
+        setDeleteAllFoldersOpen(
+          false,
+        );
         return;
       }
 
-      const descendantFolderIds =
-        getAllDescendantFolderIds(
+      const descendantIds =
+        getDescendantFolderIds(
           currentFolderId,
         );
-
-      if (
-        descendantFolderIds.length === 0
-      ) {
-        setDeleteAllFoldersOpen(false);
-        setDeleting(false);
-        return;
-      }
 
       const materialsToDelete =
         materials.filter(
           (material) =>
-            material.folder_id != null &&
-            descendantFolderIds.includes(
+            material.folder_id !=
+              null &&
+            descendantIds.includes(
               material.folder_id,
             ),
         );
@@ -1233,46 +1104,33 @@ export default function MaterialsPage() {
           )
           .filter(
             (
-              path,
-            ): path is string =>
-              Boolean(path),
+              value,
+            ): value is string =>
+              Boolean(value),
           );
 
-      /**
-       * Remove physical files from Storage.
-       *
-       * Supabase allows removing multiple
-       * objects in one request.
-       */
       if (
         storagePaths.length > 0
       ) {
         const {
-          error: storageError,
-        } = await supabase.storage
-          .from("materials")
-          .remove(
-            storagePaths,
-          );
+          error,
+        } =
+          await supabase.storage
+            .from("materials")
+            .remove(
+              storagePaths,
+            );
 
-        if (storageError) {
+        if (error) {
           console.warn(
-            "Storage cleanup warning:",
-            storageError,
+            "Storage cleanup:",
+            error,
           );
         }
       }
 
-      /**
-       * Delete the top-level child folders.
-       *
-       * Because material_folders.parent_id
-       * uses ON DELETE CASCADE, this removes
-       * the complete nested tree and the
-       * materials belonging to it.
-       */
       const {
-        error: folderDeleteError,
+        error,
       } = await supabase
         .from("material_folders")
         .delete()
@@ -1281,27 +1139,40 @@ export default function MaterialsPage() {
           childFolderIds,
         );
 
-      if (folderDeleteError) {
-        throw folderDeleteError;
+      if (error) {
+        throw error;
       }
 
-      setDeleteAllFoldersOpen(false);
+      setDeleteAllFoldersOpen(
+        false,
+      );
 
       await loadData();
     } catch (error) {
       console.error(error);
 
       alert(
-        language === "ru"
-          ? "Не удалось удалить все папки."
-          : "Die Ordner konnten nicht vollständig gelöscht werden.",
+        "Die Ordner konnten nicht vollständig gelöscht werden.",
       );
     } finally {
       setDeleting(false);
     }
   }
 
+  /*
+   * ============================================
+   * MATERIAL
+   * ============================================
+   */
+
   function openCreateMaterialModal() {
+    if (
+      !isAdmin ||
+      currentFolderId == null
+    ) {
+      return;
+    }
+
     setEditingMaterial(null);
 
     setMaterialForm({
@@ -1313,31 +1184,31 @@ export default function MaterialsPage() {
     });
 
     setSelectedFile(null);
-
     setMaterialModalOpen(true);
   }
 
   function openEditMaterialModal(
     material: Material,
   ) {
+    if (!isAdmin) {
+      return;
+    }
+
     setEditingMaterial(material);
 
     setMaterialForm({
       title: material.title,
       description:
-        material.description ??
-        "",
+        material.description ?? "",
       material_type:
         material.material_type,
       external_url:
-        material.external_url ??
-        "",
+        material.external_url ?? "",
       notes:
         material.notes ?? "",
     });
 
     setSelectedFile(null);
-
     setMaterialModalOpen(true);
   }
 
@@ -1360,8 +1231,11 @@ export default function MaterialsPage() {
 
     setSelectedFile(file);
 
+    if (!file) {
+      return;
+    }
+
     if (
-      file &&
       !materialForm.title.trim()
     ) {
       setMaterialForm(
@@ -1376,59 +1250,67 @@ export default function MaterialsPage() {
       );
     }
 
-    if (file) {
-      const lower =
-        file.name.toLocaleLowerCase();
+    const lower =
+      file.name.toLocaleLowerCase();
 
-      let type:
-        Material["material_type"] =
-        "other";
+    let type:
+      Material["material_type"] =
+      "other";
 
-      if (
-        lower.endsWith(".pdf")
-      ) {
-        type = "pdf";
-      } else if (
-        lower.endsWith(".doc") ||
-        lower.endsWith(".docx")
-      ) {
-        type = "word";
-      } else if (
-        lower.endsWith(".ppt") ||
-        lower.endsWith(".pptx")
-      ) {
-        type = "powerpoint";
-      } else if (
-        lower.endsWith(".xls") ||
-        lower.endsWith(".xlsx")
-      ) {
-        type = "excel";
-      } else if (
-        lower.endsWith(".jpg") ||
-        lower.endsWith(".jpeg") ||
-        lower.endsWith(".png") ||
-        lower.endsWith(".webp") ||
-        lower.endsWith(".gif")
-      ) {
-        type = "image";
-      } else if (
-        lower.endsWith(".txt") ||
-        lower.endsWith(".md")
-      ) {
-        type = "text";
-      }
-
-      setMaterialForm(
-        (previous) => ({
-          ...previous,
-          material_type:
-            type,
-        }),
-      );
+    if (
+      lower.endsWith(".pdf")
+    ) {
+      type = "pdf";
+    } else if (
+      lower.endsWith(".doc") ||
+      lower.endsWith(".docx")
+    ) {
+      type = "word";
+    } else if (
+      lower.endsWith(".ppt") ||
+      lower.endsWith(".pptx")
+    ) {
+      type = "powerpoint";
+    } else if (
+      lower.endsWith(".xls") ||
+      lower.endsWith(".xlsx")
+    ) {
+      type = "excel";
+    } else if (
+      [
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+        ".gif",
+      ].some((extension) =>
+        lower.endsWith(extension),
+      )
+    ) {
+      type = "image";
+    } else if (
+      lower.endsWith(".txt") ||
+      lower.endsWith(".md")
+    ) {
+      type = "text";
     }
+
+    setMaterialForm(
+      (previous) => ({
+        ...previous,
+        material_type: type,
+      }),
+    );
   }
 
   async function saveMaterial() {
+    if (
+      !isAdmin ||
+      currentFolderId == null
+    ) {
+      return;
+    }
+
     const title =
       materialForm.title.trim();
 
@@ -1445,6 +1327,9 @@ export default function MaterialsPage() {
     }
 
     setSaving(true);
+
+    let uploadedNewPath:
+      string | null = null;
 
     try {
       let storagePath =
@@ -1471,41 +1356,33 @@ export default function MaterialsPage() {
         materialForm.material_type;
 
       if (selectedFile) {
-        const originalFileName = selectedFile.name;
+        const extension =
+          selectedFile.name.match(
+            /(\.[^./\\]+)$/,
+          )?.[1]?.toLowerCase() ??
+          "";
 
-const extensionMatch =
-  originalFileName.match(
-    /(\.[^./\\]+)$/,
-  );
-
-const extension =
-  extensionMatch?.[1]
-    ?.toLowerCase() ?? "";
-
-const uniqueName =
-  `${Date.now()}_${crypto.randomUUID()}${extension}`;
-
-        const folderPath =
-          currentFolderId != null
-            ? String(
-                currentFolderId,
-              )
-            : "root";
+        const uniqueName =
+          `${Date.now()}_${crypto.randomUUID()}${extension}`;
 
         storagePath =
-          `${folderPath}/${uniqueName}`;
+          `${currentFolderId}/${uniqueName}`;
+
+        uploadedNewPath =
+          storagePath;
 
         const {
           error: uploadError,
-        } = await supabase.storage
-          .from("materials")
-          .upload(
-            storagePath,
-            selectedFile,
-            {
-              upsert: false,
-            },
-          );
+        } =
+          await supabase.storage
+            .from("materials")
+            .upload(
+              storagePath,
+              selectedFile,
+              {
+                upsert: false,
+              },
+            );
 
         if (uploadError) {
           throw uploadError;
@@ -1513,11 +1390,12 @@ const uniqueName =
 
         const {
           data: publicUrlData,
-        } = supabase.storage
-          .from("materials")
-          .getPublicUrl(
-            storagePath,
-          );
+        } =
+          supabase.storage
+            .from("materials")
+            .getPublicUrl(
+              storagePath,
+            );
 
         fileUrl =
           publicUrlData.publicUrl;
@@ -1556,11 +1434,15 @@ const uniqueName =
         ) {
           materialType = "excel";
         } else if (
-          lower.endsWith(".jpg") ||
-          lower.endsWith(".jpeg") ||
-          lower.endsWith(".png") ||
-          lower.endsWith(".webp") ||
-          lower.endsWith(".gif")
+          [
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".webp",
+            ".gif",
+          ].some((extension) =>
+            lower.endsWith(extension),
+          )
         ) {
           materialType = "image";
         } else if (
@@ -1574,36 +1456,50 @@ const uniqueName =
       const payload = {
         folder_id:
           currentFolderId,
+
         title,
+
         description:
           materialForm.description.trim() ||
           null,
+
         material_type:
           materialType,
+
         file_url:
           fileUrl,
+
         external_url:
           materialForm.external_url.trim() ||
           null,
+
         file_name:
           fileName,
+
         mime_type:
           mimeType,
+
         file_size:
           fileSize,
+
         storage_path:
           storagePath,
+
         source:
           "TLeiter",
+
         notes:
           materialForm.notes.trim() ||
           null,
+
         updated_at:
           new Date().toISOString(),
       };
 
       if (editingMaterial) {
-        const { error } =
+        const {
+          error,
+        } =
           await supabase
             .from("materials")
             .update(payload)
@@ -1615,8 +1511,27 @@ const uniqueName =
         if (error) {
           throw error;
         }
+
+        /*
+         * Если загрузили новый файл при редактировании,
+         * старый файл больше не нужен.
+         */
+        if (
+          selectedFile &&
+          editingMaterial.storage_path &&
+          editingMaterial.storage_path !==
+            storagePath
+        ) {
+          await supabase.storage
+            .from("materials")
+            .remove([
+              editingMaterial.storage_path,
+            ]);
+        }
       } else {
-        const { error } =
+        const {
+          error,
+        } =
           await supabase
             .from("materials")
             .insert({
@@ -1632,12 +1547,26 @@ const uniqueName =
       await loadData();
       closeMaterialModal();
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Save material:",
+        error,
+      );
+
+      /*
+       * Если Storage upload прошёл,
+       * но INSERT/UPDATE базы упал,
+       * удаляем уже загруженный файл.
+       */
+      if (uploadedNewPath) {
+        await supabase.storage
+          .from("materials")
+          .remove([
+            uploadedNewPath,
+          ]);
+      }
 
       alert(
-        language === "ru"
-          ? "Не удалось сохранить материал."
-          : "Das Material konnte nicht gespeichert werden.",
+        "Das Material konnte nicht gespeichert werden.",
       );
     } finally {
       setSaving(false);
@@ -1645,7 +1574,10 @@ const uniqueName =
   }
 
   async function deleteMaterial() {
-    if (!deleteMaterialTarget) {
+    if (
+      !isAdmin ||
+      !deleteMaterialTarget
+    ) {
       return;
     }
 
@@ -1656,45 +1588,44 @@ const uniqueName =
         deleteMaterialTarget.storage_path
       ) {
         const {
-          error: storageError,
-        } = await supabase.storage
-          .from("materials")
-          .remove([
-            deleteMaterialTarget.storage_path,
-          ]);
+          error,
+        } =
+          await supabase.storage
+            .from("materials")
+            .remove([
+              deleteMaterialTarget.storage_path,
+            ]);
 
-        if (storageError) {
+        if (error) {
           console.warn(
-            storageError,
+            "Storage:",
+            error,
           );
         }
       }
 
-      const { error } =
-        await supabase
-          .from("materials")
-          .delete()
-          .eq(
-            "id",
-            deleteMaterialTarget.id,
-          );
+      const {
+        error,
+      } = await supabase
+        .from("materials")
+        .delete()
+        .eq(
+          "id",
+          deleteMaterialTarget.id,
+        );
 
       if (error) {
         throw error;
       }
 
-      setDeleteMaterialTarget(
-        null,
-      );
+      setDeleteMaterialTarget(null);
 
       await loadData();
     } catch (error) {
       console.error(error);
 
       alert(
-        language === "ru"
-          ? "Не удалось удалить материал."
-          : "Das Material konnte nicht gelöscht werden.",
+        "Das Material konnte nicht gelöscht werden.",
       );
     } finally {
       setDeleting(false);
@@ -1719,1279 +1650,879 @@ const uniqueName =
     );
   }
 
+  const canManage =
+    isAdmin &&
+    !adminChecking;
+
   return (
-    <div className="min-h-screen bg-[#f5f5f4]">
-      <Sidebar
-        language={language}
-      />
+    <div className="min-h-screen bg-[#f3f4f6] text-neutral-900">
+      <main className="mx-auto w-full max-w-[1500px] px-3 pb-24 pt-3 sm:px-6 sm:pb-12 sm:pt-5 lg:px-8">
 
-      <div className="min-h-screen pl-[72px]">
-        <Header
-          language={language}
-          setLanguage={setLanguage}
-        />
+        {/* Home */}
+        <div className="mb-3">
+          <Link
+            href="/"
+            aria-label="Startseite"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-neutral-200 bg-white text-neutral-700 shadow-sm transition hover:bg-neutral-50 active:scale-95"
+          >
+            <ArrowLeft
+              size={19}
+              strokeWidth={2}
+            />
+          </Link>
+        </div>
 
-        <main className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8">
-          {/* Hero */}
-          <section className="mb-5">
-            <div className="flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <div className="mb-2 flex items-center gap-2">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-900 text-white">
-                    <BookOpen
-                      size={18}
-                      strokeWidth={1.8}
-                    />
-                  </div>
-
-                  <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
-                    {currentContentLanguage ===
-                    "de"
-                      ? "Deutsch"
-                      : currentContentLanguage ===
-                          "ru"
-                        ? "Русский"
-                        : language ===
-                            "de"
-                          ? "Materialien"
-                          : "Материалы"}
-                  </span>
+        {/* HERO */}
+        <section className="mb-5 overflow-hidden rounded-[26px] bg-neutral-950 p-5 text-white shadow-[0_18px_50px_rgba(15,23,42,0.12)] sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-neutral-900">
+                  <BookOpen
+                    size={18}
+                    strokeWidth={1.8}
+                  />
                 </div>
 
-                <h1 className="text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl">
-                  {currentFolder
-                    ? getFolderName(
-                        currentFolder,
-                        language,
-                        folders,
-                      )
-                    : ui.title}
-                </h1>
-
-                <p className="mt-1 text-sm text-neutral-500">
-                  {currentFolder
-                    ? currentFolder.description ||
-                      ui.subtitle
-                    : ui.subtitle}
-                </p>
+                <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">
+                  {currentContentLanguage ===
+                  "de"
+                    ? "Deutsch"
+                    : currentContentLanguage ===
+                        "ru"
+                      ? "Русский"
+                      : "Materialien"}
+                </span>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={
-                    openCreateFolderModal
-                  }
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white px-3.5 text-sm font-medium text-neutral-700 transition hover:border-neutral-300 hover:bg-neutral-50"
-                >
-                  <Folder
-                    size={16}
-                    strokeWidth={1.8}
-                  />
-
-                  {ui.newFolder}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setDeleteAllFoldersOpen(
-                      true,
+              <h1 className="text-2xl font-bold tracking-[-0.04em] sm:text-3xl">
+                {currentFolder
+                  ? getFolderName(
+                      currentFolder,
+                      language,
+                      folders,
                     )
-                  }
-                  disabled={
-                    currentFolderId ==
-                      null ||
-                    visibleFolders.length ===
-                      0
-                  }
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-100 bg-white px-3.5 text-sm font-medium text-red-600 transition hover:border-red-200 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Trash2
-                    size={16}
-                    strokeWidth={1.8}
-                  />
+                  : ui.title}
+              </h1>
 
-                  {ui.deleteAllFolders}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={
-                    openCreateMaterialModal
-                  }
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-neutral-900 px-3.5 text-sm font-medium text-white transition hover:bg-neutral-800"
-                >
-                  <Plus
-                    size={16}
-                    strokeWidth={2}
-                  />
-
-                  {ui.upload}
-                </button>
-              </div>
-            </div>
-          </section>
-
-          {/* Toolbar */}
-          <section className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative w-full sm:max-w-md">
-              <Search
-                size={16}
-                strokeWidth={1.8}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
-              />
-
-              <input
-                value={search}
-                onChange={(event) =>
-                  setSearch(
-                    event.target.value,
-                  )
-                }
-                placeholder={
-                  ui.search
-                }
-                className="h-10 w-full rounded-xl border border-neutral-200 bg-white pl-9 pr-3 text-sm outline-none transition placeholder:text-neutral-400 focus:border-neutral-400"
-              />
+              <p className="mt-2 max-w-xl text-sm leading-5 text-white/60">
+                {currentFolder?.description ||
+                  ui.subtitle}
+              </p>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-neutral-400">
-              <span>
-                {totalItems}{" "}
-                {language === "ru"
-                  ? "элементов"
-                  : "Elemente"}
-              </span>
-            </div>
-          </section>
-
-          {/* Breadcrumbs */}
-          <div className="mb-4 flex items-center gap-1 overflow-x-auto whitespace-nowrap text-sm">
-            <button
-              type="button"
-              onClick={() => {
-                setCurrentFolderId(
-                  null,
-                );
-                setSearch("");
-              }}
-              className={`shrink-0 rounded-lg px-2 py-1.5 transition ${
-                currentFolderId ===
-                null
-                  ? "font-medium text-neutral-900"
-                  : "text-neutral-500 hover:bg-white hover:text-neutral-900"
-              }`}
-            >
-              {ui.root}
-            </button>
-
-            {breadcrumbs.map(
-              (
-                breadcrumb,
-                index,
-              ) => (
-                <div
-                  key={
-                    breadcrumb.id
-                  }
-                  className="flex shrink-0 items-center gap-1"
-                >
-                  <ChevronRight
-                    size={14}
-                    className="text-neutral-300"
-                  />
+            {canManage &&
+              currentFolderId !=
+                null && (
+                <div className="grid grid-cols-2 gap-2 sm:flex">
+                  <button
+                    type="button"
+                    onClick={
+                      openCreateFolderModal
+                    }
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-3 text-sm font-semibold text-white hover:bg-white/15"
+                  >
+                    <Folder
+                      size={16}
+                    />
+                    {ui.newFolder}
+                  </button>
 
                   <button
                     type="button"
                     onClick={() =>
-                      goToFolder(
-                        breadcrumb.id,
+                      setDeleteAllFoldersOpen(
+                        true,
                       )
                     }
-                    className={`rounded-lg px-2 py-1.5 transition ${
-                      index ===
-                      breadcrumbs.length -
-                        1
-                        ? "font-medium text-neutral-900"
-                        : "text-neutral-500 hover:bg-white hover:text-neutral-900"
-                    }`}
-                  >
-                    {
-                      breadcrumb.name
+                    disabled={
+                      visibleFolders.length ===
+                      0
                     }
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 px-3 text-sm font-semibold text-red-200 hover:bg-red-500/15 disabled:opacity-30"
+                  >
+                    <Trash2
+                      size={16}
+                    />
+                    {ui.deleteAllFolders}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={
+                      openCreateMaterialModal
+                    }
+                    className="col-span-2 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-4 text-sm font-bold text-neutral-950 hover:bg-neutral-100 sm:col-span-1"
+                  >
+                    <Plus
+                      size={17}
+                    />
+                    {ui.upload}
                   </button>
                 </div>
-              ),
-            )}
+              )}
           </div>
+        </section>
 
-          {/* Back */}
-          {currentFolder && (
-            <button
-              type="button"
-              onClick={
-                goBack
+        {/* ADMIN STATUS */}
+        {!adminChecking && (
+          <div className="mb-3 flex items-center justify-between rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-xs">
+            <span className="text-neutral-400">
+              TLeiter Materialien
+            </span>
+
+            <span
+              className={
+                canManage
+                  ? "font-semibold text-emerald-600"
+                  : "font-medium text-neutral-400"
               }
-              className="mb-4 inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-neutral-500 transition hover:bg-white hover:text-neutral-900"
             >
-              <ArrowLeft
-                size={15}
-                strokeWidth={1.8}
-              />
+              {canManage
+                ? "Admin"
+                : "Nur ansehen"}
+            </span>
+          </div>
+        )}
 
-              {ui.back}
-            </button>
+        {/* SEARCH */}
+        <section className="mb-3">
+          <div className="relative">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
+            />
+
+            <input
+              value={search}
+              onChange={(event) =>
+                setSearch(
+                  event.target.value,
+                )
+              }
+              placeholder={ui.search}
+              className="h-12 w-full rounded-2xl border border-neutral-200 bg-white pl-10 pr-4 text-sm outline-none shadow-sm focus:border-neutral-400"
+            />
+          </div>
+        </section>
+
+        {/* BREADCRUMBS */}
+        <div className="mb-3 flex items-center gap-1 overflow-x-auto rounded-2xl border border-neutral-200 bg-white px-2 py-1.5 whitespace-nowrap shadow-sm">
+          <button
+            type="button"
+            onClick={goHome}
+            className={`rounded-lg px-2 py-1.5 text-sm ${
+              currentFolderId == null
+                ? "font-semibold text-neutral-900"
+                : "text-neutral-500"
+            }`}
+          >
+            {ui.root}
+          </button>
+
+          {breadcrumbs.map(
+            (breadcrumb, index) => (
+              <div
+                key={breadcrumb.id}
+                className="flex items-center gap-1"
+              >
+                <ChevronRight
+                  size={14}
+                  className="text-neutral-300"
+                />
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    goToFolder(
+                      breadcrumb.id,
+                    )
+                  }
+                  className={`rounded-lg px-2 py-1.5 text-sm ${
+                    index ===
+                    breadcrumbs.length -
+                      1
+                      ? "font-semibold text-neutral-900"
+                      : "text-neutral-500"
+                  }`}
+                >
+                  {
+                    breadcrumb.name
+                  }
+                </button>
+              </div>
+            ),
           )}
+        </div>
 
-          {/* Content */}
-          <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
-            {loading ? (
-              <div className="flex min-h-[300px] items-center justify-center">
-                <div className="flex items-center gap-3 text-sm text-neutral-400">
-                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-neutral-200 border-t-neutral-700" />
+        {currentFolder && (
+          <button
+            type="button"
+            onClick={goBack}
+            className="mb-3 inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 text-sm font-medium text-neutral-600 shadow-sm"
+          >
+            <ArrowLeft size={15} />
+            {ui.back}
+          </button>
+        )}
 
-                  {language ===
-                  "ru"
-                    ? "Загрузка..."
-                    : "Wird geladen..."}
-                </div>
+        {/* CONTENT */}
+        <section className="overflow-hidden rounded-[26px] border border-neutral-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.05)]">
+          {loading ? (
+            <div className="flex min-h-[280px] items-center justify-center text-sm text-neutral-400">
+              Wird geladen...
+            </div>
+          ) : totalItems === 0 ? (
+            <div className="flex min-h-[280px] flex-col items-center justify-center px-6 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-400">
+                {search ? (
+                  <Search size={20} />
+                ) : (
+                  <FolderOpen
+                    size={20}
+                  />
+                )}
               </div>
-            ) : totalItems ===
-              0 ? (
-              <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center">
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-400">
-                  {search ? (
-                    <Search
-                      size={20}
-                      strokeWidth={1.7}
-                    />
-                  ) : (
-                    <FolderOpen
-                      size={20}
-                      strokeWidth={1.7}
-                    />
-                  )}
-                </div>
 
-                <p className="text-sm font-medium text-neutral-700">
-                  {search
-                    ? ui.noResults
-                    : ui.empty}
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* Desktop */}
-                <div className="hidden md:block">
-                  <div className="grid grid-cols-[minmax(0,1fr)_130px_150px_54px] border-b border-neutral-200 bg-neutral-50/70 px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                    <span>
-                      {ui.file}
-                    </span>
+              <p className="text-sm font-medium text-neutral-700">
+                {search
+                  ? ui.noResults
+                  : ui.empty}
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-neutral-100">
+              {visibleFolders.map(
+                (folder) => (
+                  <div
+                    key={`folder-${folder.id}`}
+                    className="flex items-center gap-3 px-3 py-4 sm:px-5"
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        goToFolder(
+                          folder.id,
+                        )
+                      }
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    >
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-600">
+                        <Folder
+                          size={19}
+                        />
+                      </div>
 
-                    <span>
-                      {language ===
-                      "ru"
-                        ? "Изменено"
-                        : "Geändert"}
-                    </span>
-
-                    <span>
-                      {language ===
-                      "ru"
-                        ? "Источник"
-                        : "Quelle"}
-                    </span>
-
-                    <span />
-                  </div>
-
-                  <div className="divide-y divide-neutral-100">
-                    {visibleFolders.map(
-                      (folder) => (
-                        <div
-                          key={`folder-${folder.id}`}
-                          className="group grid grid-cols-[minmax(0,1fr)_130px_150px_54px] items-center px-5 py-3.5 transition hover:bg-neutral-50"
-                        >
-                          <button
-                            type="button"
-                            onClick={() =>
-                              goToFolder(
-                                folder.id,
-                              )
-                            }
-                            className="flex min-w-0 items-center gap-3 text-left"
-                          >
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-neutral-500">
-                              <Folder
-                                size={
-                                  18
-                                }
-                                strokeWidth={
-                                  1.7
-                                }
-                              />
-                            </div>
-
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-medium text-neutral-800">
-                                {getFolderName(
-                                  folder,
-                                  language,
-                                  folders,
-                                )}
-                              </div>
-
-                              {folder.description && (
-                                <div className="mt-0.5 truncate text-xs text-neutral-400">
-                                  {
-                                    folder.description
-                                  }
-                                </div>
-                              )}
-                            </div>
-                          </button>
-
-                          <span className="text-xs text-neutral-400">
-                            {formatDate(
-                              folder.updated_at,
-                              language,
-                            )}
-                          </span>
-
-                          <span className="text-xs text-neutral-400">
-                            TLeiter
-                          </span>
-
-                          <div className="flex justify-end gap-1 opacity-0 transition group-hover:opacity-100">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                openEditFolderModal(
-                                  folder,
-                                )
-                              }
-                              title={
-                                ui.edit
-                              }
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
-                            >
-                              <Pencil
-                                size={
-                                  14
-                                }
-                                strokeWidth={
-                                  1.8
-                                }
-                              />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setDeleteFolderTarget(
-                                  folder,
-                                )
-                              }
-                              title={
-                                ui.delete
-                              }
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-red-50 hover:text-red-600"
-                            >
-                              <Trash2
-                                size={
-                                  14
-                                }
-                                strokeWidth={
-                                  1.8
-                                }
-                              />
-                            </button>
-                          </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-[15px] font-semibold">
+                          {getFolderName(
+                            folder,
+                            language,
+                            folders,
+                          )}
                         </div>
-                      ),
-                    )}
 
-                    {visibleMaterials.map(
-                      (material) => (
-                        <div
-                          key={`material-${material.id}`}
-                          className="group grid grid-cols-[minmax(0,1fr)_130px_150px_54px] items-center px-5 py-3.5 transition hover:bg-neutral-50"
-                        >
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openMaterial(
-                                material,
-                              )
-                            }
-                            className="flex min-w-0 items-center gap-3 text-left"
-                          >
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-neutral-500">
-                              {getMaterialIcon(
-                                material.material_type,
-                                18,
-                              )}
-                            </div>
-
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-medium text-neutral-800">
-                                {
-                                  material.title
-                                }
-                              </div>
-
-                              <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-neutral-400">
-                                <span>
-                                  {getMaterialTypeLabel(
-                                    material.material_type,
-                                    language,
-                                  )}
-                                </span>
-
-                                {material.file_name && (
-                                  <>
-                                    <span>
-                                      ·
-                                    </span>
-
-                                    <span className="truncate">
-                                      {
-                                        material.file_name
-                                      }
-                                    </span>
-                                  </>
-                                )}
-
-                                {material.file_size && (
-                                  <>
-                                    <span>
-                                      ·
-                                    </span>
-
-                                    <span>
-                                      {formatFileSize(
-                                        material.file_size,
-                                      )}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </button>
-
-                          <span className="text-xs text-neutral-400">
-                            {formatDate(
-                              material.updated_at,
-                              language,
-                            )}
-                          </span>
-
-                          <span className="truncate text-xs text-neutral-400">
-                            {material.source ||
-                              "TLeiter"}
-                          </span>
-
-                          <div className="flex justify-end gap-1 opacity-0 transition group-hover:opacity-100">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                openEditMaterialModal(
-                                  material,
-                                )
-                              }
-                              title={
-                                ui.edit
-                              }
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
-                            >
-                              <Pencil
-                                size={
-                                  14
-                                }
-                                strokeWidth={
-                                  1.8
-                                }
-                              />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setDeleteMaterialTarget(
-                                  material,
-                                )
-                              }
-                              title={
-                                ui.delete
-                              }
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-red-50 hover:text-red-600"
-                            >
-                              <Trash2
-                                size={
-                                  14
-                                }
-                                strokeWidth={
-                                  1.8
-                                }
-                              />
-                            </button>
-                          </div>
+                        <div className="mt-1 text-xs text-neutral-400">
+                          {ui.folder}
                         </div>
-                      ),
-                    )}
-                  </div>
-                </div>
+                      </div>
 
-                {/* Mobile */}
-                <div className="divide-y divide-neutral-100 md:hidden">
-                  {visibleFolders.map(
-                    (folder) => (
-                      <div
-                        key={`mobile-folder-${folder.id}`}
-                        className="flex items-center gap-3 p-4"
-                      >
+                      <ChevronRight
+                        size={17}
+                        className="shrink-0 text-neutral-300"
+                      />
+                    </button>
+
+                    {canManage && (
+                      <div className="flex shrink-0 gap-1">
                         <button
                           type="button"
                           onClick={() =>
-                            goToFolder(
-                              folder.id,
+                            openEditFolderModal(
+                              folder,
                             )
                           }
-                          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                          className="flex h-10 w-10 items-center justify-center rounded-xl text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900"
                         >
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-neutral-500">
-                            <Folder
-                              size={
-                                19
-                              }
-                              strokeWidth={
-                                1.7
-                              }
-                            />
-                          </div>
-
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-medium text-neutral-800">
-                              {getFolderName(
-                                folder,
-                                language,
-                                folders,
-                              )}
-                            </div>
-
-                            <div className="mt-0.5 text-xs text-neutral-400">
-                              {
-                                ui.folder
-                              }
-                            </div>
-                          </div>
-
-                          <ChevronRight
-                            size={
-                              17
-                            }
-                            className="shrink-0 text-neutral-300"
+                          <Pencil
+                            size={14}
                           />
                         </button>
 
-                        <div className="flex shrink-0 gap-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openEditFolderModal(
-                                folder,
-                              )
-                            }
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900"
-                          >
-                            <Pencil
-                              size={
-                                14
-                              }
-                              strokeWidth={
-                                1.8
-                              }
-                            />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setDeleteFolderTarget(
-                                folder,
-                              )
-                            }
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-red-50 hover:text-red-600"
-                          >
-                            <Trash2
-                              size={
-                                14
-                              }
-                              strokeWidth={
-                                1.8
-                              }
-                            />
-                          </button>
-                        </div>
-                      </div>
-                    ),
-                  )}
-
-                  {visibleMaterials.map(
-                    (material) => (
-                      <div
-                        key={`mobile-material-${material.id}`}
-                        className="flex items-center gap-3 p-4"
-                      >
                         <button
                           type="button"
                           onClick={() =>
-                            openMaterial(
+                            setDeleteFolderTarget(
+                              folder,
+                            )
+                          }
+                          className="flex h-10 w-10 items-center justify-center rounded-xl text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2
+                            size={14}
+                          />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ),
+              )}
+
+              {visibleMaterials.map(
+                (material) => (
+                  <div
+                    key={`material-${material.id}`}
+                    className="flex items-center gap-3 px-3 py-4 sm:px-5"
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openMaterial(
+                          material,
+                        )
+                      }
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    >
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-600">
+                        {getMaterialIcon(
+                          material.material_type,
+                        )}
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="truncate text-[15px] font-semibold">
+                          {
+                            material.title
+                          }
+                        </div>
+
+                        <div className="mt-1 truncate text-xs text-neutral-400">
+                          {materialTypeLabel(
+                            material.material_type,
+                            language,
+                          )}
+
+                          {material.file_size
+                            ? ` · ${formatFileSize(
+                                material.file_size,
+                              )}`
+                            : ""}
+                        </div>
+                      </div>
+
+                      <ChevronRight
+                        size={17}
+                        className="shrink-0 text-neutral-300"
+                      />
+                    </button>
+
+                    {canManage && (
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openEditMaterialModal(
                               material,
                             )
                           }
-                          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                          className="flex h-10 w-10 items-center justify-center rounded-xl text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900"
                         >
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-neutral-500">
-                            {getMaterialIcon(
-                              material.material_type,
-                              18,
-                            )}
-                          </div>
-
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-medium text-neutral-800">
-                              {
-                                material.title
-                              }
-                            </div>
-
-                            <div className="mt-0.5 truncate text-xs text-neutral-400">
-                              {getMaterialTypeLabel(
-                                material.material_type,
-                                language,
-                              )}
-
-                              {material.file_size
-                                ? ` · ${formatFileSize(
-                                    material.file_size,
-                                  )}`
-                                : ""}
-                            </div>
-                          </div>
-
-                          <ChevronRight
-                            size={
-                              17
-                            }
-                            className="shrink-0 text-neutral-300"
+                          <Pencil
+                            size={14}
                           />
                         </button>
 
-                        <div className="flex shrink-0 gap-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openEditMaterialModal(
-                                material,
-                              )
-                            }
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900"
-                          >
-                            <Pencil
-                              size={
-                                14
-                              }
-                              strokeWidth={
-                                1.8
-                              }
-                            />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setDeleteMaterialTarget(
-                                material,
-                              )
-                            }
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-red-50 hover:text-red-600"
-                          >
-                            <Trash2
-                              size={
-                                14
-                              }
-                              strokeWidth={
-                                1.8
-                              }
-                            />
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDeleteMaterialTarget(
+                              material,
+                            )
+                          }
+                          className="flex h-10 w-10 items-center justify-center rounded-xl text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2
+                            size={14}
+                          />
+                        </button>
                       </div>
-                    ),
-                  )}
+                    )}
+                  </div>
+                ),
+              )}
+            </div>
+          )}
+        </section>
+      </main>
+
+      {/* FOLDER MODAL */}
+      {folderModalOpen &&
+        canManage && (
+          <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+            <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-[28px] bg-white shadow-2xl sm:rounded-2xl">
+              <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">
+                <div>
+                  <h2 className="font-semibold">
+                    {editingFolder
+                      ? ui.edit
+                      : ui.newFolder}
+                  </h2>
+
+                  <p className="mt-1 text-xs text-neutral-400">
+                    {ui.folder}
+                  </p>
                 </div>
-              </>
-            )}
-          </section>
-        </main>
-      </div>
 
-      {/* Folder modal */}
-      {folderModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-neutral-900">
-                  {editingFolder
-                    ? ui.edit
-                    : ui.newFolder}
-                </h2>
-
-                <p className="mt-0.5 text-xs text-neutral-400">
-                  {ui.folder}
-                </p>
+                <button
+                  type="button"
+                  onClick={
+                    closeFolderModal
+                  }
+                  className="flex h-9 w-9 items-center justify-center rounded-xl text-neutral-400 hover:bg-neutral-100"
+                >
+                  <X size={17} />
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={
-                  closeFolderModal
-                }
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900"
-              >
-                <X
-                  size={17}
-                  strokeWidth={1.8}
-                />
-              </button>
-            </div>
+              <div className="space-y-4 p-5">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-neutral-600">
+                    {ui.nameGerman}
+                  </label>
 
-            <div className="space-y-4 p-5">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-neutral-600">
-                  {
-                    ui.nameGerman
-                  }
-                </label>
+                  <input
+                    value={
+                      folderForm.name_de
+                    }
+                    onChange={(event) =>
+                      setFolderForm(
+                        (previous) => ({
+                          ...previous,
+                          name_de:
+                            event.target
+                              .value,
+                        }),
+                      )
+                    }
+                    placeholder="z. B. 3. Jahr"
+                    className="h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-400"
+                  />
+                </div>
 
-                <input
-                  value={
-                    folderForm.name_de
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setFolderForm(
-                      (
-                        previous,
-                      ) => ({
-                        ...previous,
-                        name_de:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  placeholder="z. B. 1. Jahr"
-                  className="h-10 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-neutral-400"
-                />
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-neutral-600">
+                    {ui.nameRussian}
+                  </label>
+
+                  <input
+                    value={
+                      folderForm.name_ru
+                    }
+                    onChange={(event) =>
+                      setFolderForm(
+                        (previous) => ({
+                          ...previous,
+                          name_ru:
+                            event.target
+                              .value,
+                        }),
+                      )
+                    }
+                    placeholder="например 3. Год"
+                    className="h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-neutral-600">
+                    {ui.description}
+                  </label>
+
+                  <textarea
+                    value={
+                      folderForm.description
+                    }
+                    onChange={(event) =>
+                      setFolderForm(
+                        (previous) => ({
+                          ...previous,
+                          description:
+                            event.target
+                              .value,
+                        }),
+                      )
+                    }
+                    rows={3}
+                    className="w-full resize-none rounded-xl border border-neutral-200 px-3 py-3 text-sm outline-none focus:border-neutral-400"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-neutral-600">
-                  {
-                    ui.nameRussian
+              <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-4">
+                <button
+                  type="button"
+                  onClick={
+                    closeFolderModal
                   }
-                </label>
+                  disabled={saving}
+                  className="h-11 rounded-xl px-4 text-sm text-neutral-500"
+                >
+                  {ui.cancel}
+                </button>
 
-                <input
-                  value={
-                    folderForm.name_ru
+                <button
+                  type="button"
+                  onClick={saveFolder}
+                  disabled={
+                    saving ||
+                    (!folderForm.name_de.trim() &&
+                      !folderForm.name_ru.trim())
                   }
-                  onChange={(
-                    event,
-                  ) =>
-                    setFolderForm(
-                      (
-                        previous,
-                      ) => ({
-                        ...previous,
-                        name_ru:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  placeholder="например 1. Год"
-                  className="h-10 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-neutral-400"
-                />
+                  className="h-11 rounded-xl bg-neutral-900 px-5 text-sm font-semibold text-white disabled:opacity-40"
+                >
+                  {saving
+                    ? ui.saving
+                    : editingFolder
+                      ? ui.save
+                      : ui.create}
+                </button>
               </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-neutral-600">
-                  {
-                    ui.description
-                  }
-                </label>
-
-                <textarea
-                  value={
-                    folderForm.description
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setFolderForm(
-                      (
-                        previous,
-                      ) => ({
-                        ...previous,
-                        description:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  rows={3}
-                  className="w-full resize-none rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-neutral-400"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50/70 px-5 py-4">
-              <button
-                type="button"
-                onClick={
-                  closeFolderModal
-                }
-                disabled={saving}
-                className="h-10 rounded-xl px-4 text-sm font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
-              >
-                {ui.cancel}
-              </button>
-
-              <button
-                type="button"
-                onClick={
-                  saveFolder
-                }
-                disabled={
-                  saving ||
-                  (!folderForm.name_de.trim() &&
-                    !folderForm.name_ru.trim())
-                }
-                className="h-10 rounded-xl bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {saving
-                  ? ui.saving
-                  : editingFolder
-                    ? ui.save
-                    : ui.create}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Material modal */}
-      {materialModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]">
-          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-neutral-200 bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-neutral-200 bg-white px-5 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-neutral-900">
-                  {editingMaterial
-                    ? ui.edit
-                    : ui.upload}
-                </h2>
+      {/* MATERIAL MODAL */}
+      {materialModalOpen &&
+        canManage && (
+          <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+            <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-[28px] bg-white shadow-2xl sm:rounded-2xl">
+              <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">
+                <div>
+                  <h2 className="font-semibold">
+                    {editingMaterial
+                      ? ui.edit
+                      : ui.upload}
+                  </h2>
 
-                <p className="mt-0.5 text-xs text-neutral-400">
-                  {currentFolder
-                    ? getFolderName(
-                        currentFolder,
-                        language,
-                        folders,
-                      )
-                    : ui.root}
-                </p>
-              </div>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    {currentFolder
+                      ? getFolderName(
+                          currentFolder,
+                          language,
+                          folders,
+                        )
+                      : ui.root}
+                  </p>
+                </div>
 
-              <button
-                type="button"
-                onClick={
-                  closeMaterialModal
-                }
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900"
-              >
-                <X
-                  size={17}
-                  strokeWidth={1.8}
-                />
-              </button>
-            </div>
-
-            <div className="space-y-4 p-5">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-neutral-600">
-                  {ui.titleField} *
-                </label>
-
-                <input
-                  value={
-                    materialForm.title
+                <button
+                  type="button"
+                  onClick={
+                    closeMaterialModal
                   }
-                  onChange={(
-                    event,
-                  ) =>
-                    setMaterialForm(
-                      (
-                        previous,
-                      ) => ({
-                        ...previous,
-                        title:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  className="h-10 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-neutral-400"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-neutral-600">
-                  {
-                    ui.materialType
-                  }
-                </label>
-
-                <select
-                  value={
-                    materialForm.material_type
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setMaterialForm(
-                      (
-                        previous,
-                      ) => ({
-                        ...previous,
-                        material_type:
-                          event.target
-                            .value as Material["material_type"],
-                      }),
-                    )
-                  }
-                  className="h-10 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-neutral-400"
+                  className="flex h-9 w-9 items-center justify-center rounded-xl text-neutral-400 hover:bg-neutral-100"
                 >
-                  <option value="other">
-                    {getMaterialTypeLabel(
-                      "other",
-                      language,
-                    )}
-                  </option>
-
-                  <option value="pdf">
-                    PDF
-                  </option>
-
-                  <option value="word">
-                    Word
-                  </option>
-
-                  <option value="powerpoint">
-                    PowerPoint
-                  </option>
-
-                  <option value="excel">
-                    Excel
-                  </option>
-
-                  <option value="image">
-                    {getMaterialTypeLabel(
-                      "image",
-                      language,
-                    )}
-                  </option>
-
-                  <option value="text">
-                    {getMaterialTypeLabel(
-                      "text",
-                      language,
-                    )}
-                  </option>
-
-                  <option value="link">
-                    {getMaterialTypeLabel(
-                      "link",
-                      language,
-                    )}
-                  </option>
-                </select>
+                  <X size={17} />
+                </button>
               </div>
 
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-neutral-600">
-                  {
-                    ui.uploadFile
-                  }
-                </label>
+              <div className="space-y-4 p-5">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-neutral-600">
+                    {ui.titleField} *
+                  </label>
 
-                <input
-                  ref={
-                    fileInputRef
-                  }
-                  type="file"
-                  className="hidden"
-                  onChange={
-                    handleFileChange
-                  }
-                />
+                  <input
+                    value={
+                      materialForm.title
+                    }
+                    onChange={(event) =>
+                      setMaterialForm(
+                        (previous) => ({
+                          ...previous,
+                          title:
+                            event.target
+                              .value,
+                        }),
+                      )
+                    }
+                    className="h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-400"
+                  />
+                </div>
 
-                <div className="flex items-center gap-2">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-neutral-600">
+                    {ui.materialType}
+                  </label>
+
+                  <select
+                    value={
+                      materialForm.material_type
+                    }
+                    onChange={(event) =>
+                      setMaterialForm(
+                        (previous) => ({
+                          ...previous,
+                          material_type:
+                            event.target
+                              .value as Material["material_type"],
+                        }),
+                      )
+                    }
+                    className="h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-neutral-400"
+                  >
+                    <option value="other">
+                      Datei
+                    </option>
+                    <option value="pdf">
+                      PDF
+                    </option>
+                    <option value="word">
+                      Word
+                    </option>
+                    <option value="powerpoint">
+                      PowerPoint
+                    </option>
+                    <option value="excel">
+                      Excel
+                    </option>
+                    <option value="image">
+                      Bild
+                    </option>
+                    <option value="text">
+                      Text
+                    </option>
+                    <option value="link">
+                      Link
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-neutral-600">
+                    {ui.uploadFile}
+                  </label>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={
+                      handleFileChange
+                    }
+                  />
+
                   <button
                     type="button"
                     onClick={() =>
                       fileInputRef.current?.click()
                     }
-                    className="inline-flex h-10 items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-neutral-200 px-4 text-sm font-medium hover:bg-neutral-50"
                   >
-                    <Upload
-                      size={15}
-                      strokeWidth={1.8}
-                    />
-
-                    {
-                      ui.chooseFile
-                    }
+                    <Upload size={15} />
+                    {ui.chooseFile}
                   </button>
 
-                  <span className="min-w-0 truncate text-xs text-neutral-400">
+                  <p className="mt-2 truncate text-xs text-neutral-400">
                     {selectedFile
                       ? selectedFile.name
                       : editingMaterial?.file_name ||
                         ui.noFile}
-                  </span>
+                  </p>
                 </div>
-              </div>
 
-              <div className="relative flex items-center gap-3 py-1">
-                <div className="h-px flex-1 bg-neutral-100" />
+                <div className="flex items-center gap-3 py-1">
+                  <div className="h-px flex-1 bg-neutral-100" />
 
-                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-300">
-                  {language ===
-                  "ru"
-                    ? "или"
-                    : "oder"}
-                </span>
+                  <span className="text-[10px] font-semibold uppercase text-neutral-300">
+                    oder
+                  </span>
 
-                <div className="h-px flex-1 bg-neutral-100" />
-              </div>
+                  <div className="h-px flex-1 bg-neutral-100" />
+                </div>
 
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-neutral-600">
-                  {
-                    ui.externalLink
-                  }
-                </label>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-neutral-600">
+                    {ui.externalLink}
+                  </label>
 
-                <input
-                  value={
-                    materialForm.external_url
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setMaterialForm(
-                      (
-                        previous,
-                      ) => ({
-                        ...previous,
-                        external_url:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  placeholder="https://..."
-                  className="h-10 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-neutral-400"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-neutral-600">
-                  {
-                    ui.description
-                  }
-                </label>
-
-                <textarea
-                  value={
-                    materialForm.description
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setMaterialForm(
-                      (
-                        previous,
-                      ) => ({
-                        ...previous,
-                        description:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  rows={3}
-                  className="w-full resize-none rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-neutral-400"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-neutral-600">
-                  {ui.notes}
-                </label>
-
-                <textarea
-                  value={
-                    materialForm.notes
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setMaterialForm(
-                      (
-                        previous,
-                      ) => ({
-                        ...previous,
-                        notes:
-                          event.target.value,
-                      }),
-                    )
-                  }
-                  rows={2}
-                  className="w-full resize-none rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-neutral-400"
-                />
-              </div>
-            </div>
-
-            <div className="sticky bottom-0 flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50/90 px-5 py-4 backdrop-blur">
-              <button
-                type="button"
-                onClick={
-                  closeMaterialModal
-                }
-                disabled={saving}
-                className="h-10 rounded-xl px-4 text-sm font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
-              >
-                {ui.cancel}
-              </button>
-
-              <button
-                type="button"
-                onClick={
-                  saveMaterial
-                }
-                disabled={
-                  saving ||
-                  !materialForm.title.trim() ||
-                  (!editingMaterial &&
-                    !selectedFile &&
-                    !materialForm.external_url.trim())
-                }
-                className="h-10 rounded-xl bg-neutral-900 px-4 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {saving
-                  ? ui.saving
-                  : editingMaterial
-                    ? ui.save
-                    : ui.create}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete folder */}
-      {deleteFolderTarget && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xl">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
-                <Trash2
-                  size={18}
-                  strokeWidth={1.8}
-                />
-              </div>
-
-              <div className="min-w-0">
-                <h2 className="text-base font-semibold text-neutral-900">
-                  {
-                    ui.deleteFolderTitle
-                  }
-                </h2>
-
-                <p className="mt-1 text-sm leading-5 text-neutral-500">
-                  {
-                    ui.deleteFolderText
-                  }
-                </p>
-
-                <p className="mt-3 rounded-lg bg-neutral-50 px-3 py-2 text-sm font-medium text-neutral-800">
-                  {getFolderName(
-                    deleteFolderTarget,
-                    language,
-                    folders,
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setDeleteFolderTarget(
-                    null,
-                  )
-                }
-                disabled={deleting}
-                className="h-10 rounded-xl px-4 text-sm font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
-              >
-                {ui.cancel}
-              </button>
-
-              <button
-                type="button"
-                onClick={
-                  deleteFolder
-                }
-                disabled={deleting}
-                className="h-10 rounded-xl bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleting
-                  ? ui.deleting
-                  : ui.delete}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete ALL folders */}
-      {deleteAllFoldersOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[3px]">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-red-100 bg-white shadow-2xl">
-            <div className="border-b border-red-100 bg-red-50/70 px-5 py-5">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-600">
-                  <Trash2
-                    size={20}
-                    strokeWidth={1.8}
+                  <input
+                    value={
+                      materialForm.external_url
+                    }
+                    onChange={(event) =>
+                      setMaterialForm(
+                        (previous) => ({
+                          ...previous,
+                          external_url:
+                            event.target
+                              .value,
+                        }),
+                      )
+                    }
+                    placeholder="https://..."
+                    className="h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-400"
                   />
                 </div>
 
-                <div className="min-w-0">
-                  <h2 className="text-base font-semibold text-neutral-900">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-neutral-600">
+                    {ui.description}
+                  </label>
+
+                  <textarea
+                    value={
+                      materialForm.description
+                    }
+                    onChange={(event) =>
+                      setMaterialForm(
+                        (previous) => ({
+                          ...previous,
+                          description:
+                            event.target
+                              .value,
+                        }),
+                      )
+                    }
+                    rows={3}
+                    className="w-full resize-none rounded-xl border border-neutral-200 px-3 py-3 text-sm outline-none focus:border-neutral-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-neutral-600">
+                    {ui.notes}
+                  </label>
+
+                  <textarea
+                    value={
+                      materialForm.notes
+                    }
+                    onChange={(event) =>
+                      setMaterialForm(
+                        (previous) => ({
+                          ...previous,
+                          notes:
+                            event.target
+                              .value,
+                        }),
+                      )
+                    }
+                    rows={2}
+                    className="w-full resize-none rounded-xl border border-neutral-200 px-3 py-3 text-sm outline-none focus:border-neutral-400"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 border-t border-neutral-200 bg-neutral-50 px-5 py-4">
+                <button
+                  type="button"
+                  onClick={
+                    closeMaterialModal
+                  }
+                  disabled={saving}
+                  className="h-11 rounded-xl px-4 text-sm text-neutral-500"
+                >
+                  {ui.cancel}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    saveMaterial
+                  }
+                  disabled={
+                    saving ||
+                    !materialForm.title.trim() ||
+                    (!editingMaterial &&
+                      !selectedFile &&
+                      !materialForm.external_url.trim())
+                  }
+                  className="h-11 rounded-xl bg-neutral-900 px-5 text-sm font-semibold text-white disabled:opacity-40"
+                >
+                  {saving
+                    ? ui.saving
+                    : editingMaterial
+                      ? ui.save
+                      : ui.create}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      {/* DELETE FOLDER */}
+      {deleteFolderTarget &&
+        canManage && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+              <div className="flex gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                  <Trash2 size={18} />
+                </div>
+
+                <div>
+                  <h2 className="font-semibold">
+                    {ui.deleteFolderTitle}
+                  </h2>
+
+                  <p className="mt-1 text-sm text-neutral-500">
+                    {ui.deleteFolderText}
+                  </p>
+
+                  <p className="mt-3 rounded-xl bg-neutral-50 px-3 py-2 text-sm font-medium">
+                    {getFolderName(
+                      deleteFolderTarget,
+                      language,
+                      folders,
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDeleteFolderTarget(
+                      null,
+                    )
+                  }
+                  disabled={deleting}
+                  className="h-11 rounded-xl px-4 text-sm text-neutral-500"
+                >
+                  {ui.cancel}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    deleteFolder
+                  }
+                  disabled={deleting}
+                  className="h-11 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-40"
+                >
+                  {deleting
+                    ? ui.deleting
+                    : ui.delete}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      {/* DELETE ALL */}
+      {deleteAllFoldersOpen &&
+        canManage && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+              <div className="flex gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                  <Trash2 size={19} />
+                </div>
+
+                <div>
+                  <h2 className="font-semibold">
                     {
                       ui.deleteAllFoldersTitle
                     }
@@ -3002,130 +2533,106 @@ const uniqueName =
                       ui.deleteAllFoldersText
                     }
                   </p>
+
+                  <p className="mt-3 text-sm font-medium text-red-600">
+                    {visibleFolders.length}{" "}
+                    Ordner
+                  </p>
                 </div>
               </div>
-            </div>
 
-            <div className="p-5">
-              <div className="rounded-xl border border-red-100 bg-red-50/50 p-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.08em] text-red-500">
-                  {currentFolder
-                    ? getFolderName(
-                        currentFolder,
-                        language,
-                        folders,
-                      )
-                    : ui.root}
-                </div>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDeleteAllFoldersOpen(
+                      false,
+                    )
+                  }
+                  disabled={deleting}
+                  className="h-11 rounded-xl px-4 text-sm text-neutral-500"
+                >
+                  {ui.cancel}
+                </button>
 
-                <div className="mt-2 text-sm text-neutral-700">
-                  {language ===
-                  "ru"
-                    ? `Будет удалено папок: ${visibleFolders.length}`
-                    : `Zu löschende Ordner: ${visibleFolders.length}`}
-                </div>
+                <button
+                  type="button"
+                  onClick={
+                    deleteAllChildFolders
+                  }
+                  disabled={deleting}
+                  className="h-11 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-40"
+                >
+                  {deleting
+                    ? ui.deletingAll
+                    : ui.deleteAllFoldersConfirm}
+                </button>
               </div>
-            </div>
-
-            <div className="flex flex-col-reverse gap-2 border-t border-neutral-200 bg-neutral-50/70 px-5 py-4 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() =>
-                  setDeleteAllFoldersOpen(
-                    false,
-                  )
-                }
-                disabled={deleting}
-                className="h-10 rounded-xl px-4 text-sm font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
-              >
-                {ui.cancel}
-              </button>
-
-              <button
-                type="button"
-                onClick={
-                  deleteAllChildFolders
-                }
-                disabled={deleting}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Trash2
-                  size={15}
-                  strokeWidth={1.8}
-                />
-
-                {deleting
-                  ? ui.deletingAll
-                  : ui.deleteAllFoldersConfirm}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Delete material */}
-      {deleteMaterialTarget && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xl">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
-                <Trash2
-                  size={18}
-                  strokeWidth={1.8}
-                />
+      {/* DELETE MATERIAL */}
+      {deleteMaterialTarget &&
+        canManage && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+              <div className="flex gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                  <Trash2 size={18} />
+                </div>
+
+                <div>
+                  <h2 className="font-semibold">
+                    {
+                      ui.deleteMaterialTitle
+                    }
+                  </h2>
+
+                  <p className="mt-1 text-sm text-neutral-500">
+                    {
+                      ui.deleteMaterialText
+                    }
+                  </p>
+
+                  <p className="mt-3 rounded-xl bg-neutral-50 px-3 py-2 text-sm font-medium">
+                    {
+                      deleteMaterialTarget.title
+                    }
+                  </p>
+                </div>
               </div>
 
-              <div className="min-w-0">
-                <h2 className="text-base font-semibold text-neutral-900">
-                  {
-                    ui.deleteMaterialTitle
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDeleteMaterialTarget(
+                      null,
+                    )
                   }
-                </h2>
+                  disabled={deleting}
+                  className="h-11 rounded-xl px-4 text-sm text-neutral-500"
+                >
+                  {ui.cancel}
+                </button>
 
-                <p className="mt-1 text-sm leading-5 text-neutral-500">
-                  {
-                    ui.deleteMaterialText
+                <button
+                  type="button"
+                  onClick={
+                    deleteMaterial
                   }
-                </p>
-
-                <p className="mt-3 rounded-lg bg-neutral-50 px-3 py-2 text-sm font-medium text-neutral-800">
-                  {
-                    deleteMaterialTarget.title
-                  }
-                </p>
+                  disabled={deleting}
+                  className="h-11 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-40"
+                >
+                  {deleting
+                    ? ui.deleting
+                    : ui.delete}
+                </button>
               </div>
-            </div>
-
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setDeleteMaterialTarget(
-                    null,
-                  )
-                }
-                disabled={deleting}
-                className="h-10 rounded-xl px-4 text-sm font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
-              >
-                {ui.cancel}
-              </button>
-
-              <button
-                type="button"
-                onClick={
-                  deleteMaterial
-                }
-                disabled={deleting}
-                className="h-10 rounded-xl bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleting
-                  ? ui.deleting
-                  : ui.delete}
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }

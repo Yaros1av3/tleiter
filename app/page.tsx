@@ -1,49 +1,40 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
-  CalendarClock,
+  BriefcaseBusiness,
   CalendarDays,
-  CheckCircle2,
-  CircleAlert,
+  CalendarRange,
   Clock3,
   Lightbulb,
-  ListTodo,
-  Target,
   Users,
-  BookOpen,
+  UserRound,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
-import { translations, type Language } from "@/lib/translations";
-import Sidebar from "@/components/Sidebar";
-import Header from "@/components/Header";
+import { translations } from "@/lib/translations";
+import { useLanguage } from "@/components/LanguageProvider";
 
-type Goal = {
-  id: number;
-  title: string;
-  status: "active" | "completed" | "archived";
-  priority: "low" | "medium" | "high";
-  deadline: string | null;
-};
-
-type Task = {
-  id: number;
-  title: string;
-  status: "todo" | "in_progress" | "completed";
-  priority: "low" | "medium" | "high";
-  deadline: string | null;
-  goal_id: number | null;
-};
-
-type Idea = {
+type WorkProject = {
   id: number;
   title: string;
   description: string | null;
-  status: "new" | "in_progress" | "converted";
-  created_at: string;
+  status: "planned" | "active" | "completed" | "archived";
+  start_date: string | null;
+  end_date: string | null;
+};
+
+type WorkItem = {
+  id: number;
+  project_id: number;
+  title: string;
+  status: "open" | "in_progress" | "completed";
+  priority: "low" | "normal" | "high" | "urgent";
+  deadline: string | null;
 };
 
 type ScheduleEntry = {
@@ -71,34 +62,89 @@ type ScheduleMember = {
   team_member_id: number;
 };
 
+function formatDate(
+  date: string,
+  language: "de" | "ru",
+  options: Intl.DateTimeFormatOptions,
+) {
+  return new Date(`${date}T00:00:00`).toLocaleDateString(
+    language === "de" ? "de-DE" : "ru-RU",
+    options,
+  );
+}
+
+function formatProjectPeriod(
+  startDate: string | null,
+  endDate: string | null,
+  language: "de" | "ru",
+) {
+  if (!startDate && !endDate) {
+    return language === "de"
+      ? "Kein Zeitraum festgelegt"
+      : "Период не указан";
+  }
+
+  if (startDate && endDate) {
+    return `${formatDate(startDate, language, {
+      day: "2-digit",
+      month: "short",
+    })} – ${formatDate(endDate, language, {
+      day: "2-digit",
+      month: "short",
+    })}`;
+  }
+
+  if (startDate) {
+    return language === "de"
+      ? `Ab ${formatDate(startDate, language, {
+          day: "2-digit",
+          month: "short",
+        })}`
+      : `С ${formatDate(startDate, language, {
+          day: "2-digit",
+          month: "short",
+        })}`;
+  }
+
+  return language === "de"
+    ? `Bis ${formatDate(endDate!, language, {
+        day: "2-digit",
+        month: "short",
+      })}`
+    : `До ${formatDate(endDate!, language, {
+        day: "2-digit",
+        month: "short",
+      })}`;
+}
+
 export default function Home() {
   const router = useRouter();
-
-  const [language, setLanguage] =
-    useState<Language>("ru");
-
-  const [goals, setGoals] =
-    useState<Goal[]>([]);
-
-  const [tasks, setTasks] =
-    useState<Task[]>([]);
-
-  const [ideas, setIdeas] =
-    useState<Idea[]>([]);
-
-  const [scheduleEntries, setScheduleEntries] =
-    useState<ScheduleEntry[]>([]);
-
-  const [teamMembers, setTeamMembers] =
-    useState<TeamMember[]>([]);
-
-  const [scheduleMembers, setScheduleMembers] =
-    useState<ScheduleMember[]>([]);
-
-  const [loading, setLoading] =
-    useState(true);
+  const { language } = useLanguage();
 
   const t = translations[language];
+
+  const [scheduleEntries, setScheduleEntries] = useState<
+    ScheduleEntry[]
+  >([]);
+
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(
+    [],
+  );
+
+  const [scheduleMembers, setScheduleMembers] = useState<
+    ScheduleMember[]
+  >([]);
+
+  const [workProjects, setWorkProjects] = useState<
+    WorkProject[]
+  >([]);
+
+  const [workItems, setWorkItems] = useState<WorkItem[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const isRu = language === "ru";
 
   useEffect(() => {
     loadDashboard();
@@ -108,94 +154,69 @@ export default function Home() {
     setLoading(true);
 
     const [
-      { data: goalsData, error: goalsError },
-      { data: tasksData, error: tasksError },
-      { data: ideasData, error: ideasError },
       { data: scheduleData, error: scheduleError },
       { data: teamData, error: teamError },
+      { data: projectsData, error: projectsError },
+      { data: workItemsData, error: workItemsError },
     ] = await Promise.all([
-      supabase
-        .from("goals")
-        .select(
-          "id, title, status, priority, deadline"
-        )
-        .order("created_at", {
-          ascending: false,
-        }),
-
-      supabase
-        .from("tasks")
-        .select(
-          "id, title, status, priority, deadline, goal_id"
-        )
-        .order("created_at", {
-          ascending: false,
-        }),
-
-      supabase
-        .from("ideas")
-        .select(
-          "id, title, description, status, created_at"
-        )
-        .order("created_at", {
-          ascending: false,
-        }),
-
       supabase
         .from("schedule_entries")
         .select(
-          "id, schedule_date, service_time, entry_type, title_de, title_ru, bible_text, series, notes"
+          "id, schedule_date, service_time, entry_type, title_de, title_ru, bible_text, series, notes",
         )
-        .order("schedule_date", {
-          ascending: true,
-        })
-        .order("service_time", {
-          ascending: true,
-        }),
+        .order("schedule_date", { ascending: true })
+        .order("service_time", { ascending: true }),
 
       supabase
         .from("team_members")
         .select(
-          "id, first_name, last_name, position, status"
+          "id, first_name, last_name, position, status",
         )
         .eq("status", "active")
-        .order("last_name", {
+        .order("last_name", { ascending: true }),
+
+      supabase
+        .from("work_projects")
+        .select(
+          "id, title, description, status, start_date, end_date",
+        )
+        .in("status", ["planned", "active"])
+        .order("start_date", { ascending: true })
+        .order("created_at", { ascending: false }),
+
+      supabase
+        .from("work_items")
+        .select(
+          "id, project_id, title, status, priority, deadline",
+        )
+        .order("deadline", {
           ascending: true,
+          nullsFirst: false,
         }),
     ]);
 
-    if (goalsError) {
-      console.error(
-        "Error loading dashboard goals:",
-        goalsError
-      );
-    }
-
-    if (tasksError) {
-      console.error(
-        "Error loading dashboard tasks:",
-        tasksError
-      );
-    }
-
-    if (ideasError) {
-      console.error(
-        "Error loading dashboard ideas:",
-        ideasError
-      );
-    }
-
     if (scheduleError) {
       console.error(
-        "Error loading dashboard schedule:",
-        scheduleError
+        "Dashboard schedule:",
+        scheduleError,
       );
     }
 
     if (teamError) {
+      console.error("Dashboard team:", teamError);
+    }
+
+    if (projectsError) {
       console.error(
-        "Error loading dashboard team:",
-        teamError
+        "Dashboard work projects:",
+        projectsError,
+      );
+    }
+
+    if (workItemsError) {
+      console.error(
+        "Dashboard work items:",
+        workItemsError,
       );
     }
 
@@ -204,155 +225,161 @@ export default function Home() {
     let scheduleMemberData: ScheduleMember[] = [];
 
     if (entries.length > 0) {
-      const { data, error } =
-        await supabase
-          .from("schedule_entry_members")
-          .select(
-            "schedule_entry_id, team_member_id"
-          )
-          .in(
-            "schedule_entry_id",
-            entries.map(
-              (entry) => entry.id
-            )
-          );
+      const { data, error } = await supabase
+        .from("schedule_entry_members")
+        .select(
+          "schedule_entry_id, team_member_id",
+        )
+        .in(
+          "schedule_entry_id",
+          entries.map((entry) => entry.id),
+        );
 
       if (error) {
         console.error(
-          "Error loading schedule members:",
-          error
+          "Dashboard schedule members:",
+          error,
         );
       }
 
       scheduleMemberData = data ?? [];
     }
 
-    setGoals(goalsData ?? []);
-    setTasks(tasksData ?? []);
-    setIdeas(ideasData ?? []);
     setScheduleEntries(entries);
     setTeamMembers(teamData ?? []);
-    setScheduleMembers(
-      scheduleMemberData
-    );
+    setScheduleMembers(scheduleMemberData);
+    setWorkProjects(projectsData ?? []);
+    setWorkItems(workItemsData ?? []);
 
     setLoading(false);
   }
 
-  const activeGoals = goals.filter(
-    (goal) =>
-      goal.status === "active"
-  ).length;
+  const todayString = new Date().toLocaleDateString(
+    "en-CA",
+  );
 
-  const completedGoals = goals.filter(
-    (goal) =>
-      goal.status === "completed"
-  ).length;
+  const upcomingSchedule = useMemo(() => {
+    return scheduleEntries.filter(
+      (entry) => entry.schedule_date >= todayString,
+    );
+  }, [scheduleEntries, todayString]);
 
-  const openTasks = tasks.filter(
-    (task) =>
-      task.status !== "completed"
-  ).length;
+  /*
+   * Ближайшая дата служения.
+   */
+  const nextScheduleDate =
+    upcomingSchedule[0]?.schedule_date ?? null;
 
-  const overdueTasks = tasks.filter(
-    (task) => {
-      if (
-        !task.deadline ||
-        task.status === "completed"
-      ) {
-        return false;
-      }
-
-      const today = new Date();
-
-      today.setHours(
-        0,
-        0,
-        0,
-        0
-      );
-
-      const deadline = new Date(
-        `${task.deadline}T00:00:00`
-      );
-
-      return deadline < today;
+  /*
+   * Все служения в ближайшую дату.
+   */
+  const nextServiceEntries = useMemo(() => {
+    if (!nextScheduleDate) {
+      return [];
     }
-  ).length;
 
-  const upcomingTasks = tasks
-    .filter(
-      (task) =>
-        task.deadline &&
-        task.status !== "completed"
-    )
-    .sort((a, b) => {
-      if (
-        !a.deadline ||
-        !b.deadline
-      ) {
-        return 0;
+    return upcomingSchedule
+      .filter(
+        (entry) =>
+          entry.schedule_date === nextScheduleDate,
+      )
+      .sort((a, b) =>
+        a.service_time.localeCompare(b.service_time),
+      );
+  }, [nextScheduleDate, upcomingSchedule]);
+
+  /*
+   * Следующие даты календаря.
+   */
+  const calendarPreview = useMemo(() => {
+    const dates: string[] = [];
+
+    for (const entry of upcomingSchedule) {
+      if (!dates.includes(entry.schedule_date)) {
+        dates.push(entry.schedule_date);
       }
 
-      return a.deadline.localeCompare(
-        b.deadline
-      );
-    })
-    .slice(0, 4);
+      if (dates.length >= 4) {
+        break;
+      }
+    }
 
-  const recentIdeas =
-    ideas.slice(0, 4);
+    return dates;
+  }, [upcomingSchedule]);
 
-  const todayString =
-    new Date()
-      .toLocaleDateString(
-        "en-CA"
-      );
+  /*
+   * Текущая работа.
+   *
+   * Сначала показываем active.
+   * Если active нет — показываем ближайшую planned.
+   */
+  const currentWork = useMemo(() => {
+    const active = workProjects.find(
+      (project) => project.status === "active",
+    );
 
-  const upcomingSchedule =
-    useMemo(() => {
-      return scheduleEntries
-        .filter(
-          (entry) =>
-            entry.schedule_date >=
-            todayString
-        )
-        .slice(0, 3);
-    }, [
-      scheduleEntries,
-      todayString,
-    ]);
+    if (active) {
+      return active;
+    }
 
-  const nextSchedule =
-    upcomingSchedule[0] ??
-    null;
+    return workProjects.find(
+      (project) => project.status === "planned",
+    ) ?? null;
+  }, [workProjects]);
 
-  function getScheduleMembers(
-    entryId: number
-  ) {
-    const memberIds =
-      scheduleMembers
-        .filter(
-          (item) =>
-            item.schedule_entry_id ===
-            entryId
-        )
-        .map(
-          (item) =>
-            item.team_member_id
-        );
+  const currentWorkItems = useMemo(() => {
+    if (!currentWork) {
+      return [];
+    }
 
-    return teamMembers.filter(
-      (member) =>
-        memberIds.includes(
-          member.id
-        )
+    return workItems.filter(
+      (item) => item.project_id === currentWork.id,
+    );
+  }, [currentWork, workItems]);
+
+  const currentWorkStats = useMemo(() => {
+    const total = currentWorkItems.length;
+
+    const completed = currentWorkItems.filter(
+      (item) => item.status === "completed",
+    ).length;
+
+    const inProgress = currentWorkItems.filter(
+      (item) => item.status === "in_progress",
+    ).length;
+
+    const open = currentWorkItems.filter(
+      (item) => item.status === "open",
+    ).length;
+
+    const progress =
+      total > 0
+        ? Math.round((completed / total) * 100)
+        : 0;
+
+    return {
+      total,
+      completed,
+      inProgress,
+      open,
+      progress,
+    };
+  }, [currentWorkItems]);
+
+  function getScheduleMembers(entryId: number) {
+    const memberIds = scheduleMembers
+      .filter(
+        (item) =>
+          item.schedule_entry_id === entryId,
+      )
+      .map((item) => item.team_member_id);
+
+    return teamMembers.filter((member) =>
+      memberIds.includes(member.id),
     );
   }
 
-  function getScheduleTitle(
-    entry: ScheduleEntry
-  ) {
+  function getScheduleTitle(entry: ScheduleEntry) {
     if (language === "de") {
       return (
         entry.title_de ||
@@ -368,1008 +395,808 @@ export default function Home() {
     );
   }
 
-  function formatDate(
-    date: string
-  ) {
-    return new Date(
-      `${date}T00:00:00`
-    ).toLocaleDateString(
-      language === "de"
-        ? "de-DE"
-        : "ru-RU",
-      {
-        day: "2-digit",
-        month: "short",
-      }
-    );
-  }
-
-  function formatScheduleDate(
-    date: string
-  ) {
-    return new Date(
-      `${date}T00:00:00`
-    ).toLocaleDateString(
-      language === "de"
-        ? "de-DE"
-        : "ru-RU",
-      {
-        weekday: "short",
-        day: "2-digit",
-        month: "short",
-      }
-    );
-  }
-
-  function getDaysDifference(
-    date: string
-  ) {
-    const today =
-      new Date();
-
-    today.setHours(
-      0,
-      0,
-      0,
-      0
-    );
-
-    const deadline =
-      new Date(
-        `${date}T00:00:00`
-      );
-
-    deadline.setHours(
-      0,
-      0,
-      0,
-      0
-    );
-
-    return Math.ceil(
-      (deadline.getTime() -
-        today.getTime()) /
-        (1000 *
-          60 *
-          60 *
-          24)
-    );
-  }
-
-  function getDeadlineText(
-    date: string
-  ) {
-    const days =
-      getDaysDifference(date);
-
-    if (days < 0) {
-      return t.dashboard.overdue;
-    }
-
-    if (days === 0) {
-      return t.dashboard.today;
-    }
-
-    if (days === 1) {
-      return t.dashboard.tomorrow;
-    }
-
-    return `${days} ${t.dashboard.daysLeft}`;
-  }
-
-  function getDeadlineColor(
-    date: string
-  ) {
-    const days =
-      getDaysDifference(date);
-
-    if (days < 0) {
-      return {
-        text: "text-red-600",
-        dot: "bg-red-500",
-      };
-    }
-
-    if (days <= 2) {
-      return {
-        text: "text-amber-600",
-        dot: "bg-amber-500",
-      };
-    }
-
-    return {
-      text: "text-neutral-500",
-      dot: "bg-neutral-300",
-    };
-  }
-
-  function statCard(
-    icon: React.ReactNode,
-    label: string,
-    value: number,
-    onClick: () => void,
-    accent:
-      | "green"
-      | "red"
-      | "amber"
-      | "neutral"
-  ) {
-    const accentStyles = {
-      green: {
-        icon: "bg-emerald-50 text-emerald-600",
-        value: "text-emerald-700",
-      },
-      red: {
-        icon: "bg-red-50 text-red-600",
-        value: "text-red-700",
-      },
-      amber: {
-        icon: "bg-amber-50 text-amber-600",
-        value: "text-amber-700",
-      },
-      neutral: {
-        icon: "bg-neutral-100 text-neutral-600",
-        value: "text-neutral-950",
-      },
-    };
-
-    const style =
-      accentStyles[accent];
-
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="group flex min-h-[92px] items-center gap-3 rounded-xl border border-neutral-200 bg-white px-3.5 py-3 text-left transition hover:border-neutral-300 hover:shadow-sm sm:min-h-[100px] sm:px-4"
-      >
-        <div
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${style.icon}`}
-        >
-          {icon}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div
-            className={`text-2xl font-semibold leading-none tracking-tight sm:text-3xl ${style.value}`}
-          >
-            {value}
-          </div>
-
-          <div className="mt-1.5 truncate text-[11px] leading-4 text-neutral-500 sm:text-xs">
-            {label}
-          </div>
-        </div>
-
-        <ArrowRight
-          size={14}
-          strokeWidth={1.8}
-          className="shrink-0 text-neutral-300 transition group-hover:translate-x-0.5 group-hover:text-neutral-700"
-        />
-      </button>
-    );
-  }
+  /*
+   * Menü "Mehr".
+   *
+   * Старые Ziele / Aufgaben / Deadlines убраны,
+   * потому что теперь основная рабочая структура
+   * находится внутри "Arbeit".
+   */
+  const moreItems = [
+    {
+      href: "/work",
+      label: isRu ? "Работа" : "Arbeit",
+      description: isRu
+        ? "Общие работы команды"
+        : "Gemeinsame Arbeiten",
+      icon: BriefcaseBusiness,
+    },
+    {
+      href: "/ideas",
+      label: isRu ? "Идеи" : "Ideen",
+      description: isRu
+        ? "Идеи команды"
+        : "Ideen des Teams",
+      icon: Lightbulb,
+    },
+    {
+      href: "/team",
+      label: isRu ? "Команда" : "Team",
+      description: isRu
+        ? "Участники команды"
+        : "Teammitglieder",
+      icon: Users,
+    },
+    {
+      href: "/teens",
+      label: isRu ? "Подростки" : "Teens",
+      description: isRu
+        ? "Список подростков"
+        : "Teenager",
+      icon: UserRound,
+    },
+    {
+      href: "/settings",
+      label: isRu ? "Настройки" : "Einstellungen",
+      description: isRu
+        ? "Аккаунт и система"
+        : "Konto und System",
+      icon: SettingsIcon,
+    },
+  ];
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-neutral-100 text-neutral-900">
-      <Sidebar
-        language={language}
-      />
+    <>
+      <main className="min-h-screen overflow-x-hidden bg-[#f7f7f6] text-neutral-900">
+        {/* =====================================================
+            MOBILE HEADER
+        ====================================================== */}
+        <header className="sticky top-0 z-30 border-b border-[#e6e7e8] bg-[#f7f7f6]/95 px-4 py-3 backdrop-blur-xl">
+          <div className="mx-auto flex w-full max-w-[760px] items-center justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <Image
+                src="/tlite-logo.png"
+                alt="TLite"
+                width={46}
+                height={46}
+                priority
+                className="h-[46px] w-[46px] shrink-0 rounded-[13px]"
+              />
 
-      <div className="ml-[72px] min-h-screen min-w-0">
-        <Header
-          language={language}
-          setLanguage={setLanguage}
-        />
+              <div className="min-w-0">
+                <div className="text-[20px] font-bold leading-none tracking-[-0.04em] text-[#111820]">
+                  TLite
+                </div>
 
-        <div className="mx-auto w-full max-w-[1180px] px-4 pb-12 sm:px-6 sm:pb-16 lg:px-8 lg:pb-20">
-          {/* Hero */}
-          <section className="pb-7 pt-8 sm:pb-9 sm:pt-12 lg:pt-14">
-            <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.16em] text-neutral-400 sm:text-[10px]">
-              {t.common.teamWorkspace}
-            </p>
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h1 className="text-4xl font-bold leading-[0.95] tracking-[-0.06em] text-neutral-950 sm:text-5xl lg:text-6xl">
-                  {t.dashboard.title}
-                </h1>
-
-                <p className="mt-3 max-w-xl text-sm leading-6 text-neutral-500 sm:mt-4 sm:text-base">
-                  {t.dashboard.subtitle}
-                </p>
+                <div className="mt-1 text-[8px] font-semibold uppercase leading-[1.1] tracking-[0.14em] text-[#8a939d]">
+                  {t.common.teamWorkspace}
+                </div>
               </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    "/calendar"
-                  )
-                }
-                className="inline-flex h-9 w-fit items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-600 transition hover:border-neutral-300 hover:text-neutral-900"
-              >
-                <CalendarDays
-                  size={15}
-                  strokeWidth={1.8}
-                />
-
-                {language === "ru"
-                  ? "Календарь"
-                  : "Kalender"}
-
-                <ArrowRight
-                  size={13}
-                  strokeWidth={1.8}
-                />
-              </button>
-            </div>
-          </section>
-
-          {/* Overview */}
-          <section>
-            <div className="mb-4">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold tracking-tight text-neutral-950">
-                  {t.dashboard.overview}
-                </h2>
-
-                <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-neutral-400">
-                  {language === "ru"
-                    ? "Обзор"
-                    : "Übersicht"}
-                </span>
-              </div>
-
-              <p className="mt-1 text-xs text-neutral-500 sm:text-sm">
-                {
-                  t.dashboard
-                    .overviewDescription
-                }
-              </p>
             </div>
 
-            {loading ? (
-              <div className="flex min-h-[150px] items-center justify-center rounded-xl border border-neutral-200 bg-white">
-                <p className="text-sm text-neutral-400">
-                  {t.common.loading}
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
-                {statCard(
-                  <Target
-                    size={16}
-                    strokeWidth={1.8}
-                  />,
-                  t.dashboard
-                    .activeGoals,
-                  activeGoals,
-                  () =>
-                    router.push(
-                      "/goals"
-                    ),
-                  "neutral"
-                )}
+            {/* MORE */}
+            <button
+              type="button"
+              onClick={() =>
+                setMoreOpen((value) => !value)
+              }
+              aria-label={
+                isRu ? "Ещё" : "Mehr"
+              }
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border shadow-[0_2px_8px_rgba(17,24,32,0.05)] transition active:scale-95 ${
+                moreOpen
+                  ? "border-[#111820] bg-[#111820] text-white"
+                  : "border-[#dfe2e5] bg-white text-[#374353]"
+              }`}
+            >
+              {moreOpen ? (
+                <X
+                  size={21}
+                  strokeWidth={2.1}
+                />
+              ) : (
+                <MoreIcon size={22} />
+              )}
+            </button>
+          </div>
+        </header>
 
-                {statCard(
-                  <CheckCircle2
-                    size={16}
-                    strokeWidth={1.8}
-                  />,
-                  t.dashboard
-                    .completedGoals,
-                  completedGoals,
-                  () =>
-                    router.push(
-                      "/goals"
-                    ),
-                  "green"
-                )}
-
-                {statCard(
-                  <ListTodo
-                    size={16}
-                    strokeWidth={1.8}
-                  />,
-                  t.dashboard
-                    .openTasks,
-                  openTasks,
-                  () =>
-                    router.push(
-                      "/tasks"
-                    ),
-                  "neutral"
-                )}
-
-                {statCard(
-                  <CircleAlert
-                    size={16}
-                    strokeWidth={1.8}
-                  />,
-                  t.dashboard
-                    .overdueTasks,
-                  overdueTasks,
-                  () =>
-                    router.push(
-                      "/deadlines"
-                    ),
-                  overdueTasks >
-                    0
-                    ? "red"
-                    : "green"
-                )}
-
-                {statCard(
-                  <Lightbulb
-                    size={16}
-                    strokeWidth={1.8}
-                  />,
-                  t.dashboard
-                    .ideas,
-                  ideas.length,
-                  () =>
-                    router.push(
-                      "/ideas"
-                    ),
-                  "amber"
-                )}
-              </div>
-            )}
-          </section>
-
-          {/* Next service */}
-          <section className="mt-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mx-auto w-full max-w-[760px] px-4 pb-28 sm:px-6">
+          {/* =====================================================
+              NEXT SERVICE
+          ====================================================== */}
+          <section className="pt-7">
+            <div className="mb-5 flex items-end justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold tracking-tight text-neutral-950">
-                  {language === "ru"
+                <h1 className="text-[29px] font-bold leading-[1.08] tracking-[-0.05em] text-neutral-950">
+                  {isRu
                     ? "Ближайшее служение"
                     : "Nächster Dienst"}
-                </h2>
+                </h1>
 
-                <p className="mt-1 text-xs text-neutral-500 sm:text-sm">
-                  {language === "ru"
-                    ? "Что происходит дальше"
-                    : "Was als Nächstes ansteht"}
+                <p className="mt-2 text-[14px] leading-5 text-neutral-500">
+                  {isRu
+                    ? "Самое важное на ближайшее время"
+                    : "Das Wichtigste für die nächste Zeit"}
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={() =>
-                  router.push(
-                    "/schedule"
-                  )
+                  router.push("/schedule")
                 }
-                className="text-xs font-semibold text-neutral-400 transition hover:text-neutral-900"
+                className="shrink-0 pb-1 text-[13px] font-semibold text-neutral-500"
               >
                 {t.dashboard.viewAll}
               </button>
             </div>
 
             {loading ? (
-              <div className="h-[150px] animate-pulse rounded-2xl border border-neutral-200 bg-white" />
-            ) : !nextSchedule ? (
-              <div className="rounded-2xl border border-neutral-200 bg-white p-6 text-center">
+              <div className="h-[390px] animate-pulse rounded-[27px] bg-white" />
+            ) : nextServiceEntries.length === 0 ? (
+              <div className="rounded-[27px] border border-neutral-200 bg-white px-6 py-12 text-center shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
                 <CalendarDays
-                  size={22}
-                  strokeWidth={1.7}
+                  size={30}
                   className="mx-auto text-neutral-300"
                 />
 
-                <p className="mt-2 text-sm text-neutral-400">
-                  {language === "ru"
+                <p className="mt-4 text-[14px] font-medium text-neutral-400">
+                  {isRu
                     ? "Ближайших служений пока нет"
                     : "Keine kommenden Dienste"}
                 </p>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    "/schedule"
-                  )
-                }
-                className="group w-full rounded-2xl border border-neutral-200 bg-white p-4 text-left transition hover:border-neutral-300 hover:shadow-sm sm:p-5"
-              >
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-neutral-900 text-white">
-                      <span className="text-[9px] font-semibold uppercase tracking-wide text-neutral-300">
-                        {new Date(
-                          `${nextSchedule.schedule_date}T00:00:00`
-                        ).toLocaleDateString(
-                          language ===
-                            "de"
-                            ? "de-DE"
-                            : "ru-RU",
-                          {
-                            month:
-                              "short",
-                          }
-                        )}
-                      </span>
+              <div className="space-y-3">
+                {nextServiceEntries.map(
+                  (entry) => {
+                    const members =
+                      getScheduleMembers(
+                        entry.id,
+                      );
 
-                      <span className="text-base font-semibold leading-none">
-                        {new Date(
-                          `${nextSchedule.schedule_date}T00:00:00`
-                        ).getDate()}
-                      </span>
-                    </div>
+                    return (
+                      <button
+                        type="button"
+                        key={entry.id}
+                        onClick={() =>
+                          router.push("/schedule")
+                        }
+                        className="group w-full overflow-hidden rounded-[27px] border border-neutral-200 bg-white text-left shadow-[0_4px_18px_rgba(17,24,32,0.055)] transition active:scale-[0.995]"
+                      >
+                        <div className="flex min-h-[180px]">
+                          <div className="flex w-[112px] shrink-0 flex-col items-center justify-center bg-[#111820] px-2 text-white">
+                            <Clock3
+                              size={23}
+                              strokeWidth={1.7}
+                              className="mb-3 text-neutral-400"
+                            />
 
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-1 text-[10px] font-semibold text-neutral-600">
-                          <Clock3
-                            size={11}
-                            strokeWidth={1.8}
-                          />
+                            <span className="text-[25px] font-bold leading-none tracking-[-0.05em]">
+                              {entry.service_time}
+                            </span>
 
-                          {
-                            nextSchedule.service_time
-                          }
-                        </span>
+                            <span className="mt-2 text-[9px] font-semibold uppercase tracking-[0.13em] text-neutral-400">
+                              {isRu
+                                ? "служение"
+                                : "dienst"}
+                            </span>
+                          </div>
 
-                        <span className="text-xs text-neutral-400">
-                          {formatScheduleDate(
-                            nextSchedule.schedule_date
-                          )}
-                        </span>
-                      </div>
-
-                      <h3 className="mt-2 truncate text-sm font-semibold text-neutral-900 sm:text-base">
-                        {getScheduleTitle(
-                          nextSchedule
-                        )}
-                      </h3>
-
-                      {nextSchedule.bible_text && (
-                        <p className="mt-1 truncate text-xs text-neutral-400">
-                          {
-                            nextSchedule.bible_text
-                          }
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-3 border-t border-neutral-100 pt-3 sm:min-w-[260px] sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
-                    <div className="min-w-0">
-                      <div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                        {language ===
-                        "ru"
-                          ? "Служители"
-                          : "Mitarbeiter"}
-                      </div>
-
-                      <div className="flex flex-wrap gap-1.5">
-                        {getScheduleMembers(
-                          nextSchedule.id
-                        )
-                          .slice(0, 3)
-                          .map(
-                            (
-                              member
-                            ) => (
-                              <span
-                                key={
-                                  member.id
-                                }
-                                className="rounded-full bg-neutral-100 px-2 py-1 text-[10px] font-medium text-neutral-600"
-                              >
-                                {
-                                  member.first_name
-                                }{" "}
-                                {
-                                  member.last_name
-                                }
-                              </span>
-                            )
-                          )}
-
-                        {getScheduleMembers(
-                          nextSchedule.id
-                        ).length ===
-                          0 && (
-                          <span className="text-xs text-neutral-400">
-                            {language ===
-                            "ru"
-                              ? "Не назначены"
-                              : "Nicht zugewiesen"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <ArrowRight
-                      size={16}
-                      strokeWidth={1.8}
-                      className="shrink-0 text-neutral-300 transition group-hover:translate-x-0.5 group-hover:text-neutral-800"
-                    />
-                  </div>
-                </div>
-              </button>
-            )}
-          </section>
-
-          {/* Upcoming + ideas */}
-          <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {/* Upcoming deadlines */}
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <CalendarClock
-                      size={17}
-                      strokeWidth={1.8}
-                      className="text-neutral-500"
-                    />
-
-                    <h2 className="text-sm font-semibold text-neutral-950 sm:text-base">
-                      {
-                        t.dashboard
-                          .upcomingDeadlines
-                      }
-                    </h2>
-                  </div>
-
-                  <p className="mt-1 text-xs text-neutral-400">
-                    {language === "ru"
-                      ? "Ближайшие задачи"
-                      : "Nächste Aufgaben"}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      "/deadlines"
-                    )
-                  }
-                  className="text-xs font-semibold text-neutral-400 transition hover:text-neutral-900"
-                >
-                  {
-                    t.dashboard
-                      .viewAll
-                  }
-                </button>
-              </div>
-
-              <div className="mt-4">
-                {upcomingTasks.length ===
-                0 ? (
-                  <div className="rounded-xl bg-neutral-50 px-4 py-7 text-center">
-                    <CheckCircle2
-                      size={20}
-                      strokeWidth={1.7}
-                      className="mx-auto text-emerald-500"
-                    />
-
-                    <p className="mt-2 text-xs text-neutral-400">
-                      {
-                        t.dashboard
-                          .noDeadlines
-                      }
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    {upcomingTasks.map(
-                      (task) => {
-                        const deadlineColor =
-                          getDeadlineColor(
-                            task.deadline!
-                          );
-
-                        return (
-                          <button
-                            type="button"
-                            key={
-                              task.id
-                            }
-                            onClick={() =>
-                              router.push(
-                                `/tasks?task=${task.id}`
-                              )
-                            }
-                            className="group flex w-full items-center justify-between gap-3 rounded-xl bg-neutral-50 px-3 py-2.5 text-left transition hover:bg-neutral-100 sm:px-3.5"
-                          >
-                            <div className="flex min-w-0 items-center gap-2.5">
-                              <span
-                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${deadlineColor.dot}`}
-                              />
-
+                          <div className="min-w-0 flex-1 p-5">
+                            <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <p className="truncate text-xs font-medium text-neutral-800 sm:text-sm">
-                                  {
-                                    task.title
-                                  }
-                                </p>
-
-                                <p className="mt-0.5 text-[10px] text-neutral-400 sm:text-xs">
+                                <p className="text-[12px] font-medium capitalize text-neutral-400">
                                   {formatDate(
-                                    task.deadline!
+                                    entry.schedule_date,
+                                    language,
+                                    {
+                                      weekday:
+                                        "long",
+                                      day: "2-digit",
+                                      month: "long",
+                                    },
                                   )}
                                 </p>
+
+                                <h2 className="mt-2 line-clamp-2 text-[20px] font-bold leading-[1.15] tracking-[-0.035em] text-neutral-950">
+                                  {getScheduleTitle(
+                                    entry,
+                                  )}
+                                </h2>
                               </div>
+
+                              <ArrowRight
+                                size={20}
+                                className="mt-1 shrink-0 text-neutral-300"
+                              />
                             </div>
 
-                            <div
-                              className={`shrink-0 text-[10px] font-semibold sm:text-xs ${deadlineColor.text}`}
-                            >
-                              {getDeadlineText(
-                                task.deadline!
-                              )}
-                            </div>
-                          </button>
-                        );
-                      }
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+                            {entry.bible_text && (
+                              <span className="mt-4 inline-flex max-w-full truncate rounded-full bg-neutral-100 px-3 py-1.5 text-[11px] font-medium text-neutral-600">
+                                {entry.bible_text}
+                              </span>
+                            )}
 
-            {/* Recent ideas */}
-            <div className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Lightbulb
-                      size={17}
-                      strokeWidth={1.8}
-                      className="text-amber-500"
-                    />
-
-                    <h2 className="text-sm font-semibold text-neutral-950 sm:text-base">
-                      {
-                        t.dashboard
-                          .recentIdeas
-                      }
-                    </h2>
-                  </div>
-
-                  <p className="mt-1 text-xs text-neutral-400">
-                    {language === "ru"
-                      ? "Последние идеи команды"
-                      : "Letzte Ideen des Teams"}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      "/ideas"
-                    )
-                  }
-                  className="text-xs font-semibold text-neutral-400 transition hover:text-neutral-900"
-                >
-                  {
-                    t.dashboard
-                      .viewAll
-                  }
-                </button>
-              </div>
-
-              <div className="mt-4">
-                {recentIdeas.length ===
-                0 ? (
-                  <div className="rounded-xl bg-neutral-50 px-4 py-7 text-center">
-                    <Lightbulb
-                      size={20}
-                      strokeWidth={1.7}
-                      className="mx-auto text-amber-400"
-                    />
-
-                    <p className="mt-2 text-xs text-neutral-400">
-                      {
-                        t.dashboard
-                          .noIdeas
-                      }
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    {recentIdeas.map(
-                      (idea) => (
-                        <button
-                          type="button"
-                          key={
-                            idea.id
-                          }
-                          onClick={() =>
-                            router.push(
-                              "/ideas"
-                            )
-                          }
-                          className="group flex w-full items-center justify-between gap-3 rounded-xl bg-neutral-50 px-3 py-2.5 text-left transition hover:bg-neutral-100 sm:px-3.5"
-                        >
-                          <div className="flex min-w-0 items-center gap-2.5">
-                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
-
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-medium text-neutral-800 sm:text-sm">
-                                {
-                                  idea.title
-                                }
+                            {entry.series && (
+                              <p className="mt-3 truncate text-[11px] font-medium text-neutral-400">
+                                {entry.series}
                               </p>
+                            )}
 
-                              {idea.description && (
-                                <p className="mt-0.5 truncate text-[10px] text-neutral-400 sm:text-xs">
-                                  {
-                                    idea.description
-                                  }
-                                </p>
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              {members.length > 0 ? (
+                                members
+                                  .slice(0, 4)
+                                  .map(
+                                    (member) => (
+                                      <span
+                                        key={
+                                          member.id
+                                        }
+                                        className="rounded-full bg-[#f4f5f5] px-2.5 py-1 text-[10px] font-medium text-neutral-600"
+                                      >
+                                        {
+                                          member.first_name
+                                        }{" "}
+                                        {
+                                          member.last_name
+                                        }
+                                      </span>
+                                    ),
+                                  )
+                              ) : (
+                                <span className="text-[11px] text-neutral-400">
+                                  {isRu
+                                    ? "Служители не назначены"
+                                    : "Keine Mitarbeiter zugewiesen"}
+                                </span>
                               )}
                             </div>
                           </div>
-
-                          <ArrowRight
-                            size={14}
-                            strokeWidth={
-                              1.8
-                            }
-                            className="shrink-0 text-neutral-300 transition group-hover:translate-x-0.5 group-hover:text-neutral-700"
-                          />
-                        </button>
-                      )
-                    )}
-                  </div>
+                        </div>
+                      </button>
+                    );
+                  },
                 )}
               </div>
-            </div>
+            )}
           </section>
 
-          {/* Team snapshot */}
-          <section className="mt-6">
-            <div className="mb-4 flex items-center justify-between gap-3">
+          {/* =====================================================
+              SERVICE DATE SUMMARY
+          ====================================================== */}
+          {nextScheduleDate && (
+            <section className="mt-4">
+              <button
+                type="button"
+                onClick={() =>
+                  router.push("/schedule")
+                }
+                className="flex w-full items-center justify-between rounded-[20px] border border-neutral-200 bg-white px-4 py-3.5 text-left shadow-[0_2px_10px_rgba(17,24,32,0.03)]"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-neutral-100 text-neutral-600">
+                    <CalendarRange
+                      size={19}
+                    />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-neutral-800">
+                      {formatDate(
+                        nextScheduleDate,
+                        language,
+                        {
+                          weekday: "long",
+                          day: "2-digit",
+                          month: "long",
+                        },
+                      )}
+                    </p>
+
+                    <p className="mt-0.5 text-[11px] text-neutral-400">
+                      {nextServiceEntries.length ===
+                      1
+                        ? isRu
+                          ? "1 служение"
+                          : "1 Dienst"
+                        : isRu
+                          ? `${nextServiceEntries.length} служения`
+                          : `${nextServiceEntries.length} Dienste`}
+                    </p>
+                  </div>
+                </div>
+
+                <ArrowRight
+                  size={18}
+                  className="shrink-0 text-neutral-300"
+                />
+              </button>
+            </section>
+          )}
+
+          {/* =====================================================
+              CURRENT WORK
+          ====================================================== */}
+          <section className="mt-8">
+            <div className="mb-4 flex items-end justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold tracking-tight text-neutral-950">
-                  {language === "ru"
-                    ? "Команда"
-                    : "Team"}
+                <h2 className="text-[23px] font-bold tracking-[-0.045em] text-neutral-950">
+                  {isRu
+                    ? "Текущая работа"
+                    : "Aktuelle Arbeit"}
                 </h2>
 
-                <p className="mt-1 text-xs text-neutral-500 sm:text-sm">
-                  {language === "ru"
-                    ? "Текущий состав служителей"
-                    : "Aktuelle Teamübersicht"}
+                <p className="mt-1 text-[13px] text-neutral-500">
+                  {isRu
+                    ? "Над чем команда работает сейчас"
+                    : "Woran das Team gerade arbeitet"}
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={() =>
+                  router.push("/work")
+                }
+                className="shrink-0 text-[13px] font-semibold text-neutral-500"
+              >
+                {isRu
+                  ? "Alle"
+                  : "Alle"}
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="h-[190px] animate-pulse rounded-[25px] bg-white" />
+            ) : !currentWork ? (
+              <button
+                type="button"
+                onClick={() =>
+                  router.push("/work")
+                }
+                className="w-full rounded-[25px] border border-neutral-200 bg-white px-5 py-7 text-left shadow-[0_4px_18px_rgba(17,24,32,0.04)] transition active:scale-[0.995]"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] bg-[#111820] text-white">
+                    <BriefcaseBusiness
+                      size={21}
+                      strokeWidth={1.8}
+                    />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-semibold text-neutral-900">
+                      {isRu
+                        ? "Пока нет текущей работы"
+                        : "Noch keine aktuelle Arbeit"}
+                    </p>
+
+                    <p className="mt-1 text-[12px] text-neutral-400">
+                      {isRu
+                        ? "Открыть раздел Arbeit"
+                        : "Arbeit öffnen"}
+                    </p>
+                  </div>
+
+                  <ArrowRight
+                    size={18}
+                    className="shrink-0 text-neutral-300"
+                  />
+                </div>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
                   router.push(
-                    "/team"
+                    `/work/${currentWork.id}`,
                   )
                 }
-                className="text-xs font-semibold text-neutral-400 transition hover:text-neutral-900"
+                className="group w-full overflow-hidden rounded-[25px] bg-[#111820] text-left text-white shadow-[0_7px_24px_rgba(17,24,32,0.13)] transition active:scale-[0.995]"
+              >
+                <div className="p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] bg-white/10">
+                      <BriefcaseBusiness
+                        size={21}
+                        strokeWidth={1.8}
+                        className="text-white"
+                      />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                            {currentWork.status ===
+                            "active"
+                              ? isRu
+                                ? "Активная работа"
+                                : "Aktiv"
+                              : isRu
+                                ? "Запланировано"
+                                : "Geplant"}
+                          </p>
+
+                          <h3 className="mt-1.5 line-clamp-2 text-[19px] font-bold leading-[1.15] tracking-[-0.035em]">
+                            {currentWork.title}
+                          </h3>
+                        </div>
+
+                        <ArrowRight
+                          size={19}
+                          className="mt-1 shrink-0 text-neutral-500 transition group-active:translate-x-0.5"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {currentWork.description && (
+                    <p className="mt-4 line-clamp-2 text-[12px] leading-5 text-neutral-400">
+                      {currentWork.description}
+                    </p>
+                  )}
+
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <p className="text-[11px] text-neutral-400">
+                      {formatProjectPeriod(
+                        currentWork.start_date,
+                        currentWork.end_date,
+                        language,
+                      )}
+                    </p>
+
+                    <p className="text-[11px] font-semibold text-neutral-300">
+                      {currentWorkStats.progress}%
+                    </p>
+                  </div>
+
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-white transition-all"
+                      style={{
+                        width: `${currentWorkStats.progress}%`,
+                      }}
+                    />
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {currentWorkStats.open > 0 && (
+                      <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-neutral-300">
+                        {currentWorkStats.open}{" "}
+                        {isRu
+                          ? "открыто"
+                          : "offen"}
+                      </span>
+                    )}
+
+                    {currentWorkStats.inProgress >
+                      0 && (
+                      <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-neutral-300">
+                        {currentWorkStats.inProgress}{" "}
+                        {isRu
+                          ? "в работе"
+                          : "in Arbeit"}
+                      </span>
+                    )}
+
+                    {currentWorkStats.completed >
+                      0 && (
+                      <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-neutral-300">
+                        {currentWorkStats.completed}{" "}
+                        {isRu
+                          ? "готово"
+                          : "erledigt"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </button>
+            )}
+          </section>
+
+          {/* =====================================================
+              CALENDAR PREVIEW
+          ====================================================== */}
+          <section className="mt-8">
+            <div className="mb-4 flex items-end justify-between gap-4">
+              <div>
+                <h2 className="text-[23px] font-bold tracking-[-0.045em] text-neutral-950">
+                  {t.navigation.calendar}
+                </h2>
+
+                <p className="mt-1 text-[13px] text-neutral-500">
+                  {isRu
+                    ? "Ближайшие даты"
+                    : "Die nächsten Termine"}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  router.push("/calendar")
+                }
+                className="text-[13px] font-semibold text-neutral-500"
               >
                 {t.dashboard.viewAll}
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    "/team"
-                  )
-                }
-                className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-white px-3.5 py-3.5 text-left transition hover:border-neutral-300 hover:shadow-sm"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600">
-                  <Users
-                    size={16}
-                    strokeWidth={1.8}
-                  />
-                </div>
-
-                <div>
-                  <div className="text-lg font-semibold leading-none text-neutral-950">
-                    {
-                      teamMembers.length
-                    }
+            <div className="overflow-hidden rounded-[25px] border border-neutral-200 bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
+              <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-neutral-100 text-neutral-700">
+                    <CalendarDays
+                      size={21}
+                      strokeWidth={1.8}
+                    />
                   </div>
 
-                  <div className="mt-1 text-[10px] text-neutral-400">
-                    {language ===
-                    "ru"
-                      ? "Активных"
-                      : "Aktiv"}
-                  </div>
-                </div>
-              </button>
+                  <div>
+                    <p className="text-[14px] font-semibold text-neutral-900">
+                      {nextScheduleDate
+                        ? formatDate(
+                            nextScheduleDate,
+                            language,
+                            {
+                              month: "long",
+                              year: "numeric",
+                            },
+                          )
+                        : isRu
+                          ? "Календарь"
+                          : "Kalender"}
+                    </p>
 
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    "/schedule"
-                  )
-                }
-                className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-white px-3.5 py-3.5 text-left transition hover:border-neutral-300 hover:shadow-sm"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600">
-                  <CalendarDays
-                    size={16}
-                    strokeWidth={1.8}
-                  />
-                </div>
-
-                <div>
-                  <div className="text-lg font-semibold leading-none text-neutral-950">
-                    {
-                      upcomingSchedule.length
-                    }
-                  </div>
-
-                  <div className="mt-1 text-[10px] text-neutral-400">
-                    {language ===
-                    "ru"
-                      ? "Ближайших"
-                      : "Kommende"}
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    "/materials"
-                  )
-                }
-                className="col-span-2 flex items-center gap-3 rounded-xl border border-neutral-200 bg-white px-3.5 py-3.5 text-left transition hover:border-neutral-300 hover:shadow-sm sm:col-span-1"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600">
-                  <BookOpen
-                    size={16}
-                    strokeWidth={1.8}
-                  />
-                </div>
-
-                <div>
-                  <div className="text-sm font-semibold leading-none text-neutral-950">
-                    {language ===
-                    "ru"
-                      ? "Материалы"
-                      : "Materialien"}
-                  </div>
-
-                  <div className="mt-1 text-[10px] text-neutral-400">
-                    {language ===
-                    "ru"
-                      ? "Открыть библиотеку"
-                      : "Bibliothek öffnen"}
+                    <p className="mt-0.5 text-[11px] text-neutral-400">
+                      {isRu
+                        ? "Ближайшие события"
+                        : "Nächste Termine"}
+                    </p>
                   </div>
                 </div>
 
                 <ArrowRight
-                  size={14}
-                  strokeWidth={1.8}
-                  className="ml-auto text-neutral-300"
+                  size={18}
+                  className="text-neutral-300"
                 />
-              </button>
-            </div>
-          </section>
+              </div>
 
-          {/* Quick actions */}
-          <section className="mt-6">
-            <div className="mb-4">
-              <h2 className="text-base font-semibold text-neutral-950">
-                {
-                  t.dashboard
-                    .quickActions
-                }
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    "/goals"
-                  )
-                }
-                className="group flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3.5 text-left transition hover:border-neutral-300 hover:shadow-sm sm:p-4"
-              >
-                <div>
-                  <div className="text-xs font-semibold text-neutral-900 sm:text-sm">
-                    {
-                      t.dashboard
-                        .newGoal
-                    }
-                  </div>
-
-                  <div className="mt-1 text-[10px] text-neutral-400 sm:text-xs">
-                    {
-                      t.goals
-                        .title
-                    }
-                  </div>
+              {calendarPreview.length === 0 ? (
+                <div className="px-5 py-9 text-center text-sm text-neutral-400">
+                  {isRu
+                    ? "Пока нет запланированных дат"
+                    : "Noch keine Termine geplant"}
                 </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2.5 p-3 sm:grid-cols-4">
+                  {calendarPreview.map(
+                    (date, index) => {
+                      const entriesForDate =
+                        upcomingSchedule.filter(
+                          (entry) =>
+                            entry.schedule_date ===
+                            date,
+                        );
 
-                <ArrowRight
-                  size={15}
-                  strokeWidth={1.8}
-                  className="text-neutral-300 transition group-hover:translate-x-0.5 group-hover:text-neutral-800"
-                />
-              </button>
+                      return (
+                        <button
+                          type="button"
+                          key={date}
+                          onClick={() =>
+                            router.push(
+                              "/calendar",
+                            )
+                          }
+                          className={`min-h-[125px] rounded-[19px] p-4 text-left transition active:scale-[0.98] ${
+                            index === 0
+                              ? "bg-[#111820] text-white"
+                              : "bg-neutral-50 text-neutral-900"
+                          }`}
+                        >
+                          <p
+                            className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${
+                              index === 0
+                                ? "text-neutral-400"
+                                : "text-neutral-400"
+                            }`}
+                          >
+                            {formatDate(
+                              date,
+                              language,
+                              {
+                                weekday:
+                                  "short",
+                              },
+                            )}
+                          </p>
 
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    "/tasks"
-                  )
-                }
-                className="group flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3.5 text-left transition hover:border-neutral-300 hover:shadow-sm sm:p-4"
-              >
-                <div>
-                  <div className="text-xs font-semibold text-neutral-900 sm:text-sm">
-                    {
-                      t.dashboard
-                        .viewTasks
-                    }
-                  </div>
+                          <p className="mt-2 text-[27px] font-bold leading-none tracking-[-0.04em]">
+                            {new Date(
+                              `${date}T00:00:00`,
+                            ).getDate()}
+                          </p>
 
-                  <div className="mt-1 text-[10px] text-neutral-400 sm:text-xs">
-                    {
-                      t.navigation
-                        .tasks
-                    }
-                  </div>
+                          <div className="mt-4 flex flex-wrap gap-1">
+                            {entriesForDate.map(
+                              (entry) => (
+                                <span
+                                  key={
+                                    entry.id
+                                  }
+                                  className={`rounded-full px-2 py-1 text-[9px] font-semibold ${
+                                    index === 0
+                                      ? "bg-white/10 text-white"
+                                      : "bg-white text-neutral-600"
+                                  }`}
+                                >
+                                  {
+                                    entry.service_time
+                                  }
+                                </span>
+                              ),
+                            )}
+                          </div>
+                        </button>
+                      );
+                    },
+                  )}
                 </div>
-
-                <ArrowRight
-                  size={15}
-                  strokeWidth={1.8}
-                  className="text-neutral-300 transition group-hover:translate-x-0.5 group-hover:text-neutral-800"
-                />
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    "/ideas"
-                  )
-                }
-                className="group flex items-center justify-between rounded-xl border border-neutral-200 bg-white p-3.5 text-left transition hover:border-neutral-300 hover:shadow-sm sm:p-4"
-              >
-                <div>
-                  <div className="text-xs font-semibold text-neutral-900 sm:text-sm">
-                    {
-                      t.dashboard
-                        .viewIdeas
-                    }
-                  </div>
-
-                  <div className="mt-1 text-[10px] text-neutral-400 sm:text-xs">
-                    {
-                      t.navigation
-                        .ideas
-                    }
-                  </div>
-                </div>
-
-                <ArrowRight
-                  size={15}
-                  strokeWidth={1.8}
-                  className="text-neutral-300 transition group-hover:translate-x-0.5 group-hover:text-neutral-800"
-                />
-              </button>
+              )}
             </div>
           </section>
         </div>
-      </div>
-    </main>
+      </main>
+
+      {/* =====================================================
+          MORE SHEET
+      ====================================================== */}
+      {moreOpen && (
+        <>
+          <button
+            type="button"
+            aria-label={
+              isRu
+                ? "Закрыть меню"
+                : "Menü schließen"
+            }
+            onClick={() => setMoreOpen(false)}
+            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]"
+          />
+
+          <div className="fixed inset-x-0 bottom-0 z-50 px-3 pb-3">
+            <div className="mx-auto max-w-[430px] overflow-hidden rounded-[28px] border border-[#e2e5e8] bg-white shadow-[0_-12px_40px_rgba(17,24,32,0.16)]">
+              <div className="flex items-center justify-between border-b border-[#eceef0] px-5 py-4">
+                <div>
+                  <p className="text-[18px] font-bold tracking-[-0.02em] text-[#111820]">
+                    {isRu
+                      ? "Ещё"
+                      : "Mehr"}
+                  </p>
+
+                  <p className="mt-0.5 text-[13px] text-[#7a8490]">
+                    {isRu
+                      ? "Все разделы TLite"
+                      : "Weitere Bereiche"}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMoreOpen(false)
+                  }
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f3f4f5] text-[#4e5966]"
+                  aria-label={
+                    isRu
+                      ? "Закрыть"
+                      : "Schließen"
+                  }
+                >
+                  <X size={19} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 p-3">
+                {moreItems.map((item) => {
+                  const Icon = item.icon;
+
+                  return (
+                    <button
+                      type="button"
+                      key={item.href}
+                      onClick={() => {
+                        setMoreOpen(false);
+                        router.push(item.href);
+                      }}
+                      className="flex min-h-[72px] items-center gap-3 rounded-[18px] bg-[#f6f7f7] px-4 text-left transition active:scale-[0.98]"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-white text-[#303b48] shadow-sm">
+                        <Icon size={19} />
+                      </div>
+
+                      <div className="min-w-0">
+                        <p className="truncate text-[14px] font-semibold text-[#202a35]">
+                          {item.label}
+                        </p>
+
+                        <p className="mt-0.5 truncate text-[10px] text-[#8a939d]">
+                          {item.description}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="border-t border-[#eceef0] px-5 py-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    router.push("/settings");
+                  }}
+                  className="flex min-h-[48px] w-full items-center justify-center text-[13px] font-semibold text-[#687585]"
+                >
+                  {isRu
+                    ? "Настройки аккаунта"
+                    : "Kontoeinstellungen"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/*
+ * Красивая иконка "Ещё":
+ * три точки без текста.
+ */
+function MoreIcon({
+  size = 20,
+}: {
+  size?: number;
+}) {
+  return (
+    <span
+      className="flex items-center justify-center gap-[3px]"
+      style={{
+        width: size,
+        height: size,
+      }}
+    >
+      <span className="h-[3px] w-[3px] rounded-full bg-current" />
+      <span className="h-[3px] w-[3px] rounded-full bg-current" />
+      <span className="h-[3px] w-[3px] rounded-full bg-current" />
+    </span>
+  );
+}
+
+function SettingsIcon({
+  size = 20,
+}: {
+  size?: number;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.02 1.55V20h-2.4v-.21a1.7 1.7 0 0 0-1.02-1.55 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.5 15a1.7 1.7 0 0 0-1.55-1.02H6.7v-2.4h.25A1.7 1.7 0 0 0 8.5 10a1.7 1.7 0 0 0-.34-1.88L8.1 8.06l1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.02-1.55V5h2.4v.21a1.7 1.7 0 0 0 1.02 1.55 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06A1.7 1.7 0 0 0 19.4 10a1.7 1.7 0 0 0 1.55 1.02h.25v2.4h-.25A1.7 1.7 0 0 0 19.4 15Z" />
+    </svg>
   );
 }

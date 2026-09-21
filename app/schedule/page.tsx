@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -13,15 +13,15 @@ import {
   BookOpen,
   Clock3,
   Sparkles,
+  ShieldCheck,
+  AlertCircle,
+  ArrowLeft,
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
-import {
-  translations,
-  type Language,
-} from "@/lib/translations";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type TeamMember = {
   id: number;
@@ -76,37 +76,34 @@ const emptyForm: EntryForm = {
 };
 
 export default function SchedulePage() {
-  const [language, setLanguage] =
-    useState<Language>("ru");
+  const router = useRouter();
+  const { language, t } = useLanguage();
 
-  const [entries, setEntries] =
-    useState<ScheduleEntry[]>([]);
+  const isRu = language === "ru";
 
-  const [members, setMembers] =
-    useState<TeamMember[]>([]);
-
-  const [entryMembers, setEntryMembers] =
-    useState<ScheduleMember[]>([]);
+  const [entries, setEntries] = useState<ScheduleEntry[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [entryMembers, setEntryMembers] = useState<ScheduleMember[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  const [currentMonth, setCurrentMonth] =
-    useState(() => {
-      const date = new Date();
-      return new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        1,
-      );
-    });
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const date = new Date();
+
+    return new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      1,
+    );
+  });
 
   const [modalOpen, setModalOpen] = useState(false);
-
   const [editingEntry, setEditingEntry] =
     useState<ScheduleEntry | null>(null);
 
-  const [form, setForm] =
-    useState<EntryForm>(emptyForm);
+  const [form, setForm] = useState<EntryForm>(emptyForm);
 
   const [saving, setSaving] = useState(false);
 
@@ -115,7 +112,52 @@ export default function SchedulePage() {
 
   const [deleting, setDeleting] = useState(false);
 
-  const t = translations[language];
+  const [errorMessage, setErrorMessage] = useState("");
+
+  /*
+   * =====================================================
+   * AUTH / ROLE
+   * =====================================================
+   */
+
+  useEffect(() => {
+    loadRole();
+  }, []);
+
+  async function loadRole() {
+    setRoleLoading(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setIsAdmin(false);
+      setRoleLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (error) {
+      console.error("Error loading user role:", error);
+      setIsAdmin(false);
+    } else {
+      setIsAdmin(data?.role === "admin");
+    }
+
+    setRoleLoading(false);
+  }
+
+  /*
+   * =====================================================
+   * DATA
+   * =====================================================
+   */
 
   useEffect(() => {
     loadData();
@@ -123,76 +165,69 @@ export default function SchedulePage() {
 
   async function loadData() {
     setLoading(true);
+    setErrorMessage("");
 
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
 
-    const firstDay = new Date(
-      year,
-      month,
-      1,
-    );
-
-    const lastDay = new Date(
-      year,
-      month + 1,
-      0,
-    );
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
 
     const formatForDb = (date: Date) => {
       const y = date.getFullYear();
-      const m = String(
-        date.getMonth() + 1,
-      ).padStart(2, "0");
-      const d = String(
-        date.getDate(),
-      ).padStart(2, "0");
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
 
       return `${y}-${m}-${d}`;
     };
 
-    const [
-      entriesResult,
-      membersResult,
-    ] = await Promise.all([
-      supabase
-        .from("schedule_entries")
-        .select("*")
-        .gte(
-          "schedule_date",
-          formatForDb(firstDay),
-        )
-        .lte(
-          "schedule_date",
-          formatForDb(lastDay),
-        )
-        .order("schedule_date", {
-          ascending: true,
-        })
-        .order("service_time", {
-          ascending: true,
-        }),
+    const [entriesResult, membersResult] =
+      await Promise.all([
+        supabase
+          .from("schedule_entries")
+          .select("*")
+          .gte(
+            "schedule_date",
+            formatForDb(firstDay),
+          )
+          .lte(
+            "schedule_date",
+            formatForDb(lastDay),
+          )
+          .order("schedule_date", {
+            ascending: true,
+          })
+          .order("service_time", {
+            ascending: true,
+          }),
 
-      supabase
-        .from("team_members")
-        .select(
-          "id, first_name, last_name, position, status",
-        )
-        .eq("status", "active")
-        .order("last_name", {
-          ascending: true,
-        })
-        .order("first_name", {
-          ascending: true,
-        }),
-    ]);
+        supabase
+          .from("team_members")
+          .select(
+            "id, first_name, last_name, position, status",
+          )
+          .eq("status", "active")
+          .order("last_name", {
+            ascending: true,
+          })
+          .order("first_name", {
+            ascending: true,
+          }),
+      ]);
 
     if (entriesResult.error) {
       console.error(
         "Error loading schedule:",
         entriesResult.error,
       );
+
       setEntries([]);
+
+      setErrorMessage(
+        isRu
+          ? "Не удалось загрузить расписание."
+          : "Der Dienstplan konnte nicht geladen werden.",
+      );
     } else {
       setEntries(entriesResult.data ?? []);
     }
@@ -202,6 +237,7 @@ export default function SchedulePage() {
         "Error loading team members:",
         membersResult.error,
       );
+
       setMembers([]);
     } else {
       setMembers(membersResult.data ?? []);
@@ -213,7 +249,7 @@ export default function SchedulePage() {
       ) ?? [];
 
     if (entryIds.length > 0) {
-      const membersResult =
+      const scheduleMembersResult =
         await supabase
           .from("schedule_entry_members")
           .select(
@@ -224,15 +260,16 @@ export default function SchedulePage() {
             entryIds,
           );
 
-      if (membersResult.error) {
+      if (scheduleMembersResult.error) {
         console.error(
           "Error loading schedule members:",
-          membersResult.error,
+          scheduleMembersResult.error,
         );
+
         setEntryMembers([]);
       } else {
         setEntryMembers(
-          membersResult.data ?? [],
+          scheduleMembersResult.data ?? [],
         );
       }
     } else {
@@ -242,17 +279,21 @@ export default function SchedulePage() {
     setLoading(false);
   }
 
+  /*
+   * =====================================================
+   * DATE HELPERS
+   * =====================================================
+   */
+
   const monthLabel = useMemo(() => {
     return currentMonth.toLocaleDateString(
-      language === "ru"
-        ? "ru-RU"
-        : "de-DE",
+      isRu ? "ru-RU" : "de-DE",
       {
         month: "long",
         year: "numeric",
       },
     );
-  }, [currentMonth, language]);
+  }, [currentMonth, isRu]);
 
   function previousMonth() {
     setCurrentMonth(
@@ -288,27 +329,11 @@ export default function SchedulePage() {
     );
   }
 
-  function formatDate(date: string) {
-    return new Date(
-      `${date}T00:00:00`,
-    ).toLocaleDateString(
-      language === "ru"
-        ? "ru-RU"
-        : "de-DE",
-      {
-        day: "2-digit",
-        month: "2-digit",
-      },
-    );
-  }
-
   function getWeekday(date: string) {
     return new Date(
       `${date}T00:00:00`,
     ).toLocaleDateString(
-      language === "ru"
-        ? "ru-RU"
-        : "de-DE",
+      isRu ? "ru-RU" : "de-DE",
       {
         weekday: "short",
       },
@@ -319,9 +344,7 @@ export default function SchedulePage() {
     return new Date(
       `${date}T00:00:00`,
     ).toLocaleDateString(
-      language === "ru"
-        ? "ru-RU"
-        : "de-DE",
+      isRu ? "ru-RU" : "de-DE",
       {
         weekday: "long",
         day: "numeric",
@@ -331,31 +354,39 @@ export default function SchedulePage() {
     );
   }
 
-  function getEntryTitle(
-    entry: ScheduleEntry,
-  ) {
-    if (language === "de") {
+  /*
+   * =====================================================
+   * ENTRY HELPERS
+   * =====================================================
+   */
+
+  function getEntryTitle(entry: ScheduleEntry) {
+    if (entry.service_time === "10:00") {
       return (
         entry.title_de ||
-        entry.title_ru ||
         (entry.entry_type === "event"
-          ? "Veranstaltung"
-          : "Unterricht")
+          ? isRu
+            ? "Событие"
+            : "Veranstaltung"
+          : isRu
+            ? "Урок"
+            : "Unterricht")
       );
     }
 
     return (
       entry.title_ru ||
-      entry.title_de ||
       (entry.entry_type === "event"
-        ? "Событие"
-        : "Урок")
+        ? isRu
+          ? "Событие"
+          : "Veranstaltung"
+        : isRu
+          ? "Урок"
+          : "Unterricht")
     );
   }
 
-  function getMemberIds(
-    entryId: number,
-  ) {
+  function getMemberIds(entryId: number) {
     return entryMembers
       .filter(
         (item) =>
@@ -363,32 +394,45 @@ export default function SchedulePage() {
           entryId,
       )
       .map(
-        (item) => item.team_member_id,
+        (item) =>
+          item.team_member_id,
       );
   }
 
-  function getMemberNames(
-    entryId: number,
-  ) {
+  function getEntryMembers(entryId: number) {
     const ids = getMemberIds(entryId);
 
     return ids
-      .map((id) => {
-        const member = members.find(
-          (item) => item.id === id,
-        );
-
-        if (!member) return null;
-
-        return `${member.first_name} ${member.last_name}`;
-      })
-      .filter(Boolean) as string[];
+      .map((id) =>
+        members.find(
+          (member) =>
+            member.id === id,
+        ),
+      )
+      .filter(
+        Boolean,
+      ) as TeamMember[];
   }
+
+  function getInitials(member: TeamMember) {
+    return `${member.first_name.charAt(0)}${member.last_name.charAt(0)}`.toUpperCase();
+  }
+
+  /*
+   * =====================================================
+   * CREATE / EDIT
+   * =====================================================
+   */
 
   function openCreateModal(
     date?: string,
-    time: "10:00" | "12:30" = "10:00",
+    time:
+      | "10:00"
+      | "12:30" = "10:00",
   ) {
+    if (!isAdmin) return;
+
+    setErrorMessage("");
     setEditingEntry(null);
 
     setForm({
@@ -407,18 +451,30 @@ export default function SchedulePage() {
   function openEditModal(
     entry: ScheduleEntry,
   ) {
+    if (!isAdmin) return;
+
+    setErrorMessage("");
     setEditingEntry(entry);
 
     setForm({
-      schedule_date: entry.schedule_date,
-      service_time: entry.service_time,
-      entry_type: entry.entry_type,
-      title_de: entry.title_de ?? "",
-      title_ru: entry.title_ru ?? "",
-      bible_text: entry.bible_text ?? "",
-      series: entry.series ?? "",
-      notes: entry.notes ?? "",
-      member_ids: getMemberIds(entry.id),
+      schedule_date:
+        entry.schedule_date,
+      service_time:
+        entry.service_time,
+      entry_type:
+        entry.entry_type,
+      title_de:
+        entry.title_de ?? "",
+      title_ru:
+        entry.title_ru ?? "",
+      bible_text:
+        entry.bible_text ?? "",
+      series:
+        entry.series ?? "",
+      notes:
+        entry.notes ?? "",
+      member_ids:
+        getMemberIds(entry.id),
     });
 
     setModalOpen(true);
@@ -430,11 +486,35 @@ export default function SchedulePage() {
     setModalOpen(false);
     setEditingEntry(null);
     setForm(emptyForm);
+    setErrorMessage("");
   }
 
-  function toggleMember(
-    memberId: number,
+  function changeServiceTime(
+    time: "10:00" | "12:30",
   ) {
+    setForm((current) => ({
+      ...current,
+      service_time: time,
+
+      // 10:00 = German only
+      // 12:30 = Russian only
+      title_de:
+        time === "10:00"
+          ? current.title_de
+          : "",
+
+      title_ru:
+        time === "12:30"
+          ? current.title_ru
+          : "",
+    }));
+
+    setErrorMessage("");
+  }
+
+  function toggleMember(memberId: number) {
+    if (!isAdmin) return;
+
     setForm((current) => ({
       ...current,
       member_ids:
@@ -442,7 +522,8 @@ export default function SchedulePage() {
           memberId,
         )
           ? current.member_ids.filter(
-              (id) => id !== memberId,
+              (id) =>
+                id !== memberId,
             )
           : [
               ...current.member_ids,
@@ -452,6 +533,8 @@ export default function SchedulePage() {
   }
 
   async function saveEntry() {
+    if (!isAdmin) return;
+
     if (
       !form.schedule_date ||
       saving
@@ -459,46 +542,69 @@ export default function SchedulePage() {
       return;
     }
 
-    if (
-      form.entry_type === "lesson" &&
-      !form.title_de.trim() &&
-      !form.title_ru.trim()
-    ) {
-      return;
-    }
+    const correctTitle =
+      form.service_time === "10:00"
+        ? form.title_de.trim()
+        : form.title_ru.trim();
 
-    if (
-      form.entry_type === "event" &&
-      !form.title_de.trim() &&
-      !form.title_ru.trim()
-    ) {
+    if (!correctTitle) {
+      setErrorMessage(
+        form.service_time === "10:00"
+          ? isRu
+            ? "Укажи немецкую тему служения."
+            : "Bitte gib das deutsche Thema ein."
+          : isRu
+            ? "Укажи русскую тему служения."
+            : "Bitte gib das russische Thema ein.",
+      );
+
       return;
     }
 
     setSaving(true);
+    setErrorMessage("");
 
     const payload = {
       schedule_date:
         form.schedule_date,
+
       service_time:
         form.service_time,
+
       entry_type:
         form.entry_type,
+
+      // 10:00 → DE
       title_de:
-        form.title_de.trim() || null,
+        form.service_time === "10:00"
+          ? form.title_de.trim() || null
+          : null,
+
+      // 12:30 → RU
       title_ru:
-        form.title_ru.trim() || null,
+        form.service_time === "12:30"
+          ? form.title_ru.trim() || null
+          : null,
+
       bible_text:
-        form.bible_text.trim() || null,
+        form.bible_text.trim() ||
+        null,
+
       series:
-        form.series.trim() || null,
+        form.series.trim() ||
+        null,
+
       notes:
-        form.notes.trim() || null,
+        form.notes.trim() ||
+        null,
+
       updated_at:
         new Date().toISOString(),
     };
 
-    let entryId: number | null =
+    let entryId:
+      | number
+      | null =
       editingEntry?.id ?? null;
 
     if (editingEntry) {
@@ -506,39 +612,82 @@ export default function SchedulePage() {
         await supabase
           .from("schedule_entries")
           .update(payload)
-          .eq("id", editingEntry.id);
+          .eq(
+            "id",
+            editingEntry.id,
+          );
 
       if (error) {
         console.error(
           "Error updating schedule entry:",
           error,
         );
+
+        setErrorMessage(
+          isRu
+            ? "Не удалось сохранить изменения."
+            : "Die Änderungen konnten nicht gespeichert werden.",
+        );
+
         setSaving(false);
         return;
       }
 
-      entryId = editingEntry.id;
+      entryId =
+        editingEntry.id;
 
-      await supabase
-        .from("schedule_entry_members")
+      const {
+        error:
+          deleteMembersError,
+      } = await supabase
+        .from(
+          "schedule_entry_members",
+        )
         .delete()
         .eq(
           "schedule_entry_id",
           editingEntry.id,
         );
+
+      if (deleteMembersError) {
+        console.error(
+          "Error replacing schedule members:",
+          deleteMembersError,
+        );
+
+        setErrorMessage(
+          isRu
+            ? "Служение сохранено, но список служителей обновить не удалось."
+            : "Der Dienst wurde gespeichert, aber die Mitarbeiter konnten nicht aktualisiert werden.",
+        );
+
+        setSaving(false);
+        return;
+      }
     } else {
-      const { data, error } =
-        await supabase
-          .from("schedule_entries")
-          .insert(payload)
-          .select("id")
-          .single();
+      const {
+        data,
+        error,
+      } = await supabase
+        .from(
+          "schedule_entries",
+        )
+        .insert(payload)
+        .select("id")
+        .single();
 
       if (error || !data) {
         console.error(
           "Error creating schedule entry:",
           error,
         );
+
+        setErrorMessage(
+          isRu
+            ? "Не удалось создать служение."
+            : "Der Dienst konnte nicht erstellt werden.",
+        );
+
         setSaving(false);
         return;
       }
@@ -565,40 +714,74 @@ export default function SchedulePage() {
           .from(
             "schedule_entry_members",
           )
-          .insert(memberRows);
+          .insert(
+            memberRows,
+          );
 
       if (error) {
         console.error(
           "Error saving schedule members:",
           error,
         );
+
+        setErrorMessage(
+          isRu
+            ? "Служение сохранено, но служителей добавить не удалось."
+            : "Der Dienst wurde gespeichert, aber die Mitarbeiter konnten nicht hinzugefügt werden.",
+        );
+
+        setSaving(false);
+        return;
       }
     }
 
     await loadData();
 
     setSaving(false);
-    closeModal();
+    setModalOpen(false);
+    setEditingEntry(null);
+    setForm(emptyForm);
   }
 
+  /*
+   * =====================================================
+   * DELETE
+   * =====================================================
+   */
+
   async function deleteEntry() {
-    if (!deleteTarget || deleting) {
+    if (
+      !isAdmin ||
+      !deleteTarget ||
+      deleting
+    ) {
       return;
     }
 
     setDeleting(true);
+    setErrorMessage("");
 
     const { error } =
       await supabase
         .from("schedule_entries")
         .delete()
-        .eq("id", deleteTarget.id);
+        .eq(
+          "id",
+          deleteTarget.id,
+        );
 
     if (error) {
       console.error(
         "Error deleting schedule entry:",
         error,
       );
+
+      setErrorMessage(
+        isRu
+          ? "Не удалось удалить служение."
+          : "Der Dienst konnte nicht gelöscht werden.",
+      );
+
       setDeleting(false);
       return;
     }
@@ -609,196 +792,376 @@ export default function SchedulePage() {
     setDeleteTarget(null);
   }
 
-  const groupedEntries = useMemo(() => {
-    const grouped: Record<
-      string,
-      ScheduleEntry[]
-    > = {};
+  /*
+   * =====================================================
+   * GROUPING
+   * =====================================================
+   */
 
-    entries.forEach((entry) => {
-      if (!grouped[entry.schedule_date]) {
-        grouped[entry.schedule_date] =
-          [];
-      }
+  const groupedEntries =
+    useMemo(() => {
+      const grouped: Record<
+        string,
+        ScheduleEntry[]
+      > = {};
 
-      grouped[
-        entry.schedule_date
-      ].push(entry);
-    });
+      entries.forEach(
+        (entry) => {
+          if (
+            !grouped[
+              entry.schedule_date
+            ]
+          ) {
+            grouped[
+              entry.schedule_date
+            ] = [];
+          }
 
-    return grouped;
-  }, [entries]);
+          grouped[
+            entry.schedule_date
+          ].push(entry);
+        },
+      );
 
-  const scheduleDays = useMemo(() => {
-    const days: string[] = [];
+      return grouped;
+    }, [entries]);
 
-    Object.keys(groupedEntries)
-      .sort()
-      .forEach((date) => {
-        days.push(date);
-      });
+  const scheduleDays =
+    useMemo(() => {
+      return Object.keys(
+        groupedEntries,
+      ).sort();
+    }, [groupedEntries]);
 
-    return days;
-  }, [groupedEntries]);
+  /*
+   * =====================================================
+   * RENDER
+   * =====================================================
+   */
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#f5f5f4] text-neutral-900">
-      <Sidebar language={language} />
+    <main className="min-h-screen overflow-x-hidden bg-[#f5f5f3] text-[#111820]">
+      {/* Desktop navigation */}
+      <div className="hidden md:block">
+        <Sidebar language={language} />
+      </div>
 
-      <div className="ml-[72px] min-h-screen min-w-0">
-        <Header
-          language={language}
-          setLanguage={setLanguage}
-        />
+      <div className="md:ml-[72px]">
+        {/* Desktop header */}
+        <div className="hidden md:block">
+          <Header
+            language={language}
+            setLanguage={() => {}}
+          />
+        </div>
 
-        <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 sm:px-6 lg:px-8">
-          {/* Header */}
-          <section className="pb-6 pt-8 sm:pb-7 sm:pt-10">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-neutral-400">
-                  {t.common.teamWorkspace}
-                </p>
-
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white">
-                    <CalendarDays
-                      size={20}
-                      strokeWidth={1.8}
-                    />
-                  </div>
-
-                  <div>
-                    <h1 className="text-3xl font-bold tracking-[-0.045em] text-neutral-950 sm:text-4xl">
-                      {language === "ru"
-                        ? "Расписание"
-                        : "Dienstplan"}
-                    </h1>
-
-                    <p className="mt-1 text-sm text-neutral-500">
-                      {language === "ru"
-                        ? "Кто, когда и какую тему проводит."
-                        : "Wer wann welchen Unterricht übernimmt."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() =>
-                  openCreateModal()
-                }
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-neutral-800"
-              >
-                <Plus
-                  size={15}
-                  strokeWidth={2}
-                />
-
-                {language === "ru"
-                  ? "Добавить служение"
-                  : "Dienst hinzufügen"}
-              </button>
-            </div>
-          </section>
-
-          {/* Month navigation */}
-          <section className="mb-5 flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-3 shadow-[0_1px_3px_rgba(0,0,0,0.02)] sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-1">
-              <button
-                onClick={previousMonth}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
-                title={
-                  language === "ru"
-                    ? "Предыдущий месяц"
-                    : "Vorheriger Monat"
-                }
-              >
-                <ChevronLeft
-                  size={17}
-                />
-              </button>
-
-              <button
-                onClick={nextMonth}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
-                title={
-                  language === "ru"
-                    ? "Следующий месяц"
-                    : "Nächster Monat"
-                }
-              >
-                <ChevronRight
-                  size={17}
-                />
-              </button>
-
-              <div className="ml-2 min-w-[170px]">
-                <div className="text-sm font-semibold capitalize text-neutral-900">
-                  {monthLabel}
-                </div>
-
-                <div className="text-[10px] text-neutral-400">
-                  {language === "ru"
-                    ? `${entries.length} служений`
-                    : `${entries.length} Dienste`}
-                </div>
-              </div>
-            </div>
-
+        {/* =================================================
+            MOBILE TOP BAR
+        ================================================= */}
+        <div className="sticky top-0 z-30 border-b border-[#e4e5e7] bg-[#f5f5f3]/95 px-4 py-3 backdrop-blur-xl md:hidden">
+          <div className="flex items-center gap-3">
+            {/* HOME */}
             <button
-              onClick={goToToday}
-              className="h-9 rounded-lg border border-neutral-200 px-3 text-[11px] font-semibold text-neutral-600 transition hover:bg-neutral-50 hover:text-neutral-900"
+              type="button"
+              onClick={() =>
+                router.push("/")
+              }
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white text-[#111820] shadow-sm ring-1 ring-[#e2e3e5] active:scale-[0.96]"
+              aria-label={
+                isRu
+                  ? "На главную"
+                  : "Zur Startseite"
+              }
             >
-              {language === "ru"
-                ? "Сегодня"
-                : "Heute"}
+              <ArrowLeft
+                size={20}
+                strokeWidth={2}
+              />
             </button>
+
+            {/* TITLE */}
+            <div className="min-w-0">
+              <div className="text-[17px] font-bold tracking-[-0.035em]">
+                {isRu
+                  ? "Расписание"
+                  : "Dienstplan"}
+              </div>
+
+              <div className="truncate text-[11px] text-[#818994]">
+                {monthLabel}
+              </div>
+            </div>
+
+            {/* CREATE */}
+            {!roleLoading &&
+              isAdmin && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    openCreateModal()
+                  }
+                  className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#111820] text-white shadow-sm active:scale-[0.96]"
+                  aria-label={
+                    isRu
+                      ? "Новое служение"
+                      : "Neuer Dienst"
+                  }
+                >
+                  <Plus
+                    size={21}
+                    strokeWidth={2}
+                  />
+                </button>
+              )}
+          </div>
+        </div>
+
+        <div className="mx-auto w-full max-w-[1180px] px-4 pb-10 pt-5 sm:px-6 md:pt-8 lg:px-8">
+          {/* =================================================
+              DESKTOP HEADING
+          ================================================= */}
+          <section className="mb-5 md:mb-7">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-start gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push("/")
+                  }
+                  className="mt-0.5 hidden h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white text-[#111820] ring-1 ring-[#e1e3e5] transition hover:bg-[#f0f1f2] md:flex"
+                  aria-label={
+                    isRu
+                      ? "На главную"
+                      : "Zur Startseite"
+                  }
+                >
+                  <ArrowLeft
+                    size={19}
+                  />
+                </button>
+
+                <div>
+                  <p className="mb-1.5 hidden text-[10px] font-bold uppercase tracking-[0.18em] text-[#9aa2ad] md:block">
+                    {t.common.teamWorkspace}
+                  </p>
+
+                  <h1 className="hidden text-[30px] font-bold leading-[1.05] tracking-[-0.045em] md:block md:text-4xl">
+                    {isRu
+                      ? "Расписание"
+                      : "Dienstplan"}
+                  </h1>
+
+                  <p className="mt-0 hidden max-w-[540px] text-[14px] leading-5 text-[#707987] md:block">
+                    {isRu
+                      ? "Кто, когда и какую тему проводит."
+                      : "Wer wann welchen Dienst übernimmt."}
+                  </p>
+                </div>
+              </div>
+
+              {/* DESKTOP CREATE BUTTON ONLY */}
+              {!roleLoading &&
+                isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openCreateModal()
+                    }
+                    className="hidden h-10 shrink-0 items-center gap-2 rounded-xl bg-[#111820] px-4 text-white shadow-sm transition active:scale-[0.97] md:flex"
+                    aria-label={
+                      isRu
+                        ? "Добавить служение"
+                        : "Dienst hinzufügen"
+                    }
+                  >
+                    <Plus
+                      size={18}
+                    />
+
+                    <span className="text-xs font-semibold">
+                      {isRu
+                        ? "Добавить служение"
+                        : "Dienst hinzufügen"}
+                    </span>
+                  </button>
+                )}
+            </div>
+
+            {!roleLoading &&
+              !isAdmin && (
+                <div className="mt-4 flex items-center gap-2 rounded-[15px] border border-[#e3e5e8] bg-white px-4 py-3 text-[12px] leading-4 text-[#687585]">
+                  <ShieldCheck
+                    size={16}
+                    className="shrink-0 text-[#8b949f]"
+                  />
+
+                  <span>
+                    {isRu
+                      ? "Ты просматриваешь расписание. Изменять его могут только администраторы."
+                      : "Du kannst den Dienstplan ansehen. Änderungen sind nur für Administratoren möglich."}
+                  </span>
+                </div>
+              )}
           </section>
 
-          {/* Schedule */}
-          {loading ? (
-            <div className="flex min-h-[280px] items-center justify-center rounded-2xl border border-neutral-200 bg-white">
-              <span className="text-sm text-neutral-400">
-                {language === "ru"
-                  ? "Загрузка расписания..."
-                  : "Dienstplan wird geladen..."}
+          {/* =================================================
+              MONTH NAVIGATION
+          ================================================= */}
+          <section className="mb-5 rounded-[20px] border border-[#e1e3e6] bg-white p-2 shadow-[0_2px_10px_rgba(17,24,32,0.025)]">
+            <div className="flex items-center justify-between">
+              <div className="flex min-w-0 items-center">
+                <button
+                  type="button"
+                  onClick={
+                    previousMonth
+                  }
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-[#687585] active:bg-[#f3f4f5] md:h-9 md:w-9"
+                  aria-label={
+                    isRu
+                      ? "Предыдущий месяц"
+                      : "Vorheriger Monat"
+                  }
+                >
+                  <ChevronLeft
+                    size={20}
+                  />
+                </button>
+
+                <div className="min-w-0 px-2 md:px-3">
+                  <div className="truncate text-[15px] font-bold capitalize tracking-[-0.02em]">
+                    {monthLabel}
+                  </div>
+
+                  <div className="mt-0.5 text-[11px] text-[#98a0aa]">
+                    {entries.length}{" "}
+                    {isRu
+                      ? entries.length ===
+                        1
+                        ? "служение"
+                        : "служений"
+                      : entries.length ===
+                          1
+                        ? "Dienst"
+                        : "Dienste"}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={nextMonth}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-[#687585] active:bg-[#f3f4f5] md:h-9 md:w-9"
+                  aria-label={
+                    isRu
+                      ? "Следующий месяц"
+                      : "Nächster Monat"
+                  }
+                >
+                  <ChevronRight
+                    size={20}
+                  />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={
+                  goToToday
+                }
+                className="h-10 shrink-0 rounded-[13px] border border-[#e2e4e7] px-3 text-[11px] font-bold text-[#596371] active:bg-[#f5f5f5]"
+              >
+                {isRu
+                  ? "Сегодня"
+                  : "Heute"}
+              </button>
+            </div>
+          </section>
+
+          {/* ERROR */}
+          {errorMessage && (
+            <div
+              role="alert"
+              className="mb-4 flex items-start gap-3 rounded-[17px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] leading-5 text-red-700"
+            >
+              <AlertCircle
+                size={17}
+                className="mt-0.5 shrink-0"
+              />
+
+              <span>
+                {errorMessage}
               </span>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setErrorMessage("")
+                }
+                className="ml-auto shrink-0 text-red-400"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
+          {/* LOADING */}
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(
+                (item) => (
+                  <div
+                    key={item}
+                    className="animate-pulse overflow-hidden rounded-[22px] border border-[#e5e6e8] bg-white"
+                  >
+                    <div className="h-[76px] bg-[#f0f1f2]" />
+
+                    <div className="p-3">
+                      <div className="h-[160px] rounded-[18px] bg-[#f1f2f3]" />
+                    </div>
+                  </div>
+                ),
+              )}
             </div>
           ) : scheduleDays.length ===
             0 ? (
-            <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white px-5 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-neutral-100 text-neutral-400">
-                <CalendarDays
-                  size={21}
-                  strokeWidth={1.8}
+            <div className="flex min-h-[390px] flex-col items-center justify-center rounded-[22px] border border-dashed border-[#d7dadd] bg-white px-6 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-[#f1f2f3] text-[#929aa5]">
+                <Clock3
+                  size={28}
+                  strokeWidth={1.6}
                 />
               </div>
 
-              <h2 className="mt-4 text-sm font-semibold text-neutral-900">
-                {language === "ru"
+              <h2 className="mt-5 text-[18px] font-bold tracking-[-0.025em]">
+                {isRu
                   ? "Расписание пока пустое"
                   : "Noch kein Dienstplan"}
               </h2>
 
-              <p className="mt-1 max-w-sm text-xs leading-5 text-neutral-400">
-                {language === "ru"
-                  ? "Добавь первое служение, чтобы начать формировать расписание."
-                  : "Füge den ersten Dienst hinzu, um den Dienstplan zu erstellen."}
+              <p className="mt-2 max-w-[330px] text-[13px] leading-5 text-[#858e9a]">
+                {isRu
+                  ? "В этом месяце пока нет служений."
+                  : "Für diesen Monat sind noch keine Dienste eingetragen."}
               </p>
 
-              <button
-                onClick={() =>
-                  openCreateModal()
-                }
-                className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-neutral-900 px-3 text-xs font-semibold text-white hover:bg-neutral-800"
-              >
-                <Plus size={13} />
+              {!roleLoading &&
+                isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openCreateModal()
+                    }
+                    className="mt-6 flex h-12 items-center gap-2 rounded-full bg-[#111820] px-5 text-[13px] font-bold text-white active:scale-[0.98]"
+                  >
+                    <Plus
+                      size={17}
+                    />
 
-                {language === "ru"
-                  ? "Добавить служение"
-                  : "Dienst hinzufügen"}
-              </button>
+                    {isRu
+                      ? "Добавить служение"
+                      : "Dienst hinzufügen"}
+                  </button>
+                )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -812,37 +1175,36 @@ export default function SchedulePage() {
                   return (
                     <section
                       key={date}
-                      className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
+                      className="overflow-hidden rounded-[22px] border border-[#e0e2e5] bg-white shadow-[0_3px_14px_rgba(17,24,32,0.035)]"
                     >
-                      {/* Day header */}
-                      <div className="flex flex-col gap-3 border-b border-neutral-100 bg-neutral-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                      {/* DAY HEADER */}
+                      <div className="border-b border-[#e8e9eb] bg-[#fafafa] px-3.5 py-3.5 md:px-5">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 min-w-[52px] flex-col items-center justify-center rounded-xl bg-neutral-900 text-white">
-                            <span className="text-sm font-bold leading-none">
+                          <div className="flex h-[54px] w-[54px] shrink-0 flex-col items-center justify-center rounded-[16px] bg-[#111820] text-white shadow-sm">
+                            <span className="text-[19px] font-bold leading-none">
                               {date.slice(
                                 8,
                                 10,
                               )}
                             </span>
 
-                            <span className="mt-0.5 text-[8px] uppercase tracking-wider text-neutral-300">
+                            <span className="mt-1 text-[8px] font-bold uppercase tracking-[0.1em] text-[#aeb6bf]">
                               {getWeekday(
                                 date,
                               )}
                             </span>
                           </div>
 
-                          <div>
-                            <div className="text-sm font-semibold capitalize text-neutral-900">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-[14px] font-bold capitalize tracking-[-0.015em]">
                               {getFullDate(
                                 date,
                               )}
                             </div>
 
-                            <div className="mt-0.5 text-[10px] text-neutral-400">
+                            <div className="mt-1 text-[11px] text-[#969ea8]">
                               {dayEntries.length}{" "}
-                              {language ===
-                              "ru"
+                              {isRu
                                 ? dayEntries.length ===
                                   1
                                   ? "служение"
@@ -855,316 +1217,49 @@ export default function SchedulePage() {
                           </div>
                         </div>
 
-                        <div className="flex gap-1.5">
-                          <button
-                            onClick={() =>
-                              openCreateModal(
-                                date,
-                                "10:00",
-                              )
-                            }
-                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2.5 text-[10px] font-semibold text-neutral-500 transition hover:border-neutral-300 hover:text-neutral-900"
-                          >
-                            <Plus
-                              size={12}
-                            />
-                            10:00
-                          </button>
+                        {isAdmin && (
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openCreateModal(
+                                  date,
+                                  "10:00",
+                                )
+                              }
+                              className="flex h-10 items-center justify-center gap-1.5 rounded-[12px] border border-[#dedfe2] bg-white text-[11px] font-bold text-[#68717d] active:bg-[#f4f5f5]"
+                            >
+                              <Plus
+                                size={14}
+                              />
+                              10:00 · DE
+                            </button>
 
-                          <button
-                            onClick={() =>
-                              openCreateModal(
-                                date,
-                                "12:30",
-                              )
-                            }
-                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2.5 text-[10px] font-semibold text-neutral-500 transition hover:border-neutral-300 hover:text-neutral-900"
-                          >
-                            <Plus
-                              size={12}
-                            />
-                            12:30
-                          </button>
-                        </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openCreateModal(
+                                  date,
+                                  "12:30",
+                                )
+                              }
+                              className="flex h-10 items-center justify-center gap-1.5 rounded-[12px] border border-[#dedfe2] bg-white text-[11px] font-bold text-[#68717d] active:bg-[#f4f5f5]"
+                            >
+                              <Plus
+                                size={14}
+                              />
+                              12:30 · RU
+                            </button>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Desktop table */}
-                      <div className="hidden overflow-x-auto md:block">
-                        <table className="w-full min-w-[850px] border-collapse">
-                          <thead>
-                            <tr className="border-b border-neutral-100">
-                              <th className="w-[100px] px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                                {language ===
-                                "ru"
-                                  ? "Время"
-                                  : "Zeit"}
-                              </th>
-
-                              <th className="px-4 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                                {language ===
-                                "ru"
-                                  ? "Служители"
-                                  : "Mitarbeiter"}
-                              </th>
-
-                              <th className="px-4 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                                {language ===
-                                "ru"
-                                  ? "Тема"
-                                  : "Thema"}
-                              </th>
-
-                              <th className="px-4 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                                {language ===
-                                "ru"
-                                  ? "Библия"
-                                  : "Bibel"}
-                              </th>
-
-                              <th className="px-4 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                                {language ===
-                                "ru"
-                                  ? "Серия"
-                                  : "Serie"}
-                              </th>
-
-                              <th className="w-[90px] px-4 py-3" />
-                            </tr>
-                          </thead>
-
-                          <tbody>
-                            {dayEntries.map(
-                              (entry) => {
-                                const names =
-                                  getMemberNames(
-                                    entry.id,
-                                  );
-
-                                const isEvent =
-                                  entry.entry_type ===
-                                  "event";
-
-                                return (
-                                  <tr
-                                    key={
-                                      entry.id
-                                    }
-                                    className="group border-b border-neutral-100 last:border-b-0"
-                                  >
-                                    <td className="px-5 py-4 align-top">
-                                      <div className="flex items-center gap-2">
-                                        <div
-                                          className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                                            isEvent
-                                              ? "bg-amber-50 text-amber-600"
-                                              : "bg-neutral-100 text-neutral-600"
-                                          }`}
-                                        >
-                                          {isEvent ? (
-                                            <Sparkles
-                                              size={
-                                                14
-                                              }
-                                              strokeWidth={
-                                                1.8
-                                              }
-                                            />
-                                          ) : (
-                                            <Clock3
-                                              size={
-                                                14
-                                              }
-                                              strokeWidth={
-                                                1.8
-                                              }
-                                            />
-                                          )}
-                                        </div>
-
-                                        <span className="text-sm font-semibold text-neutral-900">
-                                          {
-                                            entry.service_time
-                                          }
-                                        </span>
-                                      </div>
-                                    </td>
-
-                                    <td className="max-w-[190px] px-4 py-4 align-top">
-                                      {names.length >
-                                      0 ? (
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {names.map(
-                                            (
-                                              name,
-                                            ) => (
-                                              <span
-                                                key={
-                                                  name
-                                                }
-                                                className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] font-semibold text-neutral-600"
-                                              >
-                                                <Users
-                                                  size={
-                                                    10
-                                                  }
-                                                  strokeWidth={
-                                                    1.8
-                                                  }
-                                                />
-                                                {
-                                                  name
-                                                }
-                                              </span>
-                                            ),
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <span className="text-xs text-neutral-300">
-                                          —
-                                        </span>
-                                      )}
-                                    </td>
-
-                                    <td className="max-w-[330px] px-4 py-4 align-top">
-                                      <div className="flex items-start gap-2">
-                                        {isEvent && (
-                                          <span className="mt-0.5 rounded-full bg-amber-50 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-700">
-                                            {language ===
-                                            "ru"
-                                              ? "Событие"
-                                              : "Event"}
-                                          </span>
-                                        )}
-
-                                        <div className="min-w-0">
-                                          <div className="break-words text-sm font-semibold text-neutral-900">
-                                            {getEntryTitle(
-                                              entry,
-                                            )}
-                                          </div>
-
-                                          {language ===
-                                            "ru" &&
-                                            entry.title_de && (
-                                              <div className="mt-1 text-[10px] text-neutral-400">
-                                                {
-                                                  entry.title_de
-                                                }
-                                              </div>
-                                            )}
-
-                                          {language ===
-                                            "de" &&
-                                            entry.title_ru && (
-                                              <div className="mt-1 text-[10px] text-neutral-400">
-                                                {
-                                                  entry.title_ru
-                                                }
-                                              </div>
-                                            )}
-                                        </div>
-                                      </div>
-                                    </td>
-
-                                    <td className="max-w-[170px] px-4 py-4 align-top">
-                                      {entry.bible_text ? (
-                                        <div className="flex items-start gap-1.5 text-xs text-neutral-500">
-                                          <BookOpen
-                                            size={
-                                              13
-                                            }
-                                            strokeWidth={
-                                              1.7
-                                            }
-                                            className="mt-0.5 shrink-0 text-neutral-400"
-                                          />
-
-                                          <span>
-                                            {
-                                              entry.bible_text
-                                            }
-                                          </span>
-                                        </div>
-                                      ) : (
-                                        <span className="text-xs text-neutral-300">
-                                          —
-                                        </span>
-                                      )}
-                                    </td>
-
-                                    <td className="max-w-[150px] px-4 py-4 align-top">
-                                      {entry.series ? (
-                                        <span className="inline-flex rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] font-medium text-neutral-500">
-                                          {
-                                            entry.series
-                                          }
-                                        </span>
-                                      ) : (
-                                        <span className="text-xs text-neutral-300">
-                                          —
-                                        </span>
-                                      )}
-                                    </td>
-
-                                    <td className="px-4 py-4 align-top">
-                                      <div className="flex justify-end gap-1 opacity-0 transition group-hover:opacity-100">
-                                        <button
-                                          onClick={() =>
-                                            openEditModal(
-                                              entry,
-                                            )
-                                          }
-                                          className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
-                                          title={
-                                            language ===
-                                            "ru"
-                                              ? "Редактировать"
-                                              : "Bearbeiten"
-                                          }
-                                        >
-                                          <Pencil
-                                            size={
-                                              13
-                                            }
-                                          />
-                                        </button>
-
-                                        <button
-                                          onClick={() =>
-                                            setDeleteTarget(
-                                              entry,
-                                            )
-                                          }
-                                          className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-red-50 hover:text-red-600"
-                                          title={
-                                            language ===
-                                            "ru"
-                                              ? "Удалить"
-                                              : "Löschen"
-                                          }
-                                        >
-                                          <Trash2
-                                            size={
-                                              13
-                                            }
-                                          />
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              },
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Mobile */}
-                      <div className="space-y-2 p-2 md:hidden">
+                      {/* ENTRIES */}
+                      <div className="space-y-3 p-2.5 md:p-3">
                         {dayEntries.map(
                           (entry) => {
-                            const names =
-                              getMemberNames(
+                            const serviceMembers =
+                              getEntryMembers(
                                 entry.id,
                               );
 
@@ -1177,149 +1272,265 @@ export default function SchedulePage() {
                                 key={
                                   entry.id
                                 }
-                                className="rounded-xl border border-neutral-100 bg-neutral-50/50 p-3"
+                                className="overflow-hidden rounded-[19px] border border-[#e4e6e8] bg-[#fbfbfb]"
                               >
-                                <div className="flex items-start gap-3">
-                                  <div
-                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                                      isEvent
-                                        ? "bg-amber-50 text-amber-600"
-                                        : "bg-white text-neutral-600"
-                                    }`}
-                                  >
-                                    {isEvent ? (
-                                      <Sparkles
-                                        size={
-                                          15
-                                        }
-                                        strokeWidth={
-                                          1.8
-                                        }
-                                      />
-                                    ) : (
-                                      <Clock3
-                                        size={
-                                          15
-                                        }
-                                        strokeWidth={
-                                          1.8
-                                        }
-                                      />
-                                    )}
-                                  </div>
+                                <div className="p-4">
+                                  {/* TITLE */}
+                                  <div className="flex items-start gap-3">
+                                    <div
+                                      className={`flex h-[54px] w-[54px] shrink-0 flex-col items-center justify-center rounded-[15px] ${
+                                        isEvent
+                                          ? "bg-[#fff3d9] text-[#a8731b]"
+                                          : "bg-[#eef0f2] text-[#4e5966]"
+                                      }`}
+                                    >
+                                      {isEvent ? (
+                                        <Sparkles
+                                          size={
+                                            17
+                                          }
+                                          strokeWidth={
+                                            1.8
+                                          }
+                                        />
+                                      ) : (
+                                        <Clock3
+                                          size={
+                                            17
+                                          }
+                                          strokeWidth={
+                                            1.8
+                                          }
+                                        />
+                                      )}
 
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div>
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm font-bold text-neutral-900">
-                                            {
-                                              entry.service_time
-                                            }
-                                          </span>
+                                      <span className="mt-1 text-[11px] font-bold">
+                                        {
+                                          entry.service_time
+                                        }
+                                      </span>
+                                    </div>
 
-                                          {isEvent && (
-                                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-700">
-                                              {language ===
-                                              "ru"
-                                                ? "Событие"
-                                                : "Event"}
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                                            <span className="inline-flex rounded-full bg-[#eef0f2] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.08em] text-[#707987]">
+                                              {entry.service_time ===
+                                              "10:00"
+                                                ? "DE"
+                                                : "RU"}
                                             </span>
-                                          )}
+
+                                            {isEvent && (
+                                              <span className="inline-flex rounded-full bg-[#fff1d4] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.08em] text-[#a56d16]">
+                                                {isRu
+                                                  ? "Событие"
+                                                  : "Event"}
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          <h3 className="break-words text-[16px] font-bold leading-[1.25] tracking-[-0.025em] text-[#111820]">
+                                            {getEntryTitle(
+                                              entry,
+                                            )}
+                                          </h3>
                                         </div>
 
-                                        <h3 className="mt-1 break-words text-sm font-semibold leading-5 text-neutral-900">
-                                          {getEntryTitle(
-                                            entry,
-                                          )}
-                                        </h3>
+                                        {isAdmin && (
+                                          <div className="flex shrink-0 items-center gap-1">
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                openEditModal(
+                                                  entry,
+                                                )
+                                              }
+                                              className="flex h-9 w-9 items-center justify-center rounded-[11px] text-[#8a929c] active:bg-[#eef0f1] active:text-[#111820]"
+                                              aria-label={
+                                                isRu
+                                                  ? "Редактировать"
+                                                  : "Bearbeiten"
+                                              }
+                                            >
+                                              <Pencil
+                                                size={
+                                                  15
+                                                }
+                                              />
+                                            </button>
+
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                setDeleteTarget(
+                                                  entry,
+                                                )
+                                              }
+                                              className="flex h-9 w-9 items-center justify-center rounded-[11px] text-[#9b8a8a] active:bg-red-50 active:text-red-600"
+                                              aria-label={
+                                                isRu
+                                                  ? "Удалить"
+                                                  : "Löschen"
+                                              }
+                                            >
+                                              <Trash2
+                                                size={
+                                                  15
+                                                }
+                                              />
+                                            </button>
+                                          </div>
+                                        )}
                                       </div>
+                                    </div>
+                                  </div>
 
-                                      <div className="flex shrink-0 gap-1">
-                                        <button
-                                          onClick={() =>
-                                            openEditModal(
-                                              entry,
-                                            )
-                                          }
-                                          className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:bg-white hover:text-neutral-900"
-                                        >
-                                          <Pencil
+                                  {/* =================================================
+                                      SERVING TEAM
+                                  ================================================= */}
+                                  <div className="mt-4 rounded-[16px] border border-[#e2e4e6] bg-white p-3.5">
+                                    <div className="mb-3 flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#111820] text-white">
+                                          <Users
                                             size={
-                                              12
+                                              15
+                                            }
+                                            strokeWidth={
+                                              1.8
                                             }
                                           />
-                                        </button>
+                                        </div>
 
-                                        <button
-                                          onClick={() =>
-                                            setDeleteTarget(
-                                              entry,
-                                            )
-                                          }
-                                          className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:bg-red-50 hover:text-red-600"
-                                        >
-                                          <Trash2
-                                            size={
-                                              12
-                                            }
-                                          />
-                                        </button>
+                                        <div>
+                                          <div className="text-[12px] font-bold text-[#111820]">
+                                            {isRu
+                                              ? "Служат"
+                                              : "Mitarbeiter"}
+                                          </div>
+
+                                          <div className="text-[9px] text-[#9aa2ad]">
+                                            {serviceMembers.length}{" "}
+                                            {isRu
+                                              ? serviceMembers.length ===
+                                                1
+                                                ? "человек"
+                                                : "человека"
+                                              : serviceMembers.length ===
+                                                  1
+                                                ? "Person"
+                                                : "Personen"}
+                                          </div>
+                                        </div>
                                       </div>
                                     </div>
 
-                                    {names.length >
-                                      0 && (
-                                      <div className="mt-3 flex flex-wrap gap-1.5">
-                                        {names.map(
+                                    {serviceMembers.length >
+                                    0 ? (
+                                      <div className="space-y-2">
+                                        {serviceMembers.map(
                                           (
-                                            name,
+                                            member,
                                           ) => (
-                                            <span
+                                            <div
                                               key={
-                                                name
+                                                member.id
                                               }
-                                              className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[9px] font-semibold text-neutral-600"
+                                              className="flex min-h-[58px] items-center gap-3 rounded-[14px] bg-[#f5f6f6] px-3"
                                             >
-                                              <Users
-                                                size={
-                                                  9
-                                                }
-                                              />
-                                              {
-                                                name
-                                              }
-                                            </span>
+                                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#111820] text-[10px] font-bold text-white">
+                                                {getInitials(
+                                                  member,
+                                                )}
+                                              </div>
+
+                                              <div className="min-w-0 flex-1">
+                                                <div className="text-[13px] font-bold leading-5 text-[#1a222b]">
+                                                  {
+                                                    member.first_name
+                                                  }{" "}
+                                                  {
+                                                    member.last_name
+                                                  }
+                                                </div>
+
+                                                {member.position && (
+                                                  <div className="mt-0.5 text-[10px] text-[#8a939d]">
+                                                    {
+                                                      member.position
+                                                    }
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
                                           ),
                                         )}
                                       </div>
+                                    ) : (
+                                      <div className="rounded-[12px] bg-[#f5f6f6] px-3 py-3 text-[11px] text-[#929aa5]">
+                                        {isRu
+                                          ? "Служители ещё не назначены."
+                                          : "Noch keine Mitarbeiter zugewiesen."}
+                                      </div>
                                     )}
+                                  </div>
 
-                                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 border-t border-neutral-200 pt-2.5">
+                                  {/* META */}
+                                  {(entry.bible_text ||
+                                    entry.series) && (
+                                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
                                       {entry.bible_text && (
-                                        <div className="flex items-center gap-1.5 text-[9px] text-neutral-500">
+                                        <div className="flex min-w-0 gap-2 rounded-[13px] bg-[#f1f2f3] px-3 py-2.5">
                                           <BookOpen
                                             size={
-                                              10
+                                              15
                                             }
-                                            className="text-neutral-400"
+                                            className="mt-0.5 shrink-0 text-[#7f8893]"
                                           />
 
-                                          {
-                                            entry.bible_text
-                                          }
+                                          <div className="min-w-0">
+                                            <div className="text-[8px] font-bold uppercase tracking-[0.08em] text-[#9aa2ad]">
+                                              {isRu
+                                                ? "Библия"
+                                                : "Bibelstelle"}
+                                            </div>
+
+                                            <div className="mt-0.5 break-words text-[11px] font-semibold leading-4 text-[#5f6975]">
+                                              {
+                                                entry.bible_text
+                                              }
+                                            </div>
+                                          </div>
                                         </div>
                                       )}
 
                                       {entry.series && (
-                                        <div className="text-[9px] font-medium text-neutral-400">
-                                          {
-                                            entry.series
-                                          }
+                                        <div className="rounded-[13px] bg-[#f1f2f3] px-3 py-2.5">
+                                          <div className="text-[8px] font-bold uppercase tracking-[0.08em] text-[#9aa2ad]">
+                                            {isRu
+                                              ? "Серия"
+                                              : "Serie"}
+                                          </div>
+
+                                          <div className="mt-0.5 break-words text-[11px] font-semibold leading-4 text-[#5f6975]">
+                                            {
+                                              entry.series
+                                            }
+                                          </div>
                                         </div>
                                       )}
                                     </div>
-                                  </div>
+                                  )}
+
+                                  {entry.notes && (
+                                    <div className="mt-3 rounded-[13px] bg-[#f1f2f3] px-3 py-2.5 text-[11px] leading-4 text-[#68727e]">
+                                      {
+                                        entry.notes
+                                      }
+                                    </div>
+                                  )}
                                 </div>
                               </article>
                             );
@@ -1335,435 +1546,617 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {/* Create / Edit modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]">
-          <div className="max-h-[92vh] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-neutral-200 bg-white shadow-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-neutral-100 bg-white px-5 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-neutral-900">
-                  {editingEntry
-                    ? language === "ru"
-                      ? "Редактировать служение"
-                      : "Dienst bearbeiten"
-                    : language === "ru"
-                      ? "Новое служение"
-                      : "Neuer Dienst"}
-                </h2>
+      {/* =====================================================
+          CREATE / EDIT SHEET
+      ===================================================== */}
 
-                <p className="mt-0.5 text-[10px] text-neutral-400">
-                  {language === "ru"
-                    ? "Заполни информацию о служении."
-                    : "Informationen zum Dienst eintragen."}
-                </p>
-              </div>
+      {modalOpen &&
+        isAdmin && (
+          <div className="fixed inset-0 z-[100] flex items-end justify-center bg-[#111820]/35 backdrop-blur-[3px] md:items-center md:p-5">
+            <div className="flex max-h-[94vh] w-full flex-col overflow-hidden rounded-t-[27px] bg-white shadow-2xl md:max-w-[650px] md:rounded-[22px]">
+              <div className="shrink-0 border-b border-[#e8e9eb] bg-white px-5 pb-4 pt-3 md:px-6 md:pt-5">
+                <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[#d9dadd] md:hidden" />
 
-              <button
-                onClick={closeModal}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900"
-              >
-                <X size={16} />
-              </button>
-            </div>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-[19px] font-bold tracking-[-0.03em]">
+                      {editingEntry
+                        ? isRu
+                          ? "Редактировать служение"
+                          : "Dienst bearbeiten"
+                        : isRu
+                          ? "Новое служение"
+                          : "Neuer Dienst"}
+                    </h2>
 
-            <div className="space-y-5 p-5">
-              {/* Date + time + type */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div>
-                  <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                    {language === "ru"
-                      ? "Дата"
-                      : "Datum"}
-                  </label>
+                    <p className="mt-1 text-[12px] text-[#858e99]">
+                      {form.service_time ===
+                      "10:00"
+                        ? isRu
+                          ? "10:00 · немецкое служение"
+                          : "10:00 · Deutscher Gottesdienst"
+                        : isRu
+                          ? "12:30 · русское служение"
+                          : "12:30 · Russischer Gottesdienst"}
+                    </p>
+                  </div>
 
-                  <input
-                    type="date"
-                    value={
-                      form.schedule_date
+                  <button
+                    type="button"
+                    onClick={
+                      closeModal
                     }
-                    onChange={(event) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          schedule_date:
-                            event.target
-                              .value,
-                        }),
-                      )
-                    }
-                    className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                    {language === "ru"
-                      ? "Время"
-                      : "Zeit"}
-                  </label>
-
-                  <select
-                    value={
-                      form.service_time
-                    }
-                    onChange={(event) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          service_time:
-                            event.target
-                              .value as
-                              | "10:00"
-                              | "12:30",
-                        }),
-                      )
-                    }
-                    className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
+                    disabled={saving}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#f2f3f4] text-[#68727e] disabled:opacity-40"
                   >
-                    <option value="10:00">
-                      10:00
-                    </option>
-
-                    <option value="12:30">
-                      12:30
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                    {language === "ru"
-                      ? "Тип"
-                      : "Typ"}
-                  </label>
-
-                  <select
-                    value={
-                      form.entry_type
-                    }
-                    onChange={(event) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          entry_type:
-                            event.target
-                              .value as
-                              | "lesson"
-                              | "event",
-                        }),
-                      )
-                    }
-                    className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
-                  >
-                    <option value="lesson">
-                      {language ===
-                      "ru"
-                        ? "Урок"
-                        : "Unterricht"}
-                    </option>
-
-                    <option value="event">
-                      {language ===
-                      "ru"
-                        ? "Событие"
-                        : "Veranstaltung"}
-                    </option>
-                  </select>
+                    <X size={20} />
+                  </button>
                 </div>
               </div>
 
-              {/* Team members */}
-              <div>
-                <label className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                  {language === "ru"
-                    ? "Служители"
-                    : "Mitarbeiter"}
-                </label>
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 md:px-6">
+                <div className="space-y-5">
+                  {/* DATE */}
+                  <div>
+                    <label className="mb-2 block px-1 text-[11px] font-bold text-[#65707d]">
+                      {isRu
+                        ? "Дата"
+                        : "Datum"}
+                    </label>
 
-                <div className="grid max-h-[170px] grid-cols-1 gap-1.5 overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50 p-2 sm:grid-cols-2">
-                  {members.map(
-                    (member) => {
-                      const selected =
-                        form.member_ids.includes(
-                          member.id,
-                        );
+                    <input
+                      type="date"
+                      value={
+                        form.schedule_date
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setForm(
+                          (
+                            current,
+                          ) => ({
+                            ...current,
+                            schedule_date:
+                              event
+                                .target
+                                .value,
+                          }),
+                        )
+                      }
+                      className="h-[52px] w-full rounded-[15px] border border-[#dfe1e4] bg-[#fafafa] px-3.5 text-[15px] outline-none focus:border-[#111820] focus:bg-white"
+                    />
+                  </div>
 
-                      return (
-                        <button
-                          key={
-                            member.id
-                          }
-                          type="button"
-                          onClick={() =>
-                            toggleMember(
-                              member.id,
-                            )
-                          }
-                          className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left transition ${
-                            selected
-                              ? "border-neutral-900 bg-neutral-900 text-white"
-                              : "border-transparent bg-white text-neutral-600 hover:border-neutral-200"
+                  {/* SERVICE */}
+                  <div>
+                    <label className="mb-2 block px-1 text-[11px] font-bold text-[#65707d]">
+                      {isRu
+                        ? "Служение"
+                        : "Gottesdienst"}
+                    </label>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          changeServiceTime(
+                            "10:00",
+                          )
+                        }
+                        className={`rounded-[15px] border px-3 py-3 text-left ${
+                          form.service_time ===
+                          "10:00"
+                            ? "border-[#111820] bg-[#111820] text-white"
+                            : "border-[#dfe1e4] bg-[#fafafa] text-[#66707d]"
+                        }`}
+                      >
+                        <div className="text-[15px] font-bold">
+                          10:00
+                        </div>
+
+                        <div
+                          className={`mt-1 text-[10px] ${
+                            form.service_time ===
+                            "10:00"
+                              ? "text-white/60"
+                              : "text-[#9aa2ad]"
                           }`}
                         >
-                          <span className="text-xs font-medium">
-                            {
-                              member.first_name
-                            }{" "}
-                            {
-                              member.last_name
-                            }
-                          </span>
+                          Deutsch · DE
+                        </div>
+                      </button>
 
-                          {selected && (
-                            <CheckIcon />
-                          )}
-                        </button>
-                      );
-                    },
+                      <button
+                        type="button"
+                        onClick={() =>
+                          changeServiceTime(
+                            "12:30",
+                          )
+                        }
+                        className={`rounded-[15px] border px-3 py-3 text-left ${
+                          form.service_time ===
+                          "12:30"
+                            ? "border-[#111820] bg-[#111820] text-white"
+                            : "border-[#dfe1e4] bg-[#fafafa] text-[#66707d]"
+                        }`}
+                      >
+                        <div className="text-[15px] font-bold">
+                          12:30
+                        </div>
+
+                        <div
+                          className={`mt-1 text-[10px] ${
+                            form.service_time ===
+                            "12:30"
+                              ? "text-white/60"
+                              : "text-[#9aa2ad]"
+                          }`}
+                        >
+                          Русский · RU
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* TYPE */}
+                  <div>
+                    <label className="mb-2 block px-1 text-[11px] font-bold text-[#65707d]">
+                      {isRu
+                        ? "Тип"
+                        : "Typ"}
+                    </label>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm(
+                            (
+                              current,
+                            ) => ({
+                              ...current,
+                              entry_type:
+                                "lesson",
+                            }),
+                          )
+                        }
+                        className={`h-[52px] rounded-[15px] border text-[13px] font-bold ${
+                          form.entry_type ===
+                          "lesson"
+                            ? "border-[#111820] bg-[#111820] text-white"
+                            : "border-[#dfe1e4] bg-[#fafafa] text-[#66707d]"
+                        }`}
+                      >
+                        {isRu
+                          ? "Урок"
+                          : "Unterricht"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm(
+                            (
+                              current,
+                            ) => ({
+                              ...current,
+                              entry_type:
+                                "event",
+                            }),
+                          )
+                        }
+                        className={`h-[52px] rounded-[15px] border text-[13px] font-bold ${
+                          form.entry_type ===
+                          "event"
+                            ? "border-[#111820] bg-[#111820] text-white"
+                            : "border-[#dfe1e4] bg-[#fafafa] text-[#66707d]"
+                        }`}
+                      >
+                        {isRu
+                          ? "Событие"
+                          : "Veranstaltung"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* TEAM */}
+                  <div>
+                    <div className="mb-2 flex items-center justify-between px-1">
+                      <label className="text-[11px] font-bold text-[#65707d]">
+                        {isRu
+                          ? "Служители"
+                          : "Mitarbeiter"}
+                      </label>
+
+                      {form.member_ids
+                        .length >
+                        0 && (
+                        <span className="text-[10px] font-semibold text-[#969ea8]">
+                          {isRu
+                            ? `Выбрано: ${form.member_ids.length}`
+                            : `Ausgewählt: ${form.member_ids.length}`}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="max-h-[240px] space-y-1.5 overflow-y-auto rounded-[16px] border border-[#e0e2e5] bg-[#fafafa] p-2">
+                      {members.length ===
+                      0 ? (
+                        <div className="px-3 py-4 text-center text-[12px] text-[#939ba5]">
+                          {isRu
+                            ? "Нет активных служителей."
+                            : "Keine aktiven Mitarbeiter."}
+                        </div>
+                      ) : (
+                        members.map(
+                          (
+                            member,
+                          ) => {
+                            const selected =
+                              form.member_ids.includes(
+                                member.id,
+                              );
+
+                            return (
+                              <button
+                                key={
+                                  member.id
+                                }
+                                type="button"
+                                onClick={() =>
+                                  toggleMember(
+                                    member.id,
+                                  )
+                                }
+                                className={`flex min-h-[52px] w-full items-center justify-between rounded-[13px] border px-3.5 text-left ${
+                                  selected
+                                    ? "border-[#111820] bg-[#111820] text-white"
+                                    : "border-transparent bg-white text-[#5f6975]"
+                                }`}
+                              >
+                                <div className="flex min-w-0 items-center gap-2.5">
+                                  <div
+                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-[9px] font-bold ${
+                                      selected
+                                        ? "bg-white/10 text-white"
+                                        : "bg-[#f0f1f2] text-[#4d5864]"
+                                    }`}
+                                  >
+                                    {getInitials(
+                                      member,
+                                    )}
+                                  </div>
+
+                                  <span className="truncate text-[13px] font-semibold">
+                                    {
+                                      member.first_name
+                                    }{" "}
+                                    {
+                                      member.last_name
+                                    }
+                                  </span>
+                                </div>
+
+                                {selected && (
+                                  <CheckIcon />
+                                )}
+                              </button>
+                            );
+                          },
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  {/* =================================================
+                      LANGUAGE-SPECIFIC TOPIC
+                  ================================================= */}
+
+                  {form.service_time ===
+                  "10:00" ? (
+                    <div>
+                      <div className="mb-2 flex items-center justify-between px-1">
+                        <label className="text-[11px] font-bold text-[#65707d]">
+                          Thema · DE
+                        </label>
+
+                        <span className="rounded-full bg-[#eef0f2] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.08em] text-[#707987]">
+                          10:00
+                        </span>
+                      </div>
+
+                      <input
+                        value={
+                          form.title_de
+                        }
+                        onChange={(
+                          event,
+                        ) =>
+                          setForm(
+                            (
+                              current,
+                            ) => ({
+                              ...current,
+                              title_de:
+                                event
+                                  .target
+                                  .value,
+                            }),
+                          )
+                        }
+                        placeholder="z. B. Ich bin der Weg..."
+                        className="h-[54px] w-full rounded-[15px] border border-[#dfe1e4] bg-[#fafafa] px-4 text-[15px] outline-none placeholder:text-[#b1b7bf] focus:border-[#111820] focus:bg-white"
+                      />
+
+                      <p className="mt-1.5 px-1 text-[10px] text-[#9aa2ad]">
+                        {isRu
+                          ? "Для служения в 10:00 используется только немецкая тема."
+                          : "Für den Gottesdienst um 10:00 wird nur das deutsche Thema verwendet."}
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="mb-2 flex items-center justify-between px-1">
+                        <label className="text-[11px] font-bold text-[#65707d]">
+                          Тема · RU
+                        </label>
+
+                        <span className="rounded-full bg-[#eef0f2] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.08em] text-[#707987]">
+                          12:30
+                        </span>
+                      </div>
+
+                      <input
+                        value={
+                          form.title_ru
+                        }
+                        onChange={(
+                          event,
+                        ) =>
+                          setForm(
+                            (
+                              current,
+                            ) => ({
+                              ...current,
+                              title_ru:
+                                event
+                                  .target
+                                  .value,
+                            }),
+                          )
+                        }
+                        placeholder="Например: Я — Путь..."
+                        className="h-[54px] w-full rounded-[15px] border border-[#dfe1e4] bg-[#fafafa] px-4 text-[15px] outline-none placeholder:text-[#b1b7bf] focus:border-[#111820] focus:bg-white"
+                      />
+
+                      <p className="mt-1.5 px-1 text-[10px] text-[#9aa2ad]">
+                        {isRu
+                          ? "Для служения в 12:30 используется только русская тема."
+                          : "Für den Gottesdienst um 12:30 wird nur das russische Thema verwendet."}
+                      </p>
+                    </div>
                   )}
-                </div>
 
-                {form.member_ids
-                  .length > 0 && (
-                  <p className="mt-1.5 text-[10px] text-neutral-400">
-                    {language ===
-                    "ru"
-                      ? `Выбрано: ${form.member_ids.length}`
-                      : `Ausgewählt: ${form.member_ids.length}`}
-                  </p>
-                )}
-              </div>
+                  {/* BIBLE */}
+                  <div>
+                    <label className="mb-2 block px-1 text-[11px] font-bold text-[#65707d]">
+                      {isRu
+                        ? "Библейский текст"
+                        : "Bibelstelle"}
+                    </label>
 
-              {/* Titles */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                    Thema / DE
-                  </label>
+                    <input
+                      value={
+                        form.bible_text
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setForm(
+                          (
+                            current,
+                          ) => ({
+                            ...current,
+                            bible_text:
+                              event
+                                .target
+                                .value,
+                          }),
+                        )
+                      }
+                      placeholder="Johannes 14,1–7"
+                      className="h-[54px] w-full rounded-[15px] border border-[#dfe1e4] bg-[#fafafa] px-4 text-[15px] outline-none placeholder:text-[#b1b7bf] focus:border-[#111820] focus:bg-white"
+                    />
+                  </div>
 
-                  <input
-                    value={
-                      form.title_de
-                    }
-                    onChange={(event) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          title_de:
-                            event.target
-                              .value,
-                        }),
-                      )
-                    }
-                    placeholder="z. B. Ich bin der Weg..."
-                    className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none placeholder:text-neutral-300 focus:border-neutral-400 focus:bg-white"
-                  />
-                </div>
+                  {/* SERIES */}
+                  <div>
+                    <label className="mb-2 block px-1 text-[11px] font-bold text-[#65707d]">
+                      {isRu
+                        ? "Серия"
+                        : "Serie"}
+                    </label>
 
-                <div>
-                  <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                    Тема / RU
-                  </label>
+                    <input
+                      value={
+                        form.series
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setForm(
+                          (
+                            current,
+                          ) => ({
+                            ...current,
+                            series:
+                              event
+                                .target
+                                .value,
+                          }),
+                        )
+                      }
+                      placeholder="Lehre Jesu"
+                      className="h-[54px] w-full rounded-[15px] border border-[#dfe1e4] bg-[#fafafa] px-4 text-[15px] outline-none placeholder:text-[#b1b7bf] focus:border-[#111820] focus:bg-white"
+                    />
+                  </div>
 
-                  <input
-                    value={
-                      form.title_ru
-                    }
-                    onChange={(event) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          title_ru:
-                            event.target
-                              .value,
-                        }),
-                      )
-                    }
-                    placeholder="Например: Я — Путь..."
-                    className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none placeholder:text-neutral-300 focus:border-neutral-400 focus:bg-white"
-                  />
-                </div>
-              </div>
+                  {/* NOTES */}
+                  <div>
+                    <label className="mb-2 block px-1 text-[11px] font-bold text-[#65707d]">
+                      {isRu
+                        ? "Дополнительная информация"
+                        : "Zusätzliche Informationen"}
+                    </label>
 
-              {/* Bible + series */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                    {language ===
-                    "ru"
-                      ? "Библейский текст"
-                      : "Bibelstelle"}
-                  </label>
-
-                  <input
-                    value={
-                      form.bible_text
-                    }
-                    onChange={(event) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          bible_text:
-                            event.target
-                              .value,
-                        }),
-                      )
-                    }
-                    placeholder="Johannes 14,1–7"
-                    className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none placeholder:text-neutral-300 focus:border-neutral-400 focus:bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                    {language ===
-                    "ru"
-                      ? "Серия"
-                      : "Serie"}
-                  </label>
-
-                  <input
-                    value={form.series}
-                    onChange={(event) =>
-                      setForm(
-                        (current) => ({
-                          ...current,
-                          series:
-                            event.target
-                              .value,
-                        }),
-                      )
-                    }
-                    placeholder="Lehre Jesu"
-                    className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none placeholder:text-neutral-300 focus:border-neutral-400 focus:bg-white"
-                  />
+                    <textarea
+                      value={
+                        form.notes
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setForm(
+                          (
+                            current,
+                          ) => ({
+                            ...current,
+                            notes:
+                              event
+                                .target
+                                .value,
+                          }),
+                        )
+                      }
+                      rows={4}
+                      placeholder={
+                        isRu
+                          ? "Например: подростки остаются в зале..."
+                          : "z. B. Teens bleiben im Saal..."
+                      }
+                      className="w-full resize-none rounded-[15px] border border-[#dfe1e4] bg-[#fafafa] px-4 py-3 text-[15px] leading-5 outline-none placeholder:text-[#b1b7bf] focus:border-[#111820] focus:bg-white"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                  {language === "ru"
-                    ? "Дополнительная информация"
-                    : "Zusätzliche Informationen"}
-                </label>
+              {/* FOOTER */}
+              <div className="shrink-0 border-t border-[#e8e9eb] bg-white px-5 py-4 pb-[max(16px,env(safe-area-inset-bottom))] md:px-6">
+                <div className="flex gap-2.5">
+                  <button
+                    type="button"
+                    onClick={
+                      closeModal
+                    }
+                    disabled={saving}
+                    className="h-[54px] flex-1 rounded-[15px] border border-[#dedfe2] text-[13px] font-bold text-[#69727e] disabled:opacity-40"
+                  >
+                    {isRu
+                      ? "Отмена"
+                      : "Abbrechen"}
+                  </button>
 
-                <textarea
-                  value={form.notes}
-                  onChange={(event) =>
-                    setForm(
-                      (current) => ({
-                        ...current,
-                        notes:
-                          event.target
-                            .value,
-                      }),
-                    )
-                  }
-                  rows={3}
-                  placeholder={
-                    language === "ru"
-                      ? "Например: подростки остаются в зале..."
-                      : "z. B. Teens bleiben im Saal..."
-                  }
-                  className="w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm outline-none placeholder:text-neutral-300 focus:border-neutral-400 focus:bg-white"
+                  <button
+                    type="button"
+                    onClick={
+                      saveEntry
+                    }
+                    disabled={
+                      saving ||
+                      !form.schedule_date ||
+                      (form.service_time ===
+                        "10:00" &&
+                        !form.title_de.trim()) ||
+                      (form.service_time ===
+                        "12:30" &&
+                        !form.title_ru.trim())
+                    }
+                    className="h-[54px] flex-1 rounded-[15px] bg-[#111820] text-[13px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {saving
+                      ? isRu
+                        ? "Сохранение..."
+                        : "Speichern..."
+                      : editingEntry
+                        ? isRu
+                          ? "Сохранить"
+                          : "Speichern"
+                        : isRu
+                          ? "Добавить"
+                          : "Hinzufügen"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      {/* =====================================================
+          DELETE CONFIRMATION
+      ===================================================== */}
+
+      {deleteTarget &&
+        isAdmin && (
+          <div className="fixed inset-0 z-[110] flex items-end justify-center bg-[#111820]/35 p-0 backdrop-blur-[3px] md:items-center md:p-5">
+            <div className="w-full rounded-t-[27px] bg-white p-5 shadow-2xl md:max-w-[430px] md:rounded-[22px] md:p-6">
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[#d9dadd] md:hidden" />
+
+              <div className="flex h-12 w-12 items-center justify-center rounded-[15px] bg-red-50 text-red-600">
+                <Trash2
+                  size={20}
+                  strokeWidth={1.8}
                 />
               </div>
-            </div>
 
-            <div className="sticky bottom-0 flex gap-2 border-t border-neutral-100 bg-white px-5 py-4">
-              <button
-                onClick={closeModal}
-                disabled={saving}
-                className="h-10 flex-1 rounded-xl border border-neutral-200 text-xs font-semibold text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
-              >
-                {language === "ru"
-                  ? "Отмена"
-                  : "Abbrechen"}
-              </button>
+              <h2 className="mt-5 text-[19px] font-bold tracking-[-0.03em]">
+                {isRu
+                  ? "Удалить служение?"
+                  : "Dienst löschen?"}
+              </h2>
 
-              <button
-                onClick={saveEntry}
-                disabled={
-                  saving ||
-                  !form.schedule_date ||
-                  (!form.title_de.trim() &&
-                    !form.title_ru.trim())
-                }
-                className="h-10 flex-1 rounded-xl bg-neutral-900 text-xs font-semibold text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {saving
-                  ? language === "ru"
-                    ? "Сохранение..."
-                    : "Speichern..."
-                  : editingEntry
-                    ? language === "ru"
-                      ? "Сохранить"
-                      : "Speichern"
-                    : language === "ru"
-                      ? "Добавить"
-                      : "Hinzufügen"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              <p className="mt-2 text-[13px] leading-5 text-[#707987]">
+                {isRu
+                  ? `«${getEntryTitle(deleteTarget)}» будет удалено из расписания.`
+                  : `„${getEntryTitle(deleteTarget)}“ wird aus dem Dienstplan entfernt.`}
+              </p>
 
-      {/* Delete confirmation */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-[400px] rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xl">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600">
-              <Trash2
-                size={17}
-                strokeWidth={1.8}
-              />
-            </div>
+              <div className="mt-6 flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDeleteTarget(
+                      null,
+                    )
+                  }
+                  disabled={deleting}
+                  className="h-[52px] flex-1 rounded-[15px] border border-[#dedfe2] text-[13px] font-bold text-[#69727e] disabled:opacity-40"
+                >
+                  {isRu
+                    ? "Отмена"
+                    : "Abbrechen"}
+                </button>
 
-            <h2 className="mt-4 text-base font-semibold text-neutral-900">
-              {language === "ru"
-                ? "Удалить служение?"
-                : "Dienst löschen?"}
-            </h2>
-
-            <p className="mt-1 text-xs leading-5 text-neutral-500">
-              {language === "ru"
-                ? `«${getEntryTitle(deleteTarget)}» будет удалено из расписания.`
-                : `„${getEntryTitle(deleteTarget)}“ wird aus dem Dienstplan entfernt.`}
-            </p>
-
-            <div className="mt-5 flex gap-2">
-              <button
-                onClick={() =>
-                  setDeleteTarget(
-                    null,
-                  )
-                }
-                disabled={deleting}
-                className="h-10 flex-1 rounded-xl border border-neutral-200 text-xs font-semibold text-neutral-600 hover:bg-neutral-50"
-              >
-                {language === "ru"
-                  ? "Отмена"
-                  : "Abbrechen"}
-              </button>
-
-              <button
-                onClick={deleteEntry}
-                disabled={deleting}
-                className="h-10 flex-1 rounded-xl bg-red-600 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleting
-                  ? language === "ru"
-                    ? "Удаление..."
-                    : "Löschen..."
-                  : language === "ru"
-                    ? "Удалить"
-                    : "Löschen"}
-              </button>
+                <button
+                  type="button"
+                  onClick={
+                    deleteEntry
+                  }
+                  disabled={deleting}
+                  className="h-[52px] flex-1 rounded-[15px] bg-red-600 text-[13px] font-bold text-white disabled:opacity-50"
+                >
+                  {deleting
+                    ? isRu
+                      ? "Удаление..."
+                      : "Löschen..."
+                    : isRu
+                      ? "Удалить"
+                      : "Löschen"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
     </main>
   );
 }
@@ -1771,8 +2164,8 @@ export default function SchedulePage() {
 function CheckIcon() {
   return (
     <svg
-      width="13"
-      height="13"
+      width="16"
+      height="16"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

@@ -2,8 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  ArrowLeft,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
   Edit3,
   Filter,
+  ListTodo,
+  Phone,
   Plus,
   Search,
   Trash2,
@@ -11,9 +17,8 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
-import Header from "@/components/Header";
-import Sidebar from "@/components/Sidebar";
 import { supabase } from "@/lib/supabase";
 import { translations, type Language } from "@/lib/translations";
 
@@ -51,6 +56,21 @@ type MemberForm = {
   notes: string;
 };
 
+type WorkItem = {
+  id: number;
+  title: string;
+  status: "open" | "in_progress" | "completed";
+  priority: "low" | "normal" | "high" | "urgent";
+  deadline: string | null;
+  assigned_to: number | null;
+  project_id: number | null;
+};
+
+type WorkProject = {
+  id: number;
+  title: string;
+};
+
 const emptyForm: MemberForm = {
   first_name: "",
   last_name: "",
@@ -74,7 +94,10 @@ function calculateAge(date: string | null) {
   if (!date) return null;
 
   const birth = new Date(date);
-  if (Number.isNaN(birth.getTime())) return null;
+
+  if (Number.isNaN(birth.getTime())) {
+    return null;
+  }
 
   const today = new Date();
 
@@ -96,9 +119,37 @@ function formatDate(date: string | null, language: Language) {
   if (!date) return "—";
 
   const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return "—";
 
-  return parsed.toLocaleDateString(language === "de" ? "de-DE" : "ru-RU");
+  if (Number.isNaN(parsed.getTime())) {
+    return "—";
+  }
+
+  return parsed.toLocaleDateString(
+    language === "de" ? "de-DE" : "ru-RU",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    },
+  );
+}
+
+function formatShortDate(date: string | null, language: Language) {
+  if (!date) return "—";
+
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return "—";
+  }
+
+  return parsed.toLocaleDateString(
+    language === "de" ? "de-DE" : "ru-RU",
+    {
+      day: "2-digit",
+      month: "short",
+    },
+  );
 }
 
 function getPositionLabel(position: Position, language: Language) {
@@ -141,22 +192,19 @@ function getStatusLabel(status: Status, language: Language) {
 function getPositionStyle(position: Position) {
   switch (position) {
     case "hauptleiter":
-      return "bg-neutral-900 text-white border-neutral-900";
+      return "bg-neutral-900 text-white";
 
     case "sekretariat":
-      return "bg-purple-50 text-purple-700 border-purple-200";
+      return "bg-purple-50 text-purple-700";
 
     case "leiter":
-      return "bg-blue-50 text-blue-700 border-blue-200";
+      return "bg-blue-50 text-blue-700";
 
     case "co_leiter":
-      return "bg-emerald-50 text-emerald-700 border-emerald-200";
-
-    case "weitere":
-      return "bg-neutral-50 text-neutral-600 border-neutral-200";
+      return "bg-emerald-50 text-emerald-700";
 
     default:
-      return "bg-neutral-50 text-neutral-500 border-neutral-200";
+      return "bg-neutral-100 text-neutral-600";
   }
 }
 
@@ -167,68 +215,187 @@ function getInitials(member: TeamMember) {
   return `${first}${last}`.toUpperCase();
 }
 
-export default function TeamPage() {
-  const [language, setLanguage] = useState<Language>("ru");
+function getAvatarTone(member: TeamMember) {
+  const tones = [
+    "bg-neutral-900 text-white",
+    "bg-neutral-200 text-neutral-700",
+    "bg-slate-200 text-slate-700",
+    "bg-stone-200 text-stone-700",
+    "bg-zinc-200 text-zinc-700",
+  ];
 
+  return tones[member.id % tones.length];
+}
+
+function getTaskStatusLabel(
+  status: WorkItem["status"],
+  language: Language,
+) {
+  if (status === "completed") {
+    return language === "de" ? "Erledigt" : "Выполнено";
+  }
+
+  if (status === "in_progress") {
+    return language === "de" ? "In Arbeit" : "В работе";
+  }
+
+  return language === "de" ? "Offen" : "Открыта";
+}
+
+function getPriorityLabel(
+  priority: WorkItem["priority"],
+  language: Language,
+) {
+  const labels = {
+    low: {
+      de: "Niedrig",
+      ru: "Низкий",
+    },
+    normal: {
+      de: "Normal",
+      ru: "Обычный",
+    },
+    high: {
+      de: "Hoch",
+      ru: "Высокий",
+    },
+    urgent: {
+      de: "Dringend",
+      ru: "Срочно",
+    },
+  };
+
+  return labels[priority][language];
+}
+
+export default function TeamPage() {
+  const router = useRouter();
+
+  const [language, setLanguage] = useState<Language>("de");
   const t = translations[language];
 
   const [members, setMembers] = useState<TeamMember[]>([]);
+  const [workItems, setWorkItems] = useState<WorkItem[]>([]);
+  const [projects, setProjects] = useState<WorkProject[]>([]);
+
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
-  const [positionFilter, setPositionFilter] = useState<Position | "all">(
-    "all",
-  );
+
+  const [positionFilter, setPositionFilter] = useState<
+    Position | "all"
+  >("all");
+
   const [languageFilter, setLanguageFilter] = useState<
     "all" | "DE" | "RU"
   >("all");
-  const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
+
+  const [statusFilter, setStatusFilter] = useState<Status | "all">(
+    "all",
+  );
 
   const [showFilters, setShowFilters] = useState(false);
 
+  const [selectedMember, setSelectedMember] =
+    useState<TeamMember | null>(null);
+
   const [showModal, setShowModal] = useState(false);
-  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+  const [editingMember, setEditingMember] =
+    useState<TeamMember | null>(null);
 
   const [form, setForm] = useState<MemberForm>(emptyForm);
 
   const [saving, setSaving] = useState(false);
 
-  const [deleteMember, setDeleteMember] = useState<TeamMember | null>(null);
+  const [deleteMember, setDeleteMember] =
+    useState<TeamMember | null>(null);
+
   const [deleting, setDeleting] = useState(false);
 
-  async function loadMembers() {
+  useEffect(() => {
+    document.body.style.overflow =
+      showModal || deleteMember || selectedMember
+        ? "hidden"
+        : "";
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showModal, deleteMember, selectedMember]);
+
+  async function loadData() {
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("team_members")
-      .select("*")
-      .order("first_name", { ascending: true });
+    const [
+      membersResponse,
+      workItemsResponse,
+      projectsResponse,
+    ] = await Promise.all([
+      supabase
+        .from("team_members")
+        .select("*")
+        .order("first_name", { ascending: true }),
 
-    if (error) {
-      console.error("Error loading team members:", error);
+      supabase
+        .from("work_items")
+        .select(
+          "id,title,status,priority,deadline,assigned_to,project_id",
+        ),
+
+      supabase
+        .from("work_projects")
+        .select("id,title"),
+    ]);
+
+    if (membersResponse.error) {
+      console.error(
+        "Error loading team members:",
+        membersResponse.error,
+      );
       setMembers([]);
-      setLoading(false);
-      return;
+    } else {
+      const sorted = [...(membersResponse.data ?? [])].sort(
+        (a, b) => {
+          const positionDifference =
+            positionOrder[a.position as Position] -
+            positionOrder[b.position as Position];
+
+          if (positionDifference !== 0) {
+            return positionDifference;
+          }
+
+          return a.first_name.localeCompare(b.first_name);
+        },
+      );
+
+      setMembers(sorted as TeamMember[]);
     }
 
-    const sorted = [...(data ?? [])].sort((a, b) => {
-      const positionDifference =
-        positionOrder[a.position as Position] -
-        positionOrder[b.position as Position];
+    if (workItemsResponse.error) {
+      console.error(
+        "Error loading work items:",
+        workItemsResponse.error,
+      );
+      setWorkItems([]);
+    } else {
+      setWorkItems((workItemsResponse.data ?? []) as WorkItem[]);
+    }
 
-      if (positionDifference !== 0) {
-        return positionDifference;
-      }
+    if (projectsResponse.error) {
+      console.error(
+        "Error loading work projects:",
+        projectsResponse.error,
+      );
+      setProjects([]);
+    } else {
+      setProjects((projectsResponse.data ?? []) as WorkProject[]);
+    }
 
-      return a.first_name.localeCompare(b.first_name);
-    });
-
-    setMembers(sorted as TeamMember[]);
     setLoading(false);
   }
 
   useEffect(() => {
-    loadMembers();
+    loadData();
   }, []);
 
   const filteredMembers = useMemo(() => {
@@ -241,17 +408,21 @@ export default function TeamPage() {
       const phone = (member.phone ?? "").toLowerCase();
 
       const matchesSearch =
-        !query || fullName.includes(query) || phone.includes(query);
+        !query ||
+        fullName.includes(query) ||
+        phone.includes(query);
 
       const matchesPosition =
-        positionFilter === "all" || member.position === positionFilter;
+        positionFilter === "all" ||
+        member.position === positionFilter;
 
       const matchesLanguage =
         languageFilter === "all" ||
         member.languages.includes(languageFilter);
 
       const matchesStatus =
-        statusFilter === "all" || member.status === statusFilter;
+        statusFilter === "all" ||
+        member.status === statusFilter;
 
       return (
         matchesSearch &&
@@ -281,13 +452,53 @@ export default function TeamPage() {
     Number(languageFilter !== "all") +
     Number(statusFilter !== "all");
 
+  function getMemberTasks(memberId: number) {
+    return workItems.filter(
+      (item) =>
+        item.assigned_to === memberId &&
+        item.status !== "completed",
+    );
+  }
+
+  function getCompletedMemberTasks(memberId: number) {
+    return workItems.filter(
+      (item) =>
+        item.assigned_to === memberId &&
+        item.status === "completed",
+    );
+  }
+
+  function getNextTask(memberId: number) {
+    const tasks = getMemberTasks(memberId)
+      .filter((item) => item.deadline)
+      .sort((a, b) => {
+        return (
+          new Date(a.deadline as string).getTime() -
+          new Date(b.deadline as string).getTime()
+        );
+      });
+
+    return tasks[0] ?? null;
+  }
+
+  function getProjectTitle(projectId: number | null) {
+    if (!projectId) return null;
+
+    return (
+      projects.find((project) => project.id === projectId)
+        ?.title ?? null
+    );
+  }
+
   function openCreateModal() {
+    setSelectedMember(null);
     setEditingMember(null);
     setForm(emptyForm);
     setShowModal(true);
   }
 
   function openEditModal(member: TeamMember) {
+    setSelectedMember(null);
     setEditingMember(member);
 
     setForm({
@@ -326,7 +537,10 @@ export default function TeamPage() {
   }
 
   async function saveMember() {
-    if (!form.first_name.trim() || !form.last_name.trim()) {
+    if (
+      !form.first_name.trim() ||
+      !form.last_name.trim()
+    ) {
       return;
     }
 
@@ -351,7 +565,10 @@ export default function TeamPage() {
         .eq("id", editingMember.id);
 
       if (error) {
-        console.error("Error updating team member:", error);
+        console.error(
+          "Error updating team member:",
+          error,
+        );
         setSaving(false);
         return;
       }
@@ -361,7 +578,10 @@ export default function TeamPage() {
         .insert(payload);
 
       if (error) {
-        console.error("Error creating team member:", error);
+        console.error(
+          "Error creating team member:",
+          error,
+        );
         setSaving(false);
         return;
       }
@@ -369,7 +589,7 @@ export default function TeamPage() {
 
     setSaving(false);
     closeModal();
-    await loadMembers();
+    await loadData();
   }
 
   async function confirmDelete() {
@@ -383,15 +603,19 @@ export default function TeamPage() {
       .eq("id", deleteMember.id);
 
     if (error) {
-      console.error("Error deleting team member:", error);
+      console.error(
+        "Error deleting team member:",
+        error,
+      );
       setDeleting(false);
       return;
     }
 
     setDeleting(false);
     setDeleteMember(null);
+    setSelectedMember(null);
 
-    await loadMembers();
+    await loadData();
   }
 
   function resetFilters() {
@@ -400,172 +624,217 @@ export default function TeamPage() {
     setStatusFilter("all");
   }
 
+  function clearEverything() {
+    setSearch("");
+    resetFilters();
+  }
+
+  function openMember(member: TeamMember) {
+    setSelectedMember(member);
+  }
+
+  const selectedTasks = selectedMember
+    ? getMemberTasks(selectedMember.id)
+    : [];
+
+  const selectedCompletedTasks = selectedMember
+    ? getCompletedMemberTasks(selectedMember.id)
+    : [];
+
+  const selectedNextTask = selectedMember
+    ? getNextTask(selectedMember.id)
+    : null;
+
   return (
     <div className="min-h-screen bg-[#f5f5f4] text-neutral-900">
-      <Sidebar language={language} />
+      <main className="mx-auto min-h-screen w-full max-w-[760px] px-4 pb-8 sm:px-6">
+        {/* Top bar */}
+        <header className="sticky top-0 z-30 -mx-4 border-b border-neutral-200/80 bg-[#f5f5f4]/95 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-neutral-600 shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition active:scale-95"
+              aria-label={
+                language === "de"
+                  ? "Zurück"
+                  : "Назад"
+              }
+            >
+              <ArrowLeft size={18} strokeWidth={2} />
+            </button>
 
-      <div className="pl-[72px]">
-        <Header language={language} setLanguage={setLanguage} />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setLanguage(
+                    language === "de" ? "ru" : "de",
+                  )
+                }
+                className="flex h-9 items-center gap-1 rounded-xl border border-neutral-200 bg-white px-2.5 text-[10px] font-bold text-neutral-500"
+              >
+                {language === "de" ? "DE" : "RU"}
+              </button>
 
-        <main className="mx-auto w-full max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8">
-          {/* Header */}
-          <section className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <div className="mb-1 flex items-center gap-2">
-                <Users
-                  size={18}
-                  strokeWidth={1.8}
-                  className="text-neutral-400"
-                />
-
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-400">
-                  {language === "de" ? "Team" : "Команда"}
+              <button
+                type="button"
+                onClick={openCreateModal}
+                className="flex h-10 items-center gap-2 rounded-xl bg-neutral-900 px-3.5 text-xs font-semibold text-white shadow-sm transition active:scale-95"
+              >
+                <Plus size={16} strokeWidth={2.2} />
+                <span className="hidden min-[390px]:inline">
+                  {language === "de"
+                    ? "Hinzufügen"
+                    : "Добавить"}
                 </span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Heading */}
+        <section className="pt-6">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400">
+                <Users size={14} strokeWidth={2} />
+
+                {language === "de"
+                  ? "Team"
+                  : "Команда"}
               </div>
 
-              <h1 className="text-2xl font-semibold tracking-tight text-neutral-950 sm:text-3xl">
-                {t.navigation.team}
+              <h1 className="text-[28px] font-bold tracking-tight text-neutral-950">
+                {language === "de"
+                  ? "Unser Team"
+                  : "Наша команда"}
               </h1>
 
-              <p className="mt-1 text-sm text-neutral-500">
+              <p className="mt-1 text-sm leading-5 text-neutral-500">
                 {language === "de"
-                  ? "Übersicht über alle Teammitglieder."
-                  : "Обзор всех участников команды."}
+                  ? "Menschen, Aufgaben und Dienste an einem Ort."
+                  : "Люди, задачи и служения в одном месте."}
               </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Stats */}
+        <section className="mt-5 grid grid-cols-3 gap-2">
+          <div className="rounded-2xl border border-neutral-200 bg-white p-3.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+              {language === "de" ? "Gesamt" : "Всего"}
+            </div>
+
+            <div className="mt-1 text-2xl font-bold tracking-tight">
+              {members.length}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-neutral-200 bg-white p-3.5">
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              {language === "de" ? "Aktiv" : "Активны"}
+            </div>
+
+            <div className="mt-1 text-2xl font-bold tracking-tight">
+              {activeCount}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-neutral-200 bg-white p-3.5">
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
+              {language === "de"
+                ? "Inaktiv"
+                : "Неактивны"}
+            </div>
+
+            <div className="mt-1 text-2xl font-bold tracking-tight">
+              {inactiveCount}
+            </div>
+          </div>
+        </section>
+
+        {/* Search */}
+        <section className="mt-4">
+          <div className="flex gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search
+                size={17}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400"
+              />
+
+              <input
+                value={search}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
+                placeholder={
+                  language === "de"
+                    ? "Team durchsuchen..."
+                    : "Поиск по команде..."
+                }
+                className="h-12 w-full rounded-2xl border border-neutral-200 bg-white pl-11 pr-10 text-sm font-medium outline-none transition placeholder:text-neutral-400 focus:border-neutral-400"
+              />
+
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-neutral-400"
+                >
+                  <X size={15} />
+                </button>
+              )}
             </div>
 
             <button
-              onClick={openCreateModal}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 text-sm font-semibold text-white transition hover:bg-neutral-800 active:scale-[0.98]"
+              type="button"
+              onClick={() =>
+                setShowFilters((value) => !value)
+              }
+              className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border transition ${
+                showFilters || activeFiltersCount > 0
+                  ? "border-neutral-900 bg-neutral-900 text-white"
+                  : "border-neutral-200 bg-white text-neutral-600"
+              }`}
+              aria-label={
+                language === "de"
+                  ? "Filter"
+                  : "Фильтры"
+              }
             >
-              <Plus size={17} strokeWidth={2} />
+              <Filter size={17} />
 
-              {language === "de"
-                ? "Mitglied hinzufügen"
-                : "Добавить участника"}
-            </button>
-          </section>
-
-          {/* Compact stats */}
-          <section className="mb-5 grid grid-cols-3 gap-2 sm:max-w-[520px] sm:gap-3">
-            <div className="flex min-h-[58px] items-center gap-2.5 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] sm:px-4">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500">
-                <Users size={15} strokeWidth={1.8} />
-              </div>
-
-              <div className="min-w-0">
-                <div className="text-[10px] font-medium text-neutral-400 sm:text-[11px]">
-                  {language === "de" ? "Gesamt" : "Всего"}
-                </div>
-
-                <div className="mt-0.5 text-lg font-semibold leading-none text-neutral-900 sm:text-xl">
-                  {members.length}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex min-h-[58px] items-center gap-2.5 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] sm:px-4">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              </div>
-
-              <div className="min-w-0">
-                <div className="text-[10px] font-medium text-neutral-400 sm:text-[11px]">
-                  {language === "de" ? "Aktiv" : "Активны"}
-                </div>
-
-                <div className="mt-0.5 text-lg font-semibold leading-none text-neutral-900 sm:text-xl">
-                  {activeCount}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex min-h-[58px] items-center gap-2.5 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] sm:px-4">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-400">
-                <span className="h-2 w-2 rounded-full bg-neutral-300" />
-              </div>
-
-              <div className="min-w-0">
-                <div className="text-[10px] font-medium text-neutral-400 sm:text-[11px]">
-                  {language === "de" ? "Inaktiv" : "Неактивны"}
-                </div>
-
-                <div className="mt-0.5 text-lg font-semibold leading-none text-neutral-900 sm:text-xl">
-                  {inactiveCount}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Search / filters */}
-          <section className="mb-4 rounded-2xl border border-neutral-200 bg-white p-3 shadow-[0_1px_3px_rgba(0,0,0,0.02)] sm:p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <div className="relative min-w-0 flex-1">
-                <Search
-                  size={17}
-                  strokeWidth={1.8}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
-                />
-
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={
-                    language === "de"
-                      ? "Name oder Telefonnummer suchen..."
-                      : "Поиск по имени или телефону..."
-                  }
-                  className="h-10 w-full rounded-xl border border-neutral-200 bg-neutral-50 pl-10 pr-10 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:bg-white"
-                />
-
-                {search && (
-                  <button
-                    onClick={() => setSearch("")}
-                    className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-neutral-400 transition hover:bg-neutral-200 hover:text-neutral-700"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-
-              <button
-                onClick={() => setShowFilters((value) => !value)}
-                className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium transition ${
-                  showFilters || activeFiltersCount > 0
-                    ? "border-neutral-900 bg-neutral-900 text-white"
-                    : "border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"
-                }`}
-              >
-                <Filter size={16} strokeWidth={1.8} />
-
-                <span>
-                  {language === "de" ? "Filter" : "Фильтры"}
+              {activeFiltersCount > 0 && (
+                <span
+                  className={`absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[9px] font-bold ${
+                    showFilters
+                      ? "bg-white text-neutral-900"
+                      : "bg-neutral-900 text-white"
+                  }`}
+                >
+                  {activeFiltersCount}
                 </span>
+              )}
+            </button>
+          </div>
 
-                {activeFiltersCount > 0 && (
-                  <span
-                    className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
-                      showFilters
-                        ? "bg-white text-neutral-900"
-                        : "bg-neutral-900 text-white"
-                    }`}
-                  >
-                    {activeFiltersCount}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {showFilters && (
-              <div className="mt-3 grid grid-cols-1 gap-2 border-t border-neutral-100 pt-3 sm:grid-cols-3">
+          {showFilters && (
+            <div className="mt-2 rounded-2xl border border-neutral-200 bg-white p-3">
+              <div className="grid grid-cols-1 gap-2">
                 <select
                   value={positionFilter}
                   onChange={(event) =>
                     setPositionFilter(
-                      event.target.value as Position | "all",
+                      event.target.value as
+                        | Position
+                        | "all",
                     )
                   }
-                  className="h-10 rounded-xl border border-neutral-200 bg-white px-3 text-sm text-neutral-700 outline-none focus:border-neutral-400"
+                  className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none"
                 >
                   <option value="all">
                     {language === "de"
@@ -574,23 +843,38 @@ export default function TeamPage() {
                   </option>
 
                   <option value="hauptleiter">
-                    {getPositionLabel("hauptleiter", language)}
+                    {getPositionLabel(
+                      "hauptleiter",
+                      language,
+                    )}
                   </option>
 
                   <option value="leiter">
-                    {getPositionLabel("leiter", language)}
+                    {getPositionLabel(
+                      "leiter",
+                      language,
+                    )}
                   </option>
 
                   <option value="co_leiter">
-                    {getPositionLabel("co_leiter", language)}
+                    {getPositionLabel(
+                      "co_leiter",
+                      language,
+                    )}
                   </option>
 
                   <option value="sekretariat">
-                    {getPositionLabel("sekretariat", language)}
+                    {getPositionLabel(
+                      "sekretariat",
+                      language,
+                    )}
                   </option>
 
                   <option value="weitere">
-                    {getPositionLabel("weitere", language)}
+                    {getPositionLabel(
+                      "weitere",
+                      language,
+                    )}
                   </option>
                 </select>
 
@@ -598,10 +882,13 @@ export default function TeamPage() {
                   value={languageFilter}
                   onChange={(event) =>
                     setLanguageFilter(
-                      event.target.value as "all" | "DE" | "RU",
+                      event.target.value as
+                        | "all"
+                        | "DE"
+                        | "RU",
                     )
                   }
-                  className="h-10 rounded-xl border border-neutral-200 bg-white px-3 text-sm text-neutral-700 outline-none focus:border-neutral-400"
+                  className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none"
                 >
                   <option value="all">
                     {language === "de"
@@ -609,18 +896,25 @@ export default function TeamPage() {
                       : "Все языки"}
                   </option>
 
-                  <option value="DE">Deutsch</option>
-                  <option value="RU">Русский</option>
+                  <option value="DE">
+                    Deutsch
+                  </option>
+
+                  <option value="RU">
+                    Русский
+                  </option>
                 </select>
 
                 <select
                   value={statusFilter}
                   onChange={(event) =>
                     setStatusFilter(
-                      event.target.value as Status | "all",
+                      event.target.value as
+                        | Status
+                        | "all",
                     )
                   }
-                  className="h-10 rounded-xl border border-neutral-200 bg-white px-3 text-sm text-neutral-700 outline-none focus:border-neutral-400"
+                  className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none"
                 >
                   <option value="all">
                     {language === "de"
@@ -629,18 +923,23 @@ export default function TeamPage() {
                   </option>
 
                   <option value="active">
-                    {language === "de" ? "Aktiv" : "Активен"}
+                    {language === "de"
+                      ? "Aktiv"
+                      : "Активен"}
                   </option>
 
                   <option value="inactive">
-                    {language === "de" ? "Inaktiv" : "Неактивен"}
+                    {language === "de"
+                      ? "Inaktiv"
+                      : "Неактивен"}
                   </option>
                 </select>
 
                 {activeFiltersCount > 0 && (
                   <button
+                    type="button"
                     onClick={resetFilters}
-                    className="h-10 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm font-medium text-neutral-600 transition hover:bg-neutral-100 sm:col-span-3"
+                    className="h-11 rounded-xl bg-neutral-100 text-sm font-semibold text-neutral-600"
                   >
                     {language === "de"
                       ? "Filter zurücksetzen"
@@ -648,135 +947,113 @@ export default function TeamPage() {
                   </button>
                 )}
               </div>
-            )}
+            </div>
+          )}
 
-            <div className="mt-3 flex items-center justify-between text-[11px] text-neutral-400">
-              <span>
-                {loading
-                  ? language === "de"
-                    ? "Wird geladen..."
-                    : "Загрузка..."
-                  : language === "de"
-                    ? `${filteredMembers.length} Mitglieder`
-                    : `${filteredMembers.length} участников`}
-              </span>
+          <div className="mt-2 flex items-center justify-between px-1 text-[11px] text-neutral-400">
+            <span>
+              {loading
+                ? language === "de"
+                  ? "Wird geladen..."
+                  : "Загрузка..."
+                : language === "de"
+                  ? `${filteredMembers.length} Mitglieder`
+                  : `${filteredMembers.length} участников`}
+            </span>
 
-              {(search || activeFiltersCount > 0) && !loading && (
+            {(search || activeFiltersCount > 0) &&
+              !loading && (
                 <button
-                  onClick={() => {
-                    setSearch("");
-                    resetFilters();
-                  }}
-                  className="font-medium text-neutral-500 transition hover:text-neutral-900"
+                  type="button"
+                  onClick={clearEverything}
+                  className="font-semibold text-neutral-500"
                 >
-                  {language === "de" ? "Zurücksetzen" : "Сбросить"}
+                  {language === "de"
+                    ? "Zurücksetzen"
+                    : "Сбросить"}
                 </button>
               )}
+          </div>
+        </section>
+
+        {/* Team list */}
+        <section className="mt-4 space-y-2.5">
+          {loading ? (
+            <>
+              {[1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="animate-pulse rounded-3xl border border-neutral-200 bg-white p-4"
+                >
+                  <div className="flex gap-3">
+                    <div className="h-12 w-12 rounded-2xl bg-neutral-100" />
+
+                    <div className="flex-1">
+                      <div className="h-4 w-32 rounded bg-neutral-100" />
+                      <div className="mt-2 h-3 w-20 rounded bg-neutral-100" />
+                      <div className="mt-4 h-3 w-full rounded bg-neutral-100" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : filteredMembers.length === 0 ? (
+            <div className="rounded-3xl border border-neutral-200 bg-white px-5 py-14 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-400">
+                <UserRound size={21} />
+              </div>
+
+              <h3 className="mt-4 text-sm font-semibold text-neutral-800">
+                {language === "de"
+                  ? "Keine Mitglieder gefunden"
+                  : "Участники не найдены"}
+              </h3>
+
+              <p className="mt-1 text-xs text-neutral-400">
+                {language === "de"
+                  ? "Passe deine Suche oder Filter an."
+                  : "Измени поиск или фильтры."}
+              </p>
             </div>
-          </section>
+          ) : (
+            filteredMembers.map((member) => {
+              const openTasks = getMemberTasks(
+                member.id,
+              );
 
-          {/* Desktop table */}
-          <section className="hidden overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.025)] md:block">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] border-collapse">
-                <thead>
-                  <tr className="border-b border-neutral-100 bg-neutral-50/70">
-                    <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                      {language === "de" ? "Person" : "Участник"}
-                    </th>
+              const completedTasks =
+                getCompletedMemberTasks(member.id);
 
-                    <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                      {language === "de" ? "Position" : "Должность"}
-                    </th>
+              const nextTask = getNextTask(member.id);
 
-                    <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                      {language === "de" ? "Kontakt" : "Контакт"}
-                    </th>
+              return (
+                <article
+                  key={member.id}
+                  onClick={() => openMember(member)}
+                  className="group cursor-pointer rounded-3xl border border-neutral-200 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.025)] transition active:scale-[0.99] sm:hover:border-neutral-300 sm:hover:shadow-[0_4px_18px_rgba(0,0,0,0.05)]"
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Avatar */}
+                    <div
+                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-bold ${getAvatarTone(
+                        member,
+                      )}`}
+                    >
+                      {getInitials(member)}
+                    </div>
 
-                    <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                      {language === "de" ? "Geburtstag" : "Дата рождения"}
-                    </th>
+                    {/* Main */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h2 className="truncate text-[15px] font-bold text-neutral-950">
+                            {member.first_name}{" "}
+                            {member.last_name}
+                          </h2>
 
-                    <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                      {language === "de" ? "Sprachen" : "Языки"}
-                    </th>
-
-                    <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                      {language === "de" ? "Status" : "Статус"}
-                    </th>
-
-                    <th className="w-[90px] px-4 py-3" />
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td
-                        colSpan={7}
-                        className="px-5 py-14 text-center text-sm text-neutral-400"
-                      >
-                        {language === "de"
-                          ? "Team wird geladen..."
-                          : "Загрузка команды..."}
-                      </td>
-                    </tr>
-                  ) : filteredMembers.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={7}
-                        className="px-5 py-14 text-center"
-                      >
-                        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-100 text-neutral-400">
-                          <UserRound size={18} />
-                        </div>
-
-                        <div className="mt-3 text-sm font-medium text-neutral-700">
-                          {language === "de"
-                            ? "Keine Mitglieder gefunden"
-                            : "Участники не найдены"}
-                        </div>
-
-                        <div className="mt-1 text-xs text-neutral-400">
-                          {language === "de"
-                            ? "Passe deine Suche oder Filter an."
-                            : "Измени поиск или фильтры."}
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredMembers.map((member) => {
-                      const age = calculateAge(member.birth_date);
-
-                      return (
-                        <tr
-                          key={member.id}
-                          className="group border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50/60"
-                        >
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-[11px] font-semibold text-neutral-600">
-                                {getInitials(member)}
-                              </div>
-
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-neutral-900">
-                                  {member.first_name}{" "}
-                                  {member.last_name}
-                                </div>
-
-                                {member.notes && (
-                                  <div className="mt-0.5 max-w-[240px] truncate text-[11px] text-neutral-400">
-                                    {member.notes}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-
-                          <td className="px-4 py-3.5">
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
                             <span
-                              className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-[11px] font-medium ${getPositionStyle(
+                              className={`rounded-lg px-2 py-1 text-[9px] font-bold ${getPositionStyle(
                                 member.position,
                               )}`}
                             >
@@ -785,62 +1062,12 @@ export default function TeamPage() {
                                 language,
                               )}
                             </span>
-                          </td>
 
-                          <td className="px-4 py-3.5">
-                            {member.phone ? (
-                              <span className="text-xs font-medium text-neutral-700">
-                                {member.phone}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-neutral-300">
-                                —
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3.5">
-                            <div className="text-xs text-neutral-600">
-                              {formatDate(
-                                member.birth_date,
-                                language,
-                              )}
-                            </div>
-
-                            {age !== null && (
-                              <div className="mt-0.5 text-[10px] text-neutral-400">
-                                {age}{" "}
-                                {language === "de"
-                                  ? "Jahre"
-                                  : "лет"}
-                              </div>
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3.5">
-                            <div className="flex flex-wrap gap-1">
-                              {member.languages.length > 0 ? (
-                                member.languages.map((item) => (
-                                  <span
-                                    key={item}
-                                    className="rounded-md bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-500"
-                                  >
-                                    {item}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="text-xs text-neutral-300">
-                                  —
-                                </span>
-                              )}
-                            </div>
-                          </td>
-
-                          <td className="px-4 py-3.5">
-                            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-neutral-600">
+                            <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-neutral-400">
                               <span
                                 className={`h-1.5 w-1.5 rounded-full ${
-                                  member.status === "active"
+                                  member.status ===
+                                  "active"
                                     ? "bg-emerald-500"
                                     : "bg-neutral-300"
                                 }`}
@@ -851,279 +1078,543 @@ export default function TeamPage() {
                                 language,
                               )}
                             </span>
-                          </td>
+                          </div>
+                        </div>
 
-                          <td className="px-4 py-3.5">
-                            <div className="flex justify-end gap-1 opacity-60 transition group-hover:opacity-100">
-                              <button
-                                onClick={() =>
-                                  openEditModal(member)
-                                }
-                                title={
-                                  language === "de"
-                                    ? "Bearbeiten"
-                                    : "Редактировать"
-                                }
-                                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
-                              >
-                                <Edit3
-                                  size={15}
-                                  strokeWidth={1.8}
-                                />
-                              </button>
-
-                              <button
-                                onClick={() =>
-                                  setDeleteMember(member)
-                                }
-                                title={
-                                  language === "de"
-                                    ? "Löschen"
-                                    : "Удалить"
-                                }
-                                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-red-50 hover:text-red-600"
-                              >
-                                <Trash2
-                                  size={15}
-                                  strokeWidth={1.8}
-                                />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          {/* Mobile list */}
-          <section className="space-y-2 md:hidden">
-            {loading ? (
-              <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-12 text-center text-sm text-neutral-400">
-                {language === "de"
-                  ? "Team wird geladen..."
-                  : "Загрузка команды..."}
-              </div>
-            ) : filteredMembers.length === 0 ? (
-              <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-12 text-center">
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-100 text-neutral-400">
-                  <UserRound size={18} />
-                </div>
-
-                <div className="mt-3 text-sm font-medium text-neutral-700">
-                  {language === "de"
-                    ? "Keine Mitglieder gefunden"
-                    : "Участники не найдены"}
-                </div>
-
-                <div className="mt-1 text-xs text-neutral-400">
-                  {language === "de"
-                    ? "Passe deine Suche oder Filter an."
-                    : "Измени поиск или фильтры."}
-                </div>
-              </div>
-            ) : (
-              filteredMembers.map((member) => {
-                const age = calculateAge(member.birth_date);
-
-                return (
-                  <article
-                    key={member.id}
-                    className="rounded-2xl border border-neutral-200 bg-white p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-xs font-semibold text-neutral-600">
-                        {getInitials(member)}
+                        <ChevronRight
+                          size={17}
+                          className="mt-1 shrink-0 text-neutral-300 transition group-hover:text-neutral-500"
+                        />
                       </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <h3 className="truncate text-sm font-semibold text-neutral-900">
-                              {member.first_name}{" "}
-                              {member.last_name}
-                            </h3>
+                      {/* Contact */}
+                      <div className="mt-3 flex items-center gap-2">
+                        {member.phone ? (
+                          <a
+                            href={`tel:${member.phone}`}
+                            onClick={(event) =>
+                              event.stopPropagation()
+                            }
+                            className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-neutral-50 px-3 text-xs font-semibold text-neutral-600 transition active:bg-neutral-100"
+                          >
+                            <Phone size={13} />
+                            {member.phone}
+                          </a>
+                        ) : (
+                          <span className="text-[11px] text-neutral-300">
+                            {language === "de"
+                              ? "Keine Telefonnummer"
+                              : "Нет телефона"}
+                          </span>
+                        )}
+                      </div>
 
-                            <div className="mt-1">
-                              <span
-                                className={`inline-flex max-w-full truncate rounded-lg border px-2 py-0.5 text-[10px] font-medium ${getPositionStyle(
-                                  member.position,
-                                )}`}
-                              >
-                                {getPositionLabel(
-                                  member.position,
+                      {/* Work summary */}
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div className="rounded-2xl bg-neutral-50 p-3">
+                          <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-neutral-400">
+                            <ListTodo size={12} />
+                            {language === "de"
+                              ? "Aufgaben"
+                              : "Задачи"}
+                          </div>
+
+                          <div className="mt-1.5 flex items-end gap-1">
+                            <span className="text-lg font-bold text-neutral-900">
+                              {openTasks.length}
+                            </span>
+
+                            <span className="pb-0.5 text-[10px] text-neutral-400">
+                              {language === "de"
+                                ? "offen"
+                                : "открыто"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl bg-neutral-50 p-3">
+                          <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-neutral-400">
+                            <CheckCircle2 size={12} />
+                            {language === "de"
+                              ? "Erledigt"
+                              : "Готово"}
+                          </div>
+
+                          <div className="mt-1.5 text-lg font-bold text-neutral-900">
+                            {completedTasks.length}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Next task */}
+                      {nextTask ? (
+                        <div className="mt-2.5 flex items-center justify-between gap-3 rounded-2xl border border-neutral-100 bg-white">
+                          <div className="min-w-0 px-3 py-2.5">
+                            <div className="text-[9px] font-bold uppercase tracking-[0.08em] text-neutral-400">
+                              {language === "de"
+                                ? "Nächste Aufgabe"
+                                : "Ближайшая задача"}
+                            </div>
+
+                            <div className="mt-1 truncate text-xs font-semibold text-neutral-800">
+                              {nextTask.title}
+                            </div>
+                          </div>
+
+                          {nextTask.deadline && (
+                            <div className="mr-2.5 flex shrink-0 items-center gap-1.5 rounded-xl bg-neutral-100 px-2.5 py-2 text-[10px] font-bold text-neutral-600">
+                              <CalendarDays
+                                size={12}
+                              />
+                              {formatShortDate(
+                                nextTask.deadline,
+                                language,
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="mt-2.5 flex items-center gap-2 rounded-2xl bg-neutral-50 px-3 py-2.5 text-[10px] font-medium text-neutral-400">
+                          <CheckCircle2 size={13} />
+                          {language === "de"
+                            ? "Keine offenen Aufgaben"
+                            : "Нет открытых задач"}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </section>
+      </main>
+
+      {/* Member detail */}
+      {selectedMember && (
+        <div
+          className="fixed inset-0 z-[80] bg-black/35 backdrop-blur-[2px]"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedMember(null);
+            }
+          }}
+        >
+          <div className="absolute bottom-0 left-0 right-0 mx-auto max-h-[90vh] w-full max-w-[760px] overflow-y-auto rounded-t-[30px] bg-[#f5f5f4] shadow-2xl">
+            {/* Sheet header */}
+            <div className="sticky top-0 z-10 border-b border-neutral-200 bg-[#f5f5f4]/95 px-4 pb-3 pt-3 backdrop-blur-xl">
+              <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-neutral-300" />
+
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedMember(null)
+                  }
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-neutral-500"
+                >
+                  <X size={18} />
+                </button>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openEditModal(selectedMember)
+                    }
+                    className="flex h-10 items-center gap-2 rounded-xl bg-white px-3 text-xs font-semibold text-neutral-700"
+                  >
+                    <Edit3 size={14} />
+                    {language === "de"
+                      ? "Bearbeiten"
+                      : "Изменить"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDeleteMember(selectedMember)
+                    }
+                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-500"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 p-4 pb-8">
+              {/* Profile */}
+              <section className="rounded-3xl border border-neutral-200 bg-white p-5">
+                <div className="flex items-center gap-4">
+                  <div
+                    className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-[22px] text-lg font-bold ${getAvatarTone(
+                      selectedMember,
+                    )}`}
+                  >
+                    {getInitials(selectedMember)}
+                  </div>
+
+                  <div className="min-w-0">
+                    <h2 className="text-xl font-bold tracking-tight text-neutral-950">
+                      {selectedMember.first_name}{" "}
+                      {selectedMember.last_name}
+                    </h2>
+
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-lg px-2.5 py-1 text-[10px] font-bold ${getPositionStyle(
+                          selectedMember.position,
+                        )}`}
+                      >
+                        {getPositionLabel(
+                          selectedMember.position,
+                          language,
+                        )}
+                      </span>
+
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-neutral-400">
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            selectedMember.status ===
+                            "active"
+                              ? "bg-emerald-500"
+                              : "bg-neutral-300"
+                          }`}
+                        />
+
+                        {getStatusLabel(
+                          selectedMember.status,
+                          language,
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedMember.phone && (
+                  <a
+                    href={`tel:${selectedMember.phone}`}
+                    className="mt-5 flex h-12 items-center justify-center gap-2 rounded-2xl bg-neutral-900 text-sm font-semibold text-white transition active:scale-[0.99]"
+                  >
+                    <Phone size={16} />
+                    {selectedMember.phone}
+                  </a>
+                )}
+              </section>
+
+              {/* Personal information */}
+              <section className="rounded-3xl border border-neutral-200 bg-white p-4">
+                <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-neutral-400">
+                  {language === "de"
+                    ? "Informationen"
+                    : "Информация"}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-2xl bg-neutral-50 p-3">
+                    <div className="text-[9px] font-bold uppercase tracking-wide text-neutral-400">
+                      {language === "de"
+                        ? "Geburtstag"
+                        : "Дата рождения"}
+                    </div>
+
+                    <div className="mt-1 text-xs font-semibold text-neutral-800">
+                      {formatDate(
+                        selectedMember.birth_date,
+                        language,
+                      )}
+                    </div>
+
+                    {calculateAge(
+                      selectedMember.birth_date,
+                    ) !== null && (
+                      <div className="mt-0.5 text-[10px] text-neutral-400">
+                        {
+                          calculateAge(
+                            selectedMember.birth_date,
+                          )
+                        }{" "}
+                        {language === "de"
+                          ? "Jahre"
+                          : "лет"}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl bg-neutral-50 p-3">
+                    <div className="text-[9px] font-bold uppercase tracking-wide text-neutral-400">
+                      {language === "de"
+                        ? "Sprachen"
+                        : "Языки"}
+                    </div>
+
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {selectedMember.languages
+                        ?.length ? (
+                        selectedMember.languages.map(
+                          (item) => (
+                            <span
+                              key={item}
+                              className="rounded-md bg-white px-1.5 py-1 text-[9px] font-bold text-neutral-500"
+                            >
+                              {item}
+                            </span>
+                          ),
+                        )
+                      ) : (
+                        <span className="text-xs text-neutral-300">
+                          —
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {selectedMember.notes && (
+                  <div className="mt-2 rounded-2xl bg-neutral-50 p-3">
+                    <div className="text-[9px] font-bold uppercase tracking-wide text-neutral-400">
+                      {language === "de"
+                        ? "Notizen"
+                        : "Заметки"}
+                    </div>
+
+                    <p className="mt-1 text-xs leading-5 text-neutral-600">
+                      {selectedMember.notes}
+                    </p>
+                  </div>
+                )}
+              </section>
+
+              {/* Tasks */}
+              <section className="rounded-3xl border border-neutral-200 bg-white p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-neutral-400">
+                      {language === "de"
+                        ? "Aufgaben"
+                        : "Задачи"}
+                    </div>
+
+                    <div className="mt-1 text-lg font-bold text-neutral-900">
+                      {selectedTasks.length}
+                      <span className="ml-1 text-xs font-medium text-neutral-400">
+                        {language === "de"
+                          ? "offen"
+                          : "открытых"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-100 text-neutral-500">
+                    <ListTodo size={17} />
+                  </div>
+                </div>
+
+                {selectedTasks.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    {selectedTasks
+                      .sort((a, b) => {
+                        if (!a.deadline) return 1;
+                        if (!b.deadline) return -1;
+
+                        return (
+                          new Date(
+                            a.deadline,
+                          ).getTime() -
+                          new Date(
+                            b.deadline,
+                          ).getTime()
+                        );
+                      })
+                      .slice(0, 6)
+                      .map((task) => (
+                        <div
+                          key={task.id}
+                          className="rounded-2xl bg-neutral-50 p-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold text-neutral-800">
+                                {task.title}
+                              </div>
+
+                              {getProjectTitle(
+                                task.project_id,
+                              ) && (
+                                <div className="mt-1 truncate text-[10px] text-neutral-400">
+                                  {
+                                    getProjectTitle(
+                                      task.project_id,
+                                    )
+                                  }
+                                </div>
+                              )}
+                            </div>
+
+                            <span
+                              className={`shrink-0 rounded-lg px-2 py-1 text-[9px] font-bold ${
+                                task.priority ===
+                                "urgent"
+                                  ? "bg-red-50 text-red-600"
+                                  : task.priority ===
+                                      "high"
+                                    ? "bg-orange-50 text-orange-600"
+                                    : "bg-neutral-100 text-neutral-500"
+                              }`}
+                            >
+                              {getPriorityLabel(
+                                task.priority,
+                                language,
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="mt-2 flex items-center justify-between">
+                            <span className="text-[9px] font-semibold text-neutral-400">
+                              {getTaskStatusLabel(
+                                task.status,
+                                language,
+                              )}
+                            </span>
+
+                            {task.deadline && (
+                              <span className="flex items-center gap-1 text-[9px] font-semibold text-neutral-500">
+                                <CalendarDays
+                                  size={11}
+                                />
+                                {formatDate(
+                                  task.deadline,
                                   language,
                                 )}
                               </span>
-                            </div>
-                          </div>
-
-                          <div className="flex shrink-0 gap-1">
-                            <button
-                              onClick={() =>
-                                openEditModal(member)
-                              }
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
-                            >
-                              <Edit3
-                                size={15}
-                                strokeWidth={1.8}
-                              />
-                            </button>
-
-                            <button
-                              onClick={() =>
-                                setDeleteMember(member)
-                              }
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-red-50 hover:text-red-600"
-                            >
-                              <Trash2
-                                size={15}
-                                strokeWidth={1.8}
-                              />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
-                          <div className="min-w-0">
-                            <div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                              {language === "de"
-                                ? "Kontakt"
-                                : "Контакт"}
-                            </div>
-
-                            <div className="mt-0.5 truncate text-xs font-medium text-neutral-700">
-                              {member.phone || "—"}
-                            </div>
-                          </div>
-
-                          <div className="min-w-0">
-                            <div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                              {language === "de"
-                                ? "Geburtstag"
-                                : "Дата рождения"}
-                            </div>
-
-                            <div className="mt-0.5 truncate text-xs font-medium text-neutral-700">
-                              {formatDate(
-                                member.birth_date,
-                                language,
-                              )}
-
-                              {age !== null && (
-                                <span className="ml-1 text-neutral-400">
-                                  · {age}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-2.5">
-                          <div className="flex flex-wrap gap-1">
-                            {member.languages.length > 0 ? (
-                              member.languages.map((item) => (
-                                <span
-                                  key={item}
-                                  className="rounded-md bg-neutral-100 px-1.5 py-0.5 text-[9px] font-semibold text-neutral-500"
-                                >
-                                  {item}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-[10px] text-neutral-300">
-                                —
-                              </span>
                             )}
                           </div>
-
-                          <span className="inline-flex shrink-0 items-center gap-1.5 text-[10px] font-medium text-neutral-500">
-                            <span
-                              className={`h-1.5 w-1.5 rounded-full ${
-                                member.status === "active"
-                                  ? "bg-emerald-500"
-                                  : "bg-neutral-300"
-                              }`}
-                            />
-
-                            {getStatusLabel(
-                              member.status,
-                              language,
-                            )}
-                          </span>
                         </div>
-                      </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-2xl bg-neutral-50 px-3 py-4 text-center text-xs text-neutral-400">
+                    {language === "de"
+                      ? "Keine offenen Aufgaben."
+                      : "Нет открытых задач."}
+                  </div>
+                )}
+
+                {selectedCompletedTasks.length >
+                  0 && (
+                  <div className="mt-3 flex items-center gap-2 text-[10px] font-medium text-neutral-400">
+                    <CheckCircle2 size={13} />
+                    {selectedCompletedTasks.length}{" "}
+                    {language === "de"
+                      ? "Aufgaben erledigt"
+                      : "задач выполнено"}
+                  </div>
+                )}
+              </section>
+
+              {/* Next task */}
+              {selectedNextTask && (
+                <section className="rounded-3xl bg-neutral-900 p-5 text-white">
+                  <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-neutral-400">
+                    {language === "de"
+                      ? "Nächste Aufgabe"
+                      : "Ближайшая задача"}
+                  </div>
+
+                  <div className="mt-2 text-base font-bold">
+                    {selectedNextTask.title}
+                  </div>
+
+                  {selectedNextTask.deadline && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-neutral-300">
+                      <CalendarDays size={14} />
+
+                      {language === "de"
+                        ? `Fällig am ${formatDate(
+                            selectedNextTask.deadline,
+                            language,
+                          )}`
+                        : `Дедлайн: ${formatDate(
+                            selectedNextTask.deadline,
+                            language,
+                          )}`}
                     </div>
-                  </article>
-                );
-              })
-            )}
-          </section>
-        </main>
-      </div>
+                  )}
+                </section>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* Create / Edit modal */}
+      {/* Create / Edit */}
       {showModal && (
         <div
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               closeModal();
             }
           }}
         >
-          <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:max-w-[620px] sm:rounded-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-neutral-100 bg-white px-5 py-4 sm:px-6">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight text-neutral-900">
-                  {editingMember
-                    ? language === "de"
-                      ? "Mitglied bearbeiten"
-                      : "Редактировать участника"
-                    : language === "de"
-                      ? "Mitglied hinzufügen"
-                      : "Добавить участника"}
-                </h2>
+          <div className="max-h-[94vh] w-full overflow-y-auto rounded-t-[30px] bg-white shadow-2xl sm:max-w-[620px] sm:rounded-3xl">
+            <div className="sticky top-0 z-10 border-b border-neutral-100 bg-white px-5 pb-4 pt-4 sm:px-6">
+              <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-neutral-200 sm:hidden" />
 
-                <p className="mt-0.5 text-xs text-neutral-400">
-                  {language === "de"
-                    ? "Teamdaten verwalten."
-                    : "Управление данными участника."}
-                </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold tracking-tight text-neutral-950">
+                    {editingMember
+                      ? language === "de"
+                        ? "Mitglied bearbeiten"
+                        : "Редактировать участника"
+                      : language === "de"
+                        ? "Mitglied hinzufügen"
+                        : "Добавить участника"}
+                  </h2>
+
+                  <p className="mt-0.5 text-xs text-neutral-400">
+                    {language === "de"
+                      ? "Teamdaten verwalten."
+                      : "Управление данными участника."}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-100 text-neutral-500"
+                >
+                  <X size={17} />
+                </button>
               </div>
-
-              <button
-                onClick={closeModal}
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
-              >
-                <X size={18} />
-              </button>
             </div>
 
             <div className="space-y-5 p-5 sm:p-6">
-              {/* Name */}
               <div>
-                <label className="mb-2 block text-xs font-semibold text-neutral-700">
-                  {language === "de" ? "Name" : "Имя"}
+                <label className="mb-2 block text-xs font-bold text-neutral-700">
+                  {language === "de"
+                    ? "Name"
+                    : "Имя"}
                 </label>
 
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-2">
                   <input
                     value={form.first_name}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
-                        first_name: event.target.value,
+                        first_name:
+                          event.target.value,
                       }))
                     }
                     placeholder={
-                      language === "de" ? "Vorname" : "Имя"
+                      language === "de"
+                        ? "Vorname"
+                        : "Имя"
                     }
-                    className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none transition focus:border-neutral-400 focus:bg-white"
+                    className="h-12 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
                   />
 
                   <input
@@ -1131,21 +1622,23 @@ export default function TeamPage() {
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
-                        last_name: event.target.value,
+                        last_name:
+                          event.target.value,
                       }))
                     }
                     placeholder={
-                      language === "de" ? "Nachname" : "Фамилия"
+                      language === "de"
+                        ? "Nachname"
+                        : "Фамилия"
                     }
-                    className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none transition focus:border-neutral-400 focus:bg-white"
+                    className="h-12 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
                   />
                 </div>
               </div>
 
-              {/* Position / status */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-2 block text-xs font-semibold text-neutral-700">
+                  <label className="mb-2 block text-xs font-bold text-neutral-700">
                     {language === "de"
                       ? "Position"
                       : "Должность"}
@@ -1156,10 +1649,11 @@ export default function TeamPage() {
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
-                        position: event.target.value as Position,
+                        position:
+                          event.target.value as Position,
                       }))
                     }
-                    className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
+                    className="h-12 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none"
                   >
                     <option value="hauptleiter">
                       {getPositionLabel(
@@ -1169,7 +1663,10 @@ export default function TeamPage() {
                     </option>
 
                     <option value="leiter">
-                      {getPositionLabel("leiter", language)}
+                      {getPositionLabel(
+                        "leiter",
+                        language,
+                      )}
                     </option>
 
                     <option value="co_leiter">
@@ -1196,8 +1693,10 @@ export default function TeamPage() {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-semibold text-neutral-700">
-                    {language === "de" ? "Status" : "Статус"}
+                  <label className="mb-2 block text-xs font-bold text-neutral-700">
+                    {language === "de"
+                      ? "Status"
+                      : "Статус"}
                   </label>
 
                   <select
@@ -1205,10 +1704,11 @@ export default function TeamPage() {
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
-                        status: event.target.value as Status,
+                        status:
+                          event.target.value as Status,
                       }))
                     }
-                    className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
+                    className="h-12 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none"
                   >
                     <option value="active">
                       {language === "de"
@@ -1225,10 +1725,9 @@ export default function TeamPage() {
                 </div>
               </div>
 
-              {/* Contact / birth */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-2 block text-xs font-semibold text-neutral-700">
+                  <label className="mb-2 block text-xs font-bold text-neutral-700">
                     {language === "de"
                       ? "Telefon"
                       : "Телефон"}
@@ -1243,12 +1742,13 @@ export default function TeamPage() {
                       }))
                     }
                     placeholder="+49 ..."
-                    className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none transition focus:border-neutral-400 focus:bg-white"
+                    type="tel"
+                    className="h-12 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-semibold text-neutral-700">
+                  <label className="mb-2 block text-xs font-bold text-neutral-700">
                     {language === "de"
                       ? "Geburtsdatum"
                       : "Дата рождения"}
@@ -1260,17 +1760,17 @@ export default function TeamPage() {
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
-                        birth_date: event.target.value,
+                        birth_date:
+                          event.target.value,
                       }))
                     }
-                    className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none transition focus:border-neutral-400 focus:bg-white"
+                    className="h-12 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
                   />
                 </div>
               </div>
 
-              {/* Languages */}
               <div>
-                <label className="mb-2 block text-xs font-semibold text-neutral-700">
+                <label className="mb-2 block text-xs font-bold text-neutral-700">
                   {language === "de"
                     ? "Sprachen"
                     : "Языки"}
@@ -1285,11 +1785,13 @@ export default function TeamPage() {
                       <button
                         key={item}
                         type="button"
-                        onClick={() => toggleLanguage(item)}
-                        className={`rounded-xl border px-4 py-2.5 text-xs font-semibold transition ${
+                        onClick={() =>
+                          toggleLanguage(item)
+                        }
+                        className={`h-11 rounded-xl border px-5 text-xs font-bold transition ${
                           selected
                             ? "border-neutral-900 bg-neutral-900 text-white"
-                            : "border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50"
+                            : "border-neutral-200 bg-white text-neutral-500"
                         }`}
                       >
                         {item}
@@ -1299,9 +1801,8 @@ export default function TeamPage() {
                 </div>
               </div>
 
-              {/* Notes */}
               <div>
-                <label className="mb-2 block text-xs font-semibold text-neutral-700">
+                <label className="mb-2 block text-xs font-bold text-neutral-700">
                   {language === "de"
                     ? "Notizen"
                     : "Заметки"}
@@ -1315,34 +1816,38 @@ export default function TeamPage() {
                       notes: event.target.value,
                     }))
                   }
-                  rows={3}
+                  rows={4}
                   placeholder={
                     language === "de"
                       ? "Optionale Notizen..."
                       : "Дополнительные заметки..."
                   }
-                  className="w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3 text-sm outline-none transition focus:border-neutral-400 focus:bg-white"
+                  className="w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
                 />
               </div>
             </div>
 
             <div className="sticky bottom-0 flex gap-2 border-t border-neutral-100 bg-white p-4 sm:px-6">
               <button
+                type="button"
                 onClick={closeModal}
                 disabled={saving}
-                className="h-11 flex-1 rounded-xl border border-neutral-200 bg-white text-sm font-medium text-neutral-600 transition hover:bg-neutral-50 disabled:opacity-50"
+                className="h-12 flex-1 rounded-xl border border-neutral-200 bg-white text-sm font-semibold text-neutral-600 disabled:opacity-50"
               >
-                {language === "de" ? "Abbrechen" : "Отмена"}
+                {language === "de"
+                  ? "Abbrechen"
+                  : "Отмена"}
               </button>
 
               <button
+                type="button"
                 onClick={saveMember}
                 disabled={
                   saving ||
                   !form.first_name.trim() ||
                   !form.last_name.trim()
                 }
-                className="h-11 flex-1 rounded-xl bg-neutral-900 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+                className="h-12 flex-1 rounded-xl bg-neutral-900 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {saving
                   ? language === "de"
@@ -1361,10 +1866,10 @@ export default function TeamPage() {
         </div>
       )}
 
-      {/* Delete confirmation */}
+      {/* Delete */}
       {deleteMember && (
         <div
-          className="fixed inset-0 z-[110] flex items-end justify-center bg-black/30 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+          className="fixed inset-0 z-[120] flex items-end justify-center bg-black/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               if (!deleting) {
@@ -1373,12 +1878,12 @@ export default function TeamPage() {
             }
           }}
         >
-          <div className="w-full rounded-t-3xl bg-white p-5 shadow-2xl sm:max-w-[430px] sm:rounded-2xl sm:p-6">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600">
-              <Trash2 size={19} strokeWidth={1.8} />
+          <div className="w-full rounded-t-[30px] bg-white p-5 shadow-2xl sm:max-w-[430px] sm:rounded-3xl sm:p-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+              <Trash2 size={19} />
             </div>
 
-            <h2 className="mt-4 text-lg font-semibold tracking-tight text-neutral-900">
+            <h2 className="mt-4 text-lg font-bold text-neutral-950">
               {language === "de"
                 ? "Mitglied löschen?"
                 : "Удалить участника?"}
@@ -1392,17 +1897,21 @@ export default function TeamPage() {
 
             <div className="mt-6 flex gap-2">
               <button
+                type="button"
                 onClick={() => setDeleteMember(null)}
                 disabled={deleting}
-                className="h-11 flex-1 rounded-xl border border-neutral-200 bg-white text-sm font-medium text-neutral-600 transition hover:bg-neutral-50 disabled:opacity-50"
+                className="h-12 flex-1 rounded-xl border border-neutral-200 bg-white text-sm font-semibold text-neutral-600 disabled:opacity-50"
               >
-                {language === "de" ? "Abbrechen" : "Отмена"}
+                {language === "de"
+                  ? "Abbrechen"
+                  : "Отмена"}
               </button>
 
               <button
+                type="button"
                 onClick={confirmDelete}
                 disabled={deleting}
-                className="h-11 flex-1 rounded-xl bg-red-600 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                className="h-12 flex-1 rounded-xl bg-red-600 text-sm font-bold text-white disabled:opacity-50"
               >
                 {deleting
                   ? language === "de"
