@@ -2,19 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  Cake,
+  Check,
+  ChevronDown,
+  GraduationCap,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
+  SlidersHorizontal,
   Trash2,
   UserRound,
   X,
-  RotateCcw,
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
-import { translations, type Language } from "@/lib/translations";
-import Sidebar from "@/components/Sidebar";
-import Header from "@/components/Header";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type Gender = "male" | "female";
 type TeenLanguage = "de" | "ru";
@@ -31,37 +34,60 @@ type Teen = {
   created_at: string;
 };
 
-type AgeFilter = "all" | number;
+type BirthdayCelebration = {
+  id: number;
+  teen_id: number;
+  birthday_year: number;
+  celebration_date: string;
+  celebrated: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type AgeFilter = "all" | 12 | 13 | 14 | 15;
 type GenderFilter = "all" | Gender;
 type LanguageFilter = "all" | TeenLanguage;
 type StatusFilter = "active" | "all" | "inactive";
 
+type Tab = "teens" | "graduates";
+
 export default function TeensPage() {
-  const [language, setLanguage] = useState<Language>("ru");
+  const { language } = useLanguage();
+
+  const isRu = language === "ru";
 
   const [teens, setTeens] = useState<Teen[]>([]);
+  const [birthdayCelebrations, setBirthdayCelebrations] =
+    useState<BirthdayCelebration[]>([]);
+
   const [loading, setLoading] = useState(true);
+  const [birthdayLoading, setBirthdayLoading] = useState(true);
+
+  const [tab, setTab] = useState<Tab>("teens");
 
   const [search, setSearch] = useState("");
-
   const [statusFilter, setStatusFilter] =
     useState<StatusFilter>("active");
-
   const [genderFilter, setGenderFilter] =
     useState<GenderFilter>("all");
-
   const [languageFilter, setLanguageFilter] =
     useState<LanguageFilter>("all");
-
   const [ageFilter, setAgeFilter] =
     useState<AgeFilter>("all");
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
+  const [graduateYearFilter, setGraduateYearFilter] =
+    useState<number | "all">("all");
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] =
     useState(false);
 
   const [editingTeen, setEditingTeen] =
+    useState<Teen | null>(null);
+
+  const [selectedTeen, setSelectedTeen] =
     useState<Teen | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -80,10 +106,11 @@ export default function TeensPage() {
 
   const [isActive, setIsActive] = useState(true);
 
-  const t = translations[language];
+  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     loadTeens();
+    loadBirthdayCelebrations();
   }, []);
 
   async function loadTeens() {
@@ -105,8 +132,52 @@ export default function TeensPage() {
     setLoading(false);
   }
 
-  function calculateAge(birthDate: string) {
-    const birth = new Date(`${birthDate}T00:00:00`);
+  async function loadBirthdayCelebrations() {
+    setBirthdayLoading(true);
+
+    const { data, error } = await supabase
+      .from("teen_birthday_celebrations")
+      .select("*")
+      .eq("birthday_year", currentYear);
+
+    if (error) {
+      console.error("❌ Birthday celebrations error");
+      console.error("message:", error?.message);
+      console.error("details:", error?.details);
+      console.error("hint:", error?.hint);
+      console.error("code:", error?.code);
+      console.error("full error:", error);
+
+      setBirthdayCelebrations([]);
+      setBirthdayLoading(false);
+      return;
+    }
+
+    setBirthdayCelebrations(data ?? []);
+    setBirthdayLoading(false);
+  }
+
+  function parseDate(date: string) {
+    const [year, month, day] = date
+      .split("-")
+      .map(Number);
+
+    return new Date(year, month - 1, day);
+  }
+
+  function formatDate(date: string) {
+    return parseDate(date).toLocaleDateString(
+      isRu ? "ru-RU" : "de-DE",
+      {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }
+    );
+  }
+
+  function calculateAge(date: string) {
+    const birth = parseDate(date);
     const today = new Date();
 
     let age =
@@ -128,38 +199,266 @@ export default function TeensPage() {
     return age;
   }
 
-  function formatDate(date: string) {
+  function getGraduationYear(date: string) {
+    return parseDate(date).getFullYear() + 16;
+  }
+
+  function getBirthdayDateForYear(
+    date: string,
+    year: number
+  ) {
+    const birth = parseDate(date);
+
+    let day = birth.getDate();
+
+    if (
+      birth.getMonth() === 1 &&
+      day === 29 &&
+      !(
+        year % 4 === 0 &&
+        (year % 100 !== 0 ||
+          year % 400 === 0)
+      )
+    ) {
+      day = 28;
+    }
+
     return new Date(
-      `${date}T00:00:00`
-    ).toLocaleDateString(
-      language === "ru" ? "ru-RU" : "de-DE",
+      year,
+      birth.getMonth(),
+      day
+    );
+  }
+
+  function formatShortDate(date: Date) {
+    return date.toLocaleDateString(
+      isRu ? "ru-RU" : "de-DE",
       {
         day: "2-digit",
         month: "2-digit",
-        year: "numeric",
       }
     );
   }
 
-  function getGenderLabel(value: Gender | null) {
+  function dateToISO(date: Date) {
+    const year = date.getFullYear();
+    const month = String(
+      date.getMonth() + 1
+    ).padStart(2, "0");
+    const day = String(
+      date.getDate()
+    ).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  function getPreviousSunday(date: Date) {
+    const result = new Date(date);
+    const day = result.getDay();
+
+    result.setDate(
+      result.getDate() - day
+    );
+
+    return result;
+  }
+
+  function getNextSunday(date: Date) {
+    const result = new Date(date);
+    const day = result.getDay();
+
+    const daysUntilSunday =
+      day === 0 ? 0 : 7 - day;
+
+    result.setDate(
+      result.getDate() + daysUntilSunday
+    );
+
+    return result;
+  }
+
+  const birthdayWeek = useMemo(() => {
+    const today = new Date();
+
+    return {
+      previousSunday:
+        getPreviousSunday(today),
+      nextSunday:
+        getNextSunday(today),
+      isSunday:
+        today.getDay() === 0,
+    };
+  }, []);
+
+  const birthdayCandidates = useMemo(() => {
+    const {
+      previousSunday,
+      nextSunday,
+      isSunday,
+    } = birthdayWeek;
+
+    return teens
+      .filter((teen) => teen.is_active)
+      .map((teen) => {
+        const birthday =
+          getBirthdayDateForYear(
+            teen.birth_date,
+            currentYear
+          );
+
+        return {
+          teen,
+          birthday,
+        };
+      })
+      .filter(({ birthday }) => {
+        if (isSunday) {
+          return (
+            birthday >= previousSunday &&
+            birthday <= nextSunday
+          );
+        }
+
+        return (
+          birthday > previousSunday &&
+          birthday <= nextSunday
+        );
+      })
+      .sort(
+        (a, b) =>
+          a.birthday.getTime() -
+          b.birthday.getTime()
+      );
+  }, [
+    teens,
+    birthdayWeek,
+    currentYear,
+  ]);
+
+  const pendingBirthdays =
+    birthdayCandidates.filter(
+      ({ teen }) => {
+        const celebration =
+          birthdayCelebrations.find(
+            (item) =>
+              item.teen_id === teen.id &&
+              item.birthday_year ===
+                currentYear
+          );
+
+        return !celebration?.celebrated;
+      }
+    );
+
+  async function markBirthdayCelebrated(
+    teen: Teen
+  ) {
+    const celebrationDate = dateToISO(
+      birthdayWeek.nextSunday
+    );
+
+    const existing =
+      birthdayCelebrations.find(
+        (item) =>
+          item.teen_id === teen.id &&
+          item.birthday_year ===
+            currentYear
+      );
+
+    if (existing) {
+      const { data, error } =
+        await supabase
+          .from(
+            "teen_birthday_celebrations"
+          )
+          .update({
+            celebrated: true,
+            celebration_date:
+              celebrationDate,
+            updated_at:
+              new Date().toISOString(),
+          })
+          .eq("id", existing.id)
+          .select()
+          .single();
+
+      if (error) {
+        console.error(
+          "❌ Error updating birthday",
+          error
+        );
+        return;
+      }
+
+      setBirthdayCelebrations(
+        (current) =>
+          current.map((item) =>
+            item.id === existing.id
+              ? data
+              : item
+          )
+      );
+
+      return;
+    }
+
+    const { data, error } =
+      await supabase
+        .from(
+          "teen_birthday_celebrations"
+        )
+        .insert({
+          teen_id: teen.id,
+          birthday_year:
+            currentYear,
+          celebration_date:
+            celebrationDate,
+          celebrated: true,
+          updated_at:
+            new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+    if (error) {
+      console.error(
+        "❌ Error saving birthday",
+        error
+      );
+      return;
+    }
+
+    setBirthdayCelebrations(
+      (current) => [
+        ...current,
+        data,
+      ]
+    );
+  }
+
+  function getGenderLabel(
+    value: Gender | null
+  ) {
     if (value === "male") {
-      return language === "ru"
+      return isRu
         ? "Мальчик"
         : "Junge";
     }
 
     if (value === "female") {
-      return language === "ru"
+      return isRu
         ? "Девочка"
         : "Mädchen";
     }
 
-    return language === "ru"
+    return isRu
       ? "Не указан"
       : "Nicht angegeben";
   }
 
-  function getLanguageLabel(value: TeenLanguage) {
+  function getLanguageLabel(
+    value: TeenLanguage
+  ) {
     return value === "de"
       ? "Deutsch"
       : "Русский";
@@ -168,36 +467,54 @@ export default function TeensPage() {
   function getLanguagesLabel(
     languages: TeenLanguage[]
   ) {
-    if (!languages || languages.length === 0) {
-      return language === "ru"
+    if (
+      !languages ||
+      languages.length === 0
+    ) {
+      return isRu
         ? "Не указан"
         : "Nicht angegeben";
     }
 
     return languages
-      .map((item) => getLanguageLabel(item))
+      .map((item) =>
+        getLanguageLabel(item)
+      )
       .join(" + ");
   }
 
-  function toggleLanguage(value: TeenLanguage) {
-    setSelectedLanguages((current) => {
-      if (current.includes(value)) {
-        return current.filter(
-          (item) => item !== value
-        );
-      }
+  function toggleLanguage(
+    value: TeenLanguage
+  ) {
+    setSelectedLanguages(
+      (current) => {
+        if (current.includes(value)) {
+          return current.filter(
+            (item) => item !== value
+          );
+        }
 
-      return [...current, value];
-    });
+        return [...current, value];
+      }
+    );
   }
 
-  const filteredTeens = useMemo(() => {
+  const mainTeenList = useMemo(() => {
     const normalizedSearch =
-      search.trim().toLocaleLowerCase();
+      search
+        .trim()
+        .toLocaleLowerCase();
 
     return teens
       .filter((teen) => {
-        // STATUS
+        const age = calculateAge(
+          teen.birth_date
+        );
+
+        if (age < 12 || age > 15) {
+          return false;
+        }
+
         if (
           statusFilter === "active" &&
           !teen.is_active
@@ -212,7 +529,6 @@ export default function TeensPage() {
           return false;
         }
 
-        // GENDER
         if (
           genderFilter !== "all" &&
           teen.gender !== genderFilter
@@ -220,7 +536,6 @@ export default function TeensPage() {
           return false;
         }
 
-        // LANGUAGE
         if (
           languageFilter !== "all" &&
           !(teen.languages ?? []).includes(
@@ -230,18 +545,13 @@ export default function TeensPage() {
           return false;
         }
 
-        // AGE
-        if (ageFilter !== "all") {
-          const age = calculateAge(
-            teen.birth_date
-          );
-
-          if (age !== ageFilter) {
-            return false;
-          }
+        if (
+          ageFilter !== "all" &&
+          age !== ageFilter
+        ) {
+          return false;
         }
 
-        // SEARCH
         if (normalizedSearch) {
           const fullName =
             `${teen.first_name} ${teen.last_name}`
@@ -272,32 +582,15 @@ export default function TeensPage() {
 
         return true;
       })
-      .sort((a, b) => {
-        const lastNameCompare =
-          a.last_name.localeCompare(
-            b.last_name,
-            language === "ru"
-              ? "ru"
-              : "de",
-            {
-              sensitivity: "base",
-            }
-          );
-
-        if (lastNameCompare !== 0) {
-          return lastNameCompare;
-        }
-
-        return a.first_name.localeCompare(
-          b.first_name,
-          language === "ru"
-            ? "ru"
-            : "de",
+      .sort((a, b) =>
+        `${a.last_name} ${a.first_name}`.localeCompare(
+          `${b.last_name} ${b.first_name}`,
+          isRu ? "ru" : "de",
           {
             sensitivity: "base",
           }
-        );
-      });
+        )
+      );
   }, [
     teens,
     search,
@@ -305,27 +598,188 @@ export default function TeensPage() {
     genderFilter,
     languageFilter,
     ageFilter,
-    language,
+    isRu,
+  ]);
+
+  const graduateYears = useMemo(() => {
+    const years = new Set<number>();
+
+    teens.forEach((teen) => {
+      const year =
+        getGraduationYear(
+          teen.birth_date
+        );
+
+      if (
+        year >= currentYear &&
+        year <= currentYear + 5
+      ) {
+        years.add(year);
+      }
+    });
+
+    return Array.from(years).sort(
+      (a, b) => a - b
+    );
+  }, [teens, currentYear]);
+
+  const graduates = useMemo(() => {
+    return teens
+      .filter((teen) => {
+        const year =
+          getGraduationYear(
+            teen.birth_date
+          );
+
+        if (
+          year < currentYear ||
+          year > currentYear + 5
+        ) {
+          return false;
+        }
+
+        if (
+          graduateYearFilter !== "all" &&
+          year !== graduateYearFilter
+        ) {
+          return false;
+        }
+
+        if (search.trim()) {
+          const query =
+            search
+              .trim()
+              .toLocaleLowerCase();
+
+          const fullName =
+            `${teen.first_name} ${teen.last_name}`
+              .toLocaleLowerCase();
+
+          return fullName.includes(query);
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        const yearA =
+          getGraduationYear(
+            a.birth_date
+          );
+
+        const yearB =
+          getGraduationYear(
+            b.birth_date
+          );
+
+        if (yearA !== yearB) {
+          return yearA - yearB;
+        }
+
+        return `${a.last_name} ${a.first_name}`.localeCompare(
+          `${b.last_name} ${b.first_name}`,
+          isRu ? "ru" : "de"
+        );
+      });
+  }, [
+    teens,
+    currentYear,
+    graduateYearFilter,
+    search,
+    isRu,
   ]);
 
   const activeCount = teens.filter(
     (teen) => teen.is_active
   ).length;
 
-  const inactiveCount =
-    teens.length - activeCount;
+  const mainAgeCount = teens.filter(
+    (teen) => {
+      const age = calculateAge(
+        teen.birth_date
+      );
+
+      return age >= 12 && age <= 15;
+    }
+  ).length;
+
+  const activeMainAgeCount = teens.filter(
+    (teen) => {
+      const age = calculateAge(
+        teen.birth_date
+      );
+
+      return (
+        teen.is_active &&
+        age >= 12 &&
+        age <= 15
+      );
+    }
+  ).length;
 
   const boysCount = teens.filter(
     (teen) =>
+      teen.is_active &&
       teen.gender === "male" &&
-      teen.is_active
+      calculateAge(teen.birth_date) >=
+        12 &&
+      calculateAge(teen.birth_date) <=
+        15
   ).length;
 
   const girlsCount = teens.filter(
     (teen) =>
+      teen.is_active &&
       teen.gender === "female" &&
-      teen.is_active
+      calculateAge(teen.birth_date) >=
+        12 &&
+      calculateAge(teen.birth_date) <=
+        15
   ).length;
+
+  const ageCounts = {
+    12: teens.filter(
+      (teen) =>
+        teen.is_active &&
+        calculateAge(
+          teen.birth_date
+        ) === 12
+    ).length,
+
+    13: teens.filter(
+      (teen) =>
+        teen.is_active &&
+        calculateAge(
+          teen.birth_date
+        ) === 13
+    ).length,
+
+    14: teens.filter(
+      (teen) =>
+        teen.is_active &&
+        calculateAge(
+          teen.birth_date
+        ) === 14
+    ).length,
+
+    15: teens.filter(
+      (teen) =>
+        teen.is_active &&
+        calculateAge(
+          teen.birth_date
+        ) === 15
+    ).length,
+  };
+
+  const activeFilterCount =
+    (statusFilter !== "active"
+      ? 1
+      : 0) +
+    (genderFilter !== "all"
+      ? 1
+      : 0) +
+    (languageFilter !== "all"
+      ? 1
+      : 0);
 
   const hasActiveFilters =
     search.trim() !== "" ||
@@ -358,29 +812,49 @@ export default function TeensPage() {
     setIsModalOpen(true);
   }
 
-  function openEditModal(teen: Teen) {
-    setEditingTeen(teen);
+  function openEditModal(
+    teen: Teen
+  ) {
+    setSelectedTeen(null);
 
-    setFirstName(teen.first_name);
-    setLastName(teen.last_name);
-    setBirthDate(teen.birth_date);
-    setPhone(teen.phone ?? "");
-    setGender(teen.gender ?? "");
+    setEditingTeen(teen);
+    setFirstName(
+      teen.first_name
+    );
+    setLastName(
+      teen.last_name
+    );
+    setBirthDate(
+      teen.birth_date
+    );
+    setPhone(
+      teen.phone ?? ""
+    );
+    setGender(
+      teen.gender ?? ""
+    );
     setSelectedLanguages(
       teen.languages ?? []
     );
-    setIsActive(teen.is_active);
+    setIsActive(
+      teen.is_active
+    );
 
     setIsModalOpen(true);
   }
 
   function closeModal() {
-    if (saving || deleting) {
+    if (
+      saving ||
+      deleting
+    ) {
       return;
     }
 
     setIsModalOpen(false);
-    setIsDeleteConfirmOpen(false);
+    setIsDeleteConfirmOpen(
+      false
+    );
     resetForm();
   }
 
@@ -406,13 +880,20 @@ export default function TeensPage() {
     setSaving(true);
 
     const teenData = {
-      first_name: cleanFirstName,
-      last_name: cleanLastName,
-      birth_date: birthDate,
-      phone: cleanPhone || null,
-      gender: gender || null,
-      languages: selectedLanguages,
-      is_active: isActive,
+      first_name:
+        cleanFirstName,
+      last_name:
+        cleanLastName,
+      birth_date:
+        birthDate,
+      phone:
+        cleanPhone || null,
+      gender:
+        gender || null,
+      languages:
+        selectedLanguages,
+      is_active:
+        isActive,
     };
 
     if (editingTeen) {
@@ -420,7 +901,10 @@ export default function TeensPage() {
         await supabase
           .from("teens")
           .update(teenData)
-          .eq("id", editingTeen.id)
+          .eq(
+            "id",
+            editingTeen.id
+          )
           .select()
           .single();
 
@@ -429,17 +913,19 @@ export default function TeensPage() {
           "Error updating teen:",
           error
         );
-
         setSaving(false);
         return;
       }
 
-      setTeens((current) =>
-        current.map((teen) =>
-          teen.id === editingTeen.id
-            ? data
-            : teen
-        )
+      setTeens(
+        (current) =>
+          current.map(
+            (teen) =>
+              teen.id ===
+              editingTeen.id
+                ? data
+                : teen
+          )
       );
     } else {
       const { data, error } =
@@ -454,15 +940,16 @@ export default function TeensPage() {
           "Error creating teen:",
           error
         );
-
         setSaving(false);
         return;
       }
 
-      setTeens((current) => [
-        ...current,
-        data,
-      ]);
+      setTeens(
+        (current) => [
+          ...current,
+          data,
+        ]
+      );
     }
 
     setSaving(false);
@@ -471,7 +958,10 @@ export default function TeensPage() {
   }
 
   async function deleteTeen() {
-    if (!editingTeen || deleting) {
+    if (
+      !editingTeen ||
+      deleting
+    ) {
       return;
     }
 
@@ -481,930 +971,1255 @@ export default function TeensPage() {
       await supabase
         .from("teens")
         .delete()
-        .eq("id", editingTeen.id);
+        .eq(
+          "id",
+          editingTeen.id
+        );
 
     if (error) {
       console.error(
         "Error deleting teen:",
         error
       );
-
       setDeleting(false);
       return;
     }
 
-    setTeens((current) =>
-      current.filter(
-        (teen) =>
-          teen.id !== editingTeen.id
-      )
+    setTeens(
+      (current) =>
+        current.filter(
+          (teen) =>
+            teen.id !==
+            editingTeen.id
+        )
+    );
+
+    setBirthdayCelebrations(
+      (current) =>
+        current.filter(
+          (item) =>
+            item.teen_id !==
+            editingTeen.id
+        )
     );
 
     setDeleting(false);
-    setIsDeleteConfirmOpen(false);
+    setIsDeleteConfirmOpen(
+      false
+    );
     setIsModalOpen(false);
     resetForm();
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-neutral-100 text-neutral-900">
-      <Sidebar language={language} />
+    <main className="min-h-screen bg-[#f5f5f3] text-neutral-900">
+      <div className="mx-auto w-full max-w-[760px] px-4 pb-28 pt-5 sm:px-6 sm:pt-8">
 
-      <div className="ml-[72px] min-h-screen min-w-0">
-        <Header
-          language={language}
-          setLanguage={setLanguage}
-        />
+        {/* TOP BAR */}
 
-        <div className="mx-auto w-full max-w-[1280px] px-4 pb-12 sm:px-6 sm:pb-16 lg:px-8 lg:pb-20">
-
-          {/* HEADER */}
-
-          <section className="pb-7 pt-9 sm:pb-8 sm:pt-12">
-            <p className="mb-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-neutral-400">
-              {t.common.teamWorkspace}
+        <header className="mb-5 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400">
+              TLite
             </p>
 
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h1 className="text-4xl font-bold tracking-[-0.055em] text-neutral-950 sm:text-5xl">
-                  {language === "ru"
-                    ? "Подростки"
-                    : "Teenager"}
-                </h1>
+            <h1 className="mt-1 text-[28px] font-bold tracking-[-0.05em] text-neutral-950">
+              {isRu
+                ? "Подростки"
+                : "Teenager"}
+            </h1>
+          </div>
 
-                <p className="mt-2.5 max-w-xl text-sm leading-6 text-neutral-500">
-                  {language === "ru"
-                    ? "Обзор подростков нашей группы."
-                    : "Übersicht über die Jugendlichen unserer Gruppe."}
+          <button
+            type="button"
+            onClick={
+              openCreateModal
+            }
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-950 text-white shadow-sm transition active:scale-95"
+            aria-label={
+              isRu
+                ? "Добавить подростка"
+                : "Teenager hinzufügen"
+            }
+          >
+            <Plus
+              size={18}
+              strokeWidth={2}
+            />
+          </button>
+        </header>
+
+        {/* BIRTHDAY CARD */}
+
+        <section className="mb-5 overflow-hidden rounded-[22px] bg-neutral-950 text-white">
+          <div className="flex items-start justify-between gap-4 p-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10">
+                  <Cake
+                    size={16}
+                    strokeWidth={1.8}
+                  />
+                </div>
+
+                <p className="text-sm font-semibold">
+                  {isRu
+                    ? "Дни рождения"
+                    : "Geburtstage"}
                 </p>
               </div>
 
-              <button
-                onClick={openCreateModal}
-                className="flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 text-xs font-semibold text-white transition hover:bg-neutral-800 active:scale-[0.99] sm:w-auto"
-              >
-                <Plus
-                  size={15}
+              <p className="mt-2 text-[12px] text-white/50">
+                {isRu
+                  ? `Поздравить в воскресенье ${formatShortDate(
+                      birthdayWeek.nextSunday
+                    )}`
+                  : `Am Sonntag, ${formatShortDate(
+                      birthdayWeek.nextSunday
+                    )}, gratulieren`}
+              </p>
+            </div>
+
+            <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-white/10 px-2 text-[10px] font-semibold text-white/70">
+              {pendingBirthdays.length}
+            </span>
+          </div>
+
+          {birthdayLoading ? (
+            <div className="border-t border-white/10 px-5 py-4 text-xs text-white/40">
+              {isRu
+                ? "Загрузка..."
+                : "Wird geladen..."}
+            </div>
+          ) : pendingBirthdays.length ===
+            0 ? (
+            <div className="border-t border-white/10 px-5 py-4">
+              <div className="flex items-center gap-2 text-xs text-white/45">
+                <Check
+                  size={14}
                   strokeWidth={2}
                 />
 
-                {language === "ru"
-                  ? "Добавить подростка"
-                  : "Teenager hinzufügen"}
-              </button>
-            </div>
-          </section>
-
-          {/* COMPACT STATISTICS */}
-
-          <section className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-            <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
-              <span className="text-[10px] font-medium text-neutral-400">
-                {language === "ru"
-                  ? "Всего"
-                  : "Gesamt"}
-              </span>
-
-              <span className="text-lg font-bold tracking-tight text-neutral-900">
-                {teens.length}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
-              <span className="text-[10px] font-medium text-neutral-400">
-                {language === "ru"
-                  ? "Активные"
-                  : "Aktiv"}
-              </span>
-
-              <span className="text-lg font-bold tracking-tight text-emerald-600">
-                {activeCount}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
-              <span className="text-[10px] font-medium text-neutral-400">
-                {language === "ru"
-                  ? "Мальчики"
-                  : "Jungen"}
-              </span>
-
-              <span className="text-lg font-bold tracking-tight text-blue-600">
-                {boysCount}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
-              <span className="text-[10px] font-medium text-neutral-400">
-                {language === "ru"
-                  ? "Девочки"
-                  : "Mädchen"}
-              </span>
-
-              <span className="text-lg font-bold tracking-tight text-pink-500">
-                {girlsCount}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
-              <span className="text-[10px] font-medium text-neutral-400">
-                {language === "ru"
-                  ? "В выборке"
-                  : "Auswahl"}
-              </span>
-
-              <span className="text-lg font-bold tracking-tight text-neutral-900">
-                {filteredTeens.length}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
-              <span className="text-[10px] font-medium text-neutral-400">
-                {language === "ru"
-                  ? "Неактивные"
-                  : "Inaktiv"}
-              </span>
-
-              <span className="text-lg font-bold tracking-tight text-neutral-400">
-                {inactiveCount}
-              </span>
-            </div>
-          </section>
-
-          {/* FILTERS */}
-
-          <section className="mb-4 rounded-xl border border-neutral-200 bg-white p-2.5 sm:p-3">
-            <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
-
-              {/* SEARCH */}
-
-              <div className="relative min-w-0 flex-1">
-                <Search
-                  size={15}
-                  strokeWidth={1.8}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
-                />
-
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(event) =>
-                    setSearch(
-                      event.target.value
-                    )
-                  }
-                  placeholder={
-                    language === "ru"
-                      ? "Поиск по имени, фамилии или телефону..."
-                      : "Nach Name, Nachname oder Telefonnummer suchen..."
-                  }
-                  className="h-9 w-full rounded-lg border border-neutral-200 bg-neutral-50 pl-9 pr-3 text-xs outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:bg-white"
-                />
-              </div>
-
-              {/* FILTERS */}
-
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:shrink-0">
-                {/* STATUS */}
-
-                <select
-                  value={statusFilter}
-                  onChange={(event) =>
-                    setStatusFilter(
-                      event.target
-                        .value as StatusFilter
-                    )
-                  }
-                  className="h-9 min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 text-xs font-medium text-neutral-600 outline-none transition focus:border-neutral-400 focus:bg-white lg:w-[115px]"
-                >
-                  <option value="active">
-                    {language === "ru"
-                      ? "Активные"
-                      : "Aktive"}
-                  </option>
-
-                  <option value="all">
-                    {language === "ru"
-                      ? "Все"
-                      : "Alle"}
-                  </option>
-
-                  <option value="inactive">
-                    {language === "ru"
-                      ? "Неактивные"
-                      : "Inaktive"}
-                  </option>
-                </select>
-
-                {/* AGE */}
-
-                <select
-                  value={
-                    ageFilter === "all"
-                      ? "all"
-                      : String(ageFilter)
-                  }
-                  onChange={(event) => {
-                    const value =
-                      event.target.value;
-
-                    setAgeFilter(
-                      value === "all"
-                        ? "all"
-                        : Number(value)
-                    );
-                  }}
-                  className="h-9 min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 text-xs font-medium text-neutral-600 outline-none transition focus:border-neutral-400 focus:bg-white lg:w-[120px]"
-                >
-                  <option value="all">
-                    {language === "ru"
-                      ? "Все возраста"
-                      : "Alle Alter"}
-                  </option>
-
-                  {Array.from(
-                    { length: 9 },
-                    (_, index) => {
-                      const age =
-                        index + 10;
-
-                      return (
-                        <option
-                          key={age}
-                          value={age}
-                        >
-                          {age}{" "}
-                          {language === "ru"
-                            ? "лет"
-                            : "Jahre"}
-                        </option>
-                      );
-                    }
-                  )}
-                </select>
-
-                {/* GENDER */}
-
-                <select
-                  value={genderFilter}
-                  onChange={(event) =>
-                    setGenderFilter(
-                      event.target
-                        .value as GenderFilter
-                    )
-                  }
-                  className="h-9 min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 text-xs font-medium text-neutral-600 outline-none transition focus:border-neutral-400 focus:bg-white lg:w-[125px]"
-                >
-                  <option value="all">
-                    {language === "ru"
-                      ? "Все"
-                      : "Alle"}
-                  </option>
-
-                  <option value="male">
-                    {language === "ru"
-                      ? "Мальчики"
-                      : "Jungen"}
-                  </option>
-
-                  <option value="female">
-                    {language === "ru"
-                      ? "Девочки"
-                      : "Mädchen"}
-                  </option>
-                </select>
-
-                {/* LANGUAGE */}
-
-                <select
-                  value={languageFilter}
-                  onChange={(event) =>
-                    setLanguageFilter(
-                      event.target
-                        .value as LanguageFilter
-                    )
-                  }
-                  className="h-9 min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 text-xs font-medium text-neutral-600 outline-none transition focus:border-neutral-400 focus:bg-white lg:w-[130px]"
-                >
-                  <option value="all">
-                    {language === "ru"
-                      ? "Все языки"
-                      : "Alle Sprachen"}
-                  </option>
-
-                  <option value="de">
-                    Deutsch
-                  </option>
-
-                  <option value="ru">
-                    Русский
-                  </option>
-                </select>
+                {isRu
+                  ? "На эту неделю всё отмечено."
+                  : "Für diesen Sonntag ist alles erledigt."}
               </div>
             </div>
-
-            {/* FILTER FOOTER */}
-
-            <div className="mt-2.5 flex min-h-[24px] items-center justify-between gap-3 border-t border-neutral-100 pt-2.5">
-              <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                <span className="text-[10px] text-neutral-400">
-                  {language === "ru"
-                    ? "Показано:"
-                    : "Angezeigt:"}
-                </span>
-
-                <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-700">
-                  {filteredTeens.length}
-                </span>
-
-                {statusFilter !== "active" && (
-                  <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-500">
-                    {statusFilter ===
-                    "inactive"
-                      ? language === "ru"
-                        ? "Неактивные"
-                        : "Inaktive"
-                      : language === "ru"
-                        ? "Все"
-                        : "Alle"}
-                  </span>
-                )}
-
-                {ageFilter !== "all" && (
-                  <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-500">
-                    {ageFilter}{" "}
-                    {language === "ru"
-                      ? "лет"
-                      : "Jahre"}
-                  </span>
-                )}
-
-                {genderFilter !== "all" && (
-                  <span
-                    className={`rounded-md px-2 py-0.5 text-[10px] ${
-                      genderFilter === "male"
-                        ? "bg-blue-50 text-blue-600"
-                        : "bg-pink-50 text-pink-600"
-                    }`}
+          ) : (
+            <div className="divide-y divide-white/10 border-t border-white/10">
+              {pendingBirthdays.map(
+                ({
+                  teen,
+                  birthday,
+                }) => (
+                  <div
+                    key={teen.id}
+                    className="flex items-center gap-3 px-5 py-3.5"
                   >
-                    {genderFilter === "male"
-                      ? language === "ru"
-                        ? "Мальчики"
-                        : "Jungen"
-                      : language === "ru"
-                        ? "Девочки"
-                        : "Mädchen"}
-                  </span>
-                )}
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white/70">
+                      {teen.first_name
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
 
-                {languageFilter !== "all" && (
-                  <span className="rounded-md bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-500">
-                    {languageFilter === "de"
-                      ? "Deutsch"
-                      : "Русский"}
-                  </span>
-                )}
-              </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">
+                        {teen.first_name}{" "}
+                        {teen.last_name}
+                      </p>
 
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-medium text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
-                >
-                  <RotateCcw
-                    size={12}
-                    strokeWidth={1.8}
-                  />
+                      <p className="mt-0.5 text-[11px] text-white/40">
+                        {formatShortDate(
+                          birthday
+                        )}{" "}
+                        ·{" "}
+                        {calculateAge(
+                          teen.birth_date
+                        ) + 1}{" "}
+                        {isRu
+                          ? "лет"
+                          : "Jahre"}
+                      </p>
+                    </div>
 
-                  {language === "ru"
-                    ? "Сбросить"
-                    : "Zurücksetzen"}
-                </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        markBirthdayCelebrated(
+                          teen
+                        )
+                      }
+                      className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-bold text-neutral-900 transition active:scale-95"
+                    >
+                      <Check
+                        size={13}
+                        strokeWidth={2.3}
+                      />
+
+                      {isRu
+                        ? "Поздравили"
+                        : "Gratuliert"}
+                    </button>
+                  </div>
+                )
               )}
             </div>
-          </section>
+          )}
+        </section>
 
-          {/* TABLE */}
+        {/* TABS */}
 
-          <section className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
-            {loading ? (
-              <div className="flex min-h-[240px] items-center justify-center">
-                <p className="text-sm text-neutral-400">
-                  {language === "ru"
-                    ? "Загрузка подростков..."
-                    : "Teenager werden geladen..."}
-                </p>
-              </div>
-            ) : filteredTeens.length === 0 ? (
-              <div className="flex min-h-[260px] flex-col items-center justify-center px-5 text-center">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-100 text-neutral-400">
-                  <UserRound
-                    size={19}
-                    strokeWidth={1.7}
-                  />
+        <div className="mb-4 flex rounded-xl bg-neutral-200/70 p-1">
+          <button
+            type="button"
+            onClick={() =>
+              setTab("teens")
+            }
+            className={`flex h-10 flex-1 items-center justify-center rounded-lg text-xs font-bold transition ${
+              tab === "teens"
+                ? "bg-white text-neutral-950 shadow-sm"
+                : "text-neutral-500"
+            }`}
+          >
+            {isRu
+              ? "Подростки"
+              : "Teenager"}
+
+            <span className="ml-1.5 text-neutral-400">
+              {mainAgeCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              setTab("graduates")
+            }
+            className={`flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg text-xs font-bold transition ${
+              tab === "graduates"
+                ? "bg-white text-neutral-950 shadow-sm"
+                : "text-neutral-500"
+            }`}
+          >
+            <GraduationCap
+              size={14}
+              strokeWidth={1.9}
+            />
+
+            {isRu
+              ? "Выпускники"
+              : "Absolventen"}
+          </button>
+        </div>
+
+        {/* TEENS */}
+
+        {tab === "teens" && (
+          <>
+            {/* COMPACT STATS */}
+
+            <section className="mb-4 overflow-hidden rounded-[20px] bg-white">
+              <div className="flex items-center justify-between px-4 py-3.5">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-400">
+                    {isRu
+                      ? "Подростки 12–15"
+                      : "Teenager 12–15"}
+                  </p>
+
+                  <p className="mt-0.5 text-[11px] text-neutral-400">
+                    {isRu
+                      ? `${activeMainAgeCount} активных`
+                      : `${activeMainAgeCount} aktiv`}
+                  </p>
                 </div>
 
-                <h3 className="mt-4 text-sm font-semibold text-neutral-900">
-                  {language === "ru"
-                    ? "Никого не найдено"
-                    : "Keine Teenager gefunden"}
-                </h3>
-
-                <p className="mt-1 max-w-sm text-xs leading-5 text-neutral-400">
-                  {language === "ru"
-                    ? "Попробуйте изменить фильтры или поисковый запрос."
-                    : "Versuche die Filter oder den Suchbegriff zu ändern."}
-                </p>
-
-                {hasActiveFilters && (
-                  <button
-                    type="button"
-                    onClick={resetFilters}
-                    className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-neutral-800"
-                  >
-                    <RotateCcw
-                      size={12}
-                      strokeWidth={1.8}
-                    />
-
-                    {language === "ru"
-                      ? "Сбросить фильтры"
-                      : "Filter zurücksetzen"}
-                  </button>
-                )}
+                <span className="text-xl font-bold tracking-tight text-neutral-950">
+                  {mainAgeCount}
+                </span>
               </div>
-            ) : (
-              <>
-                {/* DESKTOP */}
 
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full min-w-[1000px] border-collapse">
-                    <thead>
-                      <tr className="border-b border-neutral-200 bg-neutral-50">
-                        <th className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language === "ru"
-                            ? "Имя"
-                            : "Name"}
-                        </th>
-
-                        <th className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language === "ru"
-                            ? "Пол"
-                            : "Geschlecht"}
-                        </th>
-
-                        <th className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language === "ru"
-                            ? "Рождение"
-                            : "Geburt"}
-                        </th>
-
-                        <th className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language === "ru"
-                            ? "Возраст"
-                            : "Alter"}
-                        </th>
-
-                        <th className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language === "ru"
-                            ? "Язык"
-                            : "Sprache"}
-                        </th>
-
-                        <th className="px-5 py-3 text-left text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language === "ru"
-                            ? "Телефон"
-                            : "Telefon"}
-                        </th>
-
-                        <th className="px-5 py-3 text-right text-[9px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
-                          {language === "ru"
-                            ? "Статус"
-                            : "Status"}
-                        </th>
-
-                        <th className="w-12 px-3 py-3" />
-                      </tr>
-                    </thead>
-
-                    <tbody className="divide-y divide-neutral-100">
-                      {filteredTeens.map(
-                        (teen) => (
-                          <tr
-                            key={teen.id}
-                            className="group transition hover:bg-neutral-50"
-                          >
-                            <td className="px-5 py-3.5">
-                              <div className="font-medium text-sm text-neutral-900">
-                                {teen.last_name}{" "}
-                                {teen.first_name}
-                              </div>
-                            </td>
-
-                            <td className="px-5 py-3.5">
-                              {teen.gender ? (
-                                <span className="inline-flex items-center gap-2">
-                                  <span
-                                    className={`h-1.5 w-1.5 rounded-full ${
-                                      teen.gender ===
-                                      "male"
-                                        ? "bg-blue-500"
-                                        : "bg-pink-500"
-                                    }`}
-                                  />
-
-                                  <span
-                                    className={`text-xs font-medium ${
-                                      teen.gender ===
-                                      "male"
-                                        ? "text-blue-600"
-                                        : "text-pink-600"
-                                    }`}
-                                  >
-                                    {getGenderLabel(
-                                      teen.gender
-                                    )}
-                                  </span>
-                                </span>
-                              ) : (
-                                <span className="text-xs text-neutral-400">
-                                  —
-                                </span>
-                              )}
-                            </td>
-
-                            <td className="px-5 py-3.5 text-xs text-neutral-500">
-                              {formatDate(
-                                teen.birth_date
-                              )}
-                            </td>
-
-                            <td className="px-5 py-3.5">
-                              <span className="inline-flex min-w-[30px] items-center justify-center rounded-md bg-neutral-100 px-1.5 py-0.5 text-xs font-semibold text-neutral-800">
-                                {calculateAge(
-                                  teen.birth_date
-                                )}
-                              </span>
-                            </td>
-
-                            <td className="px-5 py-3.5">
-                              <div className="flex flex-wrap gap-1">
-                                {(
-                                  teen.languages ??
-                                  []
-                                ).length === 0 ? (
-                                  <span className="text-xs text-neutral-400">
-                                    —
-                                  </span>
-                                ) : (
-                                  (
-                                    teen.languages ??
-                                    []
-                                  ).map(
-                                    (lang) => (
-                                      <span
-                                        key={lang}
-                                        className="rounded-full bg-neutral-100 px-2 py-0.5 text-[9px] font-semibold text-neutral-600"
-                                      >
-                                        {getLanguageLabel(
-                                          lang
-                                        )}
-                                      </span>
-                                    )
-                                  )
-                                )}
-                              </div>
-                            </td>
-
-                            <td className="px-5 py-3.5 text-xs text-neutral-500">
-                              {teen.phone ||
-                                "—"}
-                            </td>
-
-                            <td className="px-5 py-3.5 text-right">
-                              <span
-                                className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold ${
-                                  teen.is_active
-                                    ? "bg-emerald-50 text-emerald-600"
-                                    : "bg-neutral-100 text-neutral-400"
-                                }`}
-                              >
-                                {teen.is_active
-                                  ? language ===
-                                    "ru"
-                                    ? "Активен"
-                                    : "Aktiv"
-                                  : language ===
-                                      "ru"
-                                    ? "Неактивен"
-                                    : "Inaktiv"}
-                              </span>
-                            </td>
-
-                            <td className="px-3 py-3.5">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openEditModal(
-                                    teen
-                                  )
-                                }
-                                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-300 opacity-0 transition hover:bg-white hover:text-neutral-900 group-hover:opacity-100"
-                              >
-                                <Pencil
-                                  size={14}
-                                  strokeWidth={
-                                    1.8
-                                  }
-                                />
-                              </button>
-                            </td>
-                          </tr>
-                        )
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* MOBILE */}
-
-                <div className="divide-y divide-neutral-100 md:hidden">
-                  {filteredTeens.map(
-                    (teen) => (
-                      <button
-                        key={teen.id}
-                        type="button"
-                        onClick={() =>
-                          openEditModal(
-                            teen
-                          )
-                        }
-                        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-neutral-50"
+              <div className="border-t border-neutral-100 px-4 py-2.5">
+                <div className="grid grid-cols-4">
+                  {[12, 13, 14, 15].map(
+                    (age) => (
+                      <div
+                        key={age}
+                        className="flex flex-col items-center"
                       >
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
-                          <UserRound
-                            size={16}
-                            strokeWidth={1.7}
-                          />
-                        </div>
+                        <span className="text-[10px] font-semibold text-neutral-400">
+                          {age}
+                        </span>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate text-sm font-semibold text-neutral-900">
-                              {teen.last_name}{" "}
-                              {teen.first_name}
-                            </p>
+                        <span className="mt-0.5 text-sm font-bold text-neutral-800">
+                          {
+                            ageCounts[
+                              age as 12 | 13 | 14 | 15
+                            ]
+                          }
+                        </span>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
 
-                            <span
-                              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                                teen.is_active
-                                  ? "bg-emerald-500"
-                                  : "bg-neutral-300"
+              <div className="flex items-center gap-4 border-t border-neutral-100 px-4 py-2.5">
+                <span className="text-[11px] font-semibold text-blue-600">
+                  ♂ {boysCount}
+                </span>
+
+                <span className="text-[11px] font-semibold text-pink-600">
+                  ♀ {girlsCount}
+                </span>
+
+                <span className="ml-auto text-[10px] text-neutral-400">
+                  {isRu
+                    ? `${activeCount} всего активных`
+                    : `${activeCount} insgesamt aktiv`}
+                </span>
+              </div>
+            </section>
+
+            {/* SEARCH */}
+
+            <div className="relative mb-3">
+              <Search
+                size={16}
+                strokeWidth={1.8}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400"
+              />
+
+              <input
+                value={search}
+                onChange={(event) =>
+                  setSearch(
+                    event.target.value
+                  )
+                }
+                placeholder={
+                  isRu
+                    ? "Поиск подростка..."
+                    : "Teenager suchen..."
+                }
+                className="h-12 w-full rounded-2xl border border-neutral-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-neutral-400 focus:ring-4 focus:ring-neutral-950/5"
+              />
+            </div>
+
+            {/* AGE FILTER */}
+
+            <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
+              {(
+                [
+                  "all",
+                  12,
+                  13,
+                  14,
+                  15,
+                ] as AgeFilter[]
+              ).map((age) => (
+                <button
+                  key={String(age)}
+                  type="button"
+                  onClick={() =>
+                    setAgeFilter(
+                      age
+                    )
+                  }
+                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold transition ${
+                    ageFilter === age
+                      ? "bg-neutral-950 text-white"
+                      : "bg-white text-neutral-500"
+                  }`}
+                >
+                  {age === "all"
+                    ? isRu
+                      ? "Все"
+                      : "Alle"
+                    : `${age}`}
+                </button>
+              ))}
+            </div>
+
+            {/* FILTER BUTTON */}
+
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() =>
+                  setFiltersOpen(
+                    (value) => !value
+                  )
+                }
+                className={`flex h-11 w-full items-center justify-between rounded-2xl border px-4 text-xs font-bold transition ${
+                  filtersOpen ||
+                  activeFilterCount > 0
+                    ? "border-neutral-950 bg-neutral-950 text-white"
+                    : "border-neutral-200 bg-white text-neutral-700"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <SlidersHorizontal
+                    size={15}
+                    strokeWidth={2}
+                  />
+
+                  {isRu
+                    ? "Фильтры"
+                    : "Filter"}
+                </span>
+
+                <span className="flex items-center gap-2">
+                  {activeFilterCount >
+                    0 && (
+                    <span
+                      className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[9px] font-bold ${
+                        filtersOpen
+                          ? "bg-white text-neutral-950"
+                          : "bg-neutral-950 text-white"
+                      }`}
+                    >
+                      {activeFilterCount}
+                    </span>
+                  )}
+
+                  <ChevronDown
+                    size={15}
+                    className={`transition-transform ${
+                      filtersOpen
+                        ? "rotate-180"
+                        : ""
+                    }`}
+                  />
+                </span>
+              </button>
+
+              {filtersOpen && (
+                <div className="mt-2 rounded-[20px] border border-neutral-200 bg-white p-3">
+                  <div className="space-y-4">
+
+                    {/* STATUS */}
+
+                    <div>
+                      <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-400">
+                        {isRu
+                          ? "Статус"
+                          : "Status"}
+                      </p>
+
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[
+                          [
+                            "active",
+                            isRu
+                              ? "Активные"
+                              : "Aktive",
+                          ],
+                          [
+                            "all",
+                            isRu
+                              ? "Все"
+                              : "Alle",
+                          ],
+                          [
+                            "inactive",
+                            isRu
+                              ? "Неактивные"
+                              : "Inaktive",
+                          ],
+                        ].map(
+                          ([
+                            value,
+                            label,
+                          ]) => (
+                            <button
+                              key={
+                                value
+                              }
+                              type="button"
+                              onClick={() =>
+                                setStatusFilter(
+                                  value as StatusFilter
+                                )
+                              }
+                              className={`h-9 rounded-xl text-[10px] font-semibold transition ${
+                                statusFilter ===
+                                value
+                                  ? "bg-neutral-950 text-white"
+                                  : "bg-neutral-100 text-neutral-500"
                               }`}
-                            />
+                            >
+                              {label}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
+
+                    {/* GENDER */}
+
+                    <div>
+                      <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-400">
+                        {isRu
+                          ? "Пол"
+                          : "Geschlecht"}
+                      </p>
+
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[
+                          [
+                            "all",
+                            isRu
+                              ? "Все"
+                              : "Alle",
+                          ],
+                          [
+                            "male",
+                            isRu
+                              ? "Мальчики"
+                              : "Jungen",
+                          ],
+                          [
+                            "female",
+                            isRu
+                              ? "Девочки"
+                              : "Mädchen",
+                          ],
+                        ].map(
+                          ([
+                            value,
+                            label,
+                          ]) => (
+                            <button
+                              key={
+                                value
+                              }
+                              type="button"
+                              onClick={() =>
+                                setGenderFilter(
+                                  value as GenderFilter
+                                )
+                              }
+                              className={`h-9 rounded-xl text-[10px] font-semibold transition ${
+                                genderFilter ===
+                                value
+                                  ? "bg-neutral-950 text-white"
+                                  : "bg-neutral-100 text-neutral-500"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
+
+                    {/* LANGUAGE */}
+
+                    <div>
+                      <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-400">
+                        {isRu
+                          ? "Язык"
+                          : "Sprache"}
+                      </p>
+
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[
+                          [
+                            "all",
+                            isRu
+                              ? "Все"
+                              : "Alle",
+                          ],
+                          [
+                            "de",
+                            "Deutsch",
+                          ],
+                          [
+                            "ru",
+                            "Русский",
+                          ],
+                        ].map(
+                          ([
+                            value,
+                            label,
+                          ]) => (
+                            <button
+                              key={
+                                value
+                              }
+                              type="button"
+                              onClick={() =>
+                                setLanguageFilter(
+                                  value as LanguageFilter
+                                )
+                              }
+                              className={`h-9 rounded-xl text-[10px] font-semibold transition ${
+                                languageFilter ===
+                                value
+                                  ? "bg-neutral-950 text-white"
+                                  : "bg-neutral-100 text-neutral-500"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
+
+                    {/* RESET */}
+
+                    {hasActiveFilters && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          resetFilters();
+                          setFiltersOpen(
+                            false
+                          );
+                        }}
+                        className="flex h-9 w-full items-center justify-center gap-1.5 rounded-xl text-[11px] font-semibold text-neutral-400 transition active:bg-neutral-50"
+                      >
+                        <RotateCcw
+                          size={12}
+                        />
+
+                        {isRu
+                          ? "Сбросить фильтры"
+                          : "Filter zurücksetzen"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* LIST */}
+
+            <section className="overflow-hidden rounded-[22px] bg-white">
+              {loading ? (
+                <div className="flex min-h-[220px] items-center justify-center text-xs text-neutral-400">
+                  {isRu
+                    ? "Загрузка..."
+                    : "Wird geladen..."}
+                </div>
+              ) : mainTeenList.length ===
+                0 ? (
+                <div className="flex min-h-[240px] flex-col items-center justify-center px-6 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-400">
+                    <UserRound
+                      size={20}
+                    />
+                  </div>
+
+                  <p className="mt-4 text-sm font-semibold">
+                    {isRu
+                      ? "Никого не найдено"
+                      : "Keine Teenager gefunden"}
+                  </p>
+
+                  <p className="mt-1 text-xs text-neutral-400">
+                    {isRu
+                      ? "Измени фильтры или поиск."
+                      : "Filter oder Suche ändern."}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-neutral-100">
+                  {mainTeenList.map(
+                    (teen) => {
+                      const age =
+                        calculateAge(
+                          teen.birth_date
+                        );
+
+                      const graduationYear =
+                        getGraduationYear(
+                          teen.birth_date
+                        );
+
+                      return (
+                        <button
+                          key={teen.id}
+                          type="button"
+                          onClick={() =>
+                            setSelectedTeen(
+                              teen
+                            )
+                          }
+                          className="flex w-full items-center gap-3 p-4 text-left transition active:bg-neutral-50"
+                        >
+                          <div
+                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                              teen.gender ===
+                              "female"
+                                ? "bg-pink-50 text-pink-500"
+                                : teen.gender ===
+                                  "male"
+                                ? "bg-blue-50 text-blue-500"
+                                : "bg-neutral-100 text-neutral-500"
+                            }`}
+                          >
+                            {teen.first_name
+                              .charAt(0)
+                              .toUpperCase()}
                           </div>
 
-                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-neutral-400">
-                            <span className="font-semibold text-neutral-700">
-                              {calculateAge(
-                                teen.birth_date
-                              )}{" "}
-                              {language === "ru"
-                                ? "лет"
-                                : "Jahre"}
-                            </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="truncate text-sm font-bold text-neutral-950">
+                                {
+                                  teen.first_name
+                                }{" "}
+                                {
+                                  teen.last_name
+                                }
+                              </p>
 
-                            {teen.gender && (
-                              <>
-                                <span>
-                                  ·
-                                </span>
+                              <span
+                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                                  teen.is_active
+                                    ? "bg-emerald-500"
+                                    : "bg-neutral-300"
+                                }`}
+                              />
+                            </div>
 
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-600">
+                                {age}{" "}
+                                {isRu
+                                  ? "лет"
+                                  : "Jahre"}
+                              </span>
+
+                              {teen.gender && (
                                 <span
-                                  className={
+                                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                                     teen.gender ===
                                     "male"
-                                      ? "font-medium text-blue-500"
-                                      : "font-medium text-pink-500"
-                                  }
+                                      ? "bg-blue-50 text-blue-600"
+                                      : "bg-pink-50 text-pink-600"
+                                  }`}
                                 >
                                   {getGenderLabel(
                                     teen.gender
                                   )}
                                 </span>
-                              </>
-                            )}
+                              )}
 
-                            {(
-                              teen.languages ??
-                              []
-                            ).length > 0 && (
-                              <>
-                                <span>
-                                  ·
-                                </span>
+                              {(
+                                teen.languages ??
+                                []
+                              ).map(
+                                (
+                                  item
+                                ) => (
+                                  <span
+                                    key={
+                                      item
+                                    }
+                                    className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-500"
+                                  >
+                                    {item ===
+                                    "de"
+                                      ? "DE"
+                                      : "RU"}
+                                  </span>
+                                )
+                              )}
+                            </div>
 
-                                <span>
-                                  {getLanguagesLabel(
-                                    teen.languages ??
-                                      []
-                                  )}
-                                </span>
-                              </>
+                            {graduationYear ===
+                              currentYear && (
+                              <div className="mt-1.5 flex items-center gap-1 text-[10px] font-semibold text-neutral-400">
+                                <GraduationCap
+                                  size={
+                                    11
+                                  }
+                                />
+
+                                {isRu
+                                  ? `Выпускник ${graduationYear}`
+                                  : `Absolvent ${graduationYear}`}
+                              </div>
                             )}
                           </div>
 
-                          {teen.phone && (
-                            <p className="mt-0.5 truncate text-[11px] text-neutral-400">
-                              {teen.phone}
-                            </p>
-                          )}
-                        </div>
-
-                        <Pencil
-                          size={14}
-                          strokeWidth={1.8}
-                          className="shrink-0 text-neutral-300"
-                        />
-                      </button>
-                    )
+                          <Pencil
+                            size={15}
+                            className="shrink-0 text-neutral-300"
+                          />
+                        </button>
+                      );
+                    }
                   )}
                 </div>
-              </>
-            )}
-          </section>
+              )}
+            </section>
+          </>
+        )}
 
-          {!loading &&
-            filteredTeens.length > 0 && (
-              <div className="mt-2.5 flex items-center justify-between text-[10px] text-neutral-400">
-                <span>
-                  {filteredTeens.length}{" "}
-                  {language === "ru"
-                    ? "подростков показано"
-                    : "Teenager angezeigt"}
-                </span>
+        {/* GRADUATES */}
 
-                <span className="hidden sm:block">
-                  {language === "ru"
-                    ? "Сортировка: фамилия А–Я"
-                    : "Sortierung: Nachname A–Z"}
-                </span>
+        {tab === "graduates" && (
+          <>
+            <section className="mb-5 rounded-[22px] bg-neutral-950 p-5 text-white">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10">
+                  <GraduationCap
+                    size={19}
+                    strokeWidth={1.8}
+                  />
+                </div>
+
+                <div>
+                  <h2 className="text-base font-bold">
+                    {isRu
+                      ? "Будущие выпускники"
+                      : "Zukünftige Absolventen"}
+                  </h2>
+
+                  <p className="mt-1 text-xs leading-5 text-white/45">
+                    {isRu
+                      ? "Здесь автоматически отображаются подростки, которым исполнится 16 лет."
+                      : "Hier erscheinen automatisch Teenager, die 16 Jahre alt werden."}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1">
+              <button
+                type="button"
+                onClick={() =>
+                  setGraduateYearFilter(
+                    "all"
+                  )
+                }
+                className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${
+                  graduateYearFilter ===
+                  "all"
+                    ? "bg-neutral-950 text-white"
+                    : "bg-white text-neutral-500"
+                }`}
+              >
+                {isRu
+                  ? "Все"
+                  : "Alle"}
+              </button>
+
+              {graduateYears.map(
+                (year) => (
+                  <button
+                    key={year}
+                    type="button"
+                    onClick={() =>
+                      setGraduateYearFilter(
+                        year
+                      )
+                    }
+                    className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${
+                      graduateYearFilter ===
+                      year
+                        ? "bg-neutral-950 text-white"
+                        : "bg-white text-neutral-500"
+                    }`}
+                  >
+                    {year}
+                  </button>
+                )
+              )}
+            </div>
+
+            <div className="relative mb-3">
+              <Search
+                size={16}
+                strokeWidth={1.8}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400"
+              />
+
+              <input
+                value={search}
+                onChange={(event) =>
+                  setSearch(
+                    event.target.value
+                  )
+                }
+                placeholder={
+                  isRu
+                    ? "Поиск выпускника..."
+                    : "Absolvent suchen..."
+                }
+                className="h-12 w-full rounded-2xl border border-neutral-200 bg-white pl-10 pr-4 text-sm outline-none transition focus:border-neutral-400 focus:ring-4 focus:ring-neutral-950/5"
+              />
+            </div>
+
+            <section className="overflow-hidden rounded-[22px] bg-white">
+              {graduates.length ===
+              0 ? (
+                <div className="flex min-h-[240px] flex-col items-center justify-center px-6 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-400">
+                    <GraduationCap
+                      size={21}
+                    />
+                  </div>
+
+                  <p className="mt-4 text-sm font-semibold">
+                    {isRu
+                      ? "Выпускников пока нет"
+                      : "Keine Absolventen"}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-neutral-100">
+                  {graduates.map(
+                    (teen) => {
+                      const year =
+                        getGraduationYear(
+                          teen.birth_date
+                        );
+
+                      const age =
+                        calculateAge(
+                          teen.birth_date
+                        );
+
+                      return (
+                        <button
+                          key={teen.id}
+                          type="button"
+                          onClick={() =>
+                            setSelectedTeen(
+                              teen
+                            )
+                          }
+                          className="flex w-full items-center gap-3 p-4 text-left transition active:bg-neutral-50"
+                        >
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+                            {teen.first_name
+                              .charAt(0)
+                              .toUpperCase()}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-bold">
+                              {
+                                teen.first_name
+                              }{" "}
+                              {
+                                teen.last_name
+                              }
+                            </p>
+
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-500">
+                                {age}{" "}
+                                {isRu
+                                  ? "лет"
+                                  : "Jahre"}
+                              </span>
+
+                              <span className="rounded-full bg-neutral-950 px-2 py-0.5 text-[10px] font-bold text-white">
+                                {isRu
+                                  ? `Выпускник ${year}`
+                                  : `Absolvent ${year}`}
+                              </span>
+                            </div>
+                          </div>
+
+                          <ChevronDown
+                            size={15}
+                            className="-rotate-90 shrink-0 text-neutral-300"
+                          />
+                        </button>
+                      );
+                    }
+                  )}
+                </div>
+              )}
+            </section>
+          </>
+        )}
+      </div>
+
+      {/* DETAIL SHEET */}
+
+      {selectedTeen && (
+        <div
+          className="fixed inset-0 z-[80] bg-black/30 backdrop-blur-sm"
+          onClick={() =>
+            setSelectedTeen(null)
+          }
+        >
+          <div
+            className="absolute bottom-0 left-0 right-0 mx-auto max-h-[88vh] w-full max-w-[760px] overflow-y-auto rounded-t-[28px] bg-white p-5 pb-8 shadow-2xl sm:bottom-4 sm:rounded-[28px]"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
+            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-neutral-200" />
+
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-neutral-100 text-lg font-bold text-neutral-500">
+                  {selectedTeen.first_name
+                    .charAt(0)
+                    .toUpperCase()}
+                </div>
+
+                <div>
+                  <h2 className="text-lg font-bold tracking-tight">
+                    {
+                      selectedTeen.first_name
+                    }{" "}
+                    {
+                      selectedTeen.last_name
+                    }
+                  </h2>
+
+                  <p className="mt-1 text-xs text-neutral-400">
+                    {calculateAge(
+                      selectedTeen.birth_date
+                    )}{" "}
+                    {isRu
+                      ? "лет"
+                      : "Jahre"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedTeen(null)
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-neutral-500"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              <div className="rounded-2xl bg-neutral-50 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                  {isRu
+                    ? "Рождение"
+                    : "Geburt"}
+                </p>
+
+                <p className="mt-1 text-sm font-semibold">
+                  {formatDate(
+                    selectedTeen.birth_date
+                  )}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-neutral-50 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                  {isRu
+                    ? "Выпуск"
+                    : "Abschluss"}
+                </p>
+
+                <p className="mt-1 text-sm font-semibold">
+                  {getGraduationYear(
+                    selectedTeen.birth_date
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-2 rounded-2xl bg-neutral-50 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                {isRu
+                  ? "Язык"
+                  : "Sprache"}
+              </p>
+
+              <p className="mt-1 text-sm font-semibold">
+                {getLanguagesLabel(
+                  selectedTeen.languages ??
+                    []
+                )}
+              </p>
+            </div>
+
+            <div className="mt-2 rounded-2xl bg-neutral-50 p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                {isRu
+                  ? "Телефон"
+                  : "Telefon"}
+              </p>
+
+              <p className="mt-1 text-sm font-semibold">
+                {selectedTeen.phone ||
+                  "—"}
+              </p>
+            </div>
+
+            <div className="mt-2 flex items-center justify-between rounded-2xl bg-neutral-50 p-4">
+              <span className="text-sm font-semibold">
+                {isRu
+                  ? "Статус"
+                  : "Status"}
+              </span>
+
+              <span
+                className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                  selectedTeen.is_active
+                    ? "bg-emerald-50 text-emerald-600"
+                    : "bg-neutral-200 text-neutral-500"
+                }`}
+              >
+                {selectedTeen.is_active
+                  ? isRu
+                    ? "Активен"
+                    : "Aktiv"
+                  : isRu
+                    ? "Неактивен"
+                    : "Inaktiv"}
+              </span>
+            </div>
+
+            {getGraduationYear(
+              selectedTeen.birth_date
+            ) >= currentYear && (
+              <div className="mt-2 flex items-center gap-3 rounded-2xl bg-neutral-950 p-4 text-white">
+                <GraduationCap
+                  size={19}
+                  strokeWidth={1.8}
+                />
+
+                <div>
+                  <p className="text-sm font-bold">
+                    {isRu
+                      ? `Выпускник ${getGraduationYear(
+                          selectedTeen.birth_date
+                        )}`
+                      : `Absolvent ${getGraduationYear(
+                          selectedTeen.birth_date
+                        )}`}
+                  </p>
+
+                  <p className="mt-0.5 text-[11px] text-white/40">
+                    {isRu
+                      ? "Автоматически рассчитано по дате рождения"
+                      : "Automatisch aus dem Geburtsdatum berechnet"}
+                  </p>
+                </div>
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={() =>
+                openEditModal(
+                  selectedTeen
+                )
+              }
+              className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-neutral-950 text-sm font-bold text-white transition active:scale-[0.99]"
+            >
+              <Pencil size={15} />
+
+              {isRu
+                ? "Редактировать"
+                : "Bearbeiten"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* CREATE / EDIT MODAL */}
 
       {isModalOpen && (
         <div
-          className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/30 px-3 py-3 backdrop-blur-sm sm:items-center sm:px-4 sm:py-6"
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/30 px-0 backdrop-blur-sm sm:items-center sm:px-4"
           onClick={closeModal}
         >
           <div
-            className="max-h-[calc(100dvh-24px)] w-full max-w-lg overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xl sm:max-h-[calc(100dvh-48px)] sm:p-6"
+            className="max-h-[94vh] w-full max-w-lg overflow-y-auto rounded-t-[28px] bg-white p-5 pb-8 shadow-2xl sm:max-h-[90vh] sm:rounded-[28px] sm:p-6"
             onClick={(event) =>
               event.stopPropagation()
             }
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-neutral-200 sm:hidden" />
+
+            <div className="flex items-start justify-between">
               <div>
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-400">
-                  Teens
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
+                  Teenager
                 </p>
 
-                <h2 className="text-xl font-semibold tracking-tight text-neutral-950 sm:text-2xl">
+                <h2 className="mt-1 text-xl font-bold tracking-tight">
                   {editingTeen
-                    ? language === "ru"
-                      ? "Редактировать подростка"
-                      : "Teenager bearbeiten"
-                    : language === "ru"
+                    ? isRu
+                      ? "Редактировать"
+                      : "Bearbeiten"
+                    : isRu
                       ? "Новый подросток"
                       : "Neuer Teenager"}
                 </h2>
               </div>
 
               <button
+                type="button"
                 onClick={closeModal}
-                disabled={saving || deleting}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-40"
+                disabled={
+                  saving ||
+                  deleting
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-neutral-500"
               >
-                <X
-                  size={19}
-                  strokeWidth={1.8}
-                />
+                <X size={17} />
               </button>
             </div>
 
-            <div className="mt-7 space-y-5">
-
-              {/* NAME */}
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="mt-6 space-y-4">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="mb-2 block text-xs font-semibold text-neutral-700">
-                    {language === "ru"
+                  <label className="mb-1.5 block text-xs font-bold text-neutral-700">
+                    {isRu
                       ? "Имя"
                       : "Vorname"}
                   </label>
 
                   <input
-                    type="text"
                     value={firstName}
                     onChange={(event) =>
                       setFirstName(
                         event.target.value
                       )
                     }
-                    className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 text-sm outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:bg-white"
-                    placeholder={
-                      language === "ru"
-                        ? "Например: Max"
-                        : "z. B. Max"
-                    }
+                    placeholder="Max"
+                    className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-semibold text-neutral-700">
-                    {language === "ru"
+                  <label className="mb-1.5 block text-xs font-bold text-neutral-700">
+                    {isRu
                       ? "Фамилия"
                       : "Nachname"}
                   </label>
 
                   <input
-                    type="text"
                     value={lastName}
                     onChange={(event) =>
                       setLastName(
                         event.target.value
                       )
                     }
-                    className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 text-sm outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:bg-white"
-                    placeholder={
-                      language === "ru"
-                        ? "Например: Mustermann"
-                        : "z. B. Mustermann"
-                    }
+                    placeholder="Mustermann"
+                    className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
                   />
                 </div>
               </div>
 
-              {/* GENDER */}
-
               <div>
-                <label className="mb-2 block text-xs font-semibold text-neutral-700">
-                  {language === "ru"
-                    ? "Пол"
-                    : "Geschlecht"}
-                </label>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setGender("male")
-                    }
-                    className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition ${
-                      gender === "male"
-                        ? "border-blue-200 bg-blue-50 text-blue-700"
-                        : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-white hover:text-neutral-900"
-                    }`}
-                  >
-                    <span className="h-2 w-2 rounded-full bg-blue-500" />
-
-                    {language === "ru"
-                      ? "Мальчик"
-                      : "Junge"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setGender("female")
-                    }
-                    className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition ${
-                      gender === "female"
-                        ? "border-pink-200 bg-pink-50 text-pink-700"
-                        : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-white hover:text-neutral-900"
-                    }`}
-                  >
-                    <span className="h-2 w-2 rounded-full bg-pink-500" />
-
-                    {language === "ru"
-                      ? "Девочка"
-                      : "Mädchen"}
-                  </button>
-                </div>
-              </div>
-
-              {/* BIRTH DATE */}
-
-              <div>
-                <label className="mb-2 block text-xs font-semibold text-neutral-700">
-                  {language === "ru"
+                <label className="mb-1.5 block text-xs font-bold text-neutral-700">
+                  {isRu
                     ? "Дата рождения"
                     : "Geburtsdatum"}
                 </label>
@@ -1417,35 +2232,93 @@ export default function TeensPage() {
                       event.target.value
                     )
                   }
-                  className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 text-sm text-neutral-700 outline-none transition focus:border-neutral-400 focus:bg-white"
+                  className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
                 />
 
                 {birthDate && (
-                  <p className="mt-2 text-xs text-neutral-400">
-                    {language === "ru"
-                      ? `Возраст сейчас: ${calculateAge(
-                          birthDate
-                        )} лет`
-                      : `Aktuelles Alter: ${calculateAge(
-                          birthDate
-                        )} Jahre`}
-                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] font-semibold text-neutral-500">
+                      {isRu
+                        ? `Сейчас ${calculateAge(
+                            birthDate
+                          )} лет`
+                        : `Jetzt ${calculateAge(
+                            birthDate
+                          )} Jahre`}
+                    </span>
+
+                    <span className="rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-bold text-white">
+                      {isRu
+                        ? `Выпуск ${getGraduationYear(
+                            birthDate
+                          )}`
+                        : `Abschluss ${getGraduationYear(
+                            birthDate
+                          )}`}
+                    </span>
+                  </div>
                 )}
               </div>
 
-              {/* LANGUAGES */}
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-neutral-700">
+                  {isRu
+                    ? "Пол"
+                    : "Geschlecht"}
+                </label>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setGender(
+                        "male"
+                      )
+                    }
+                    className={`h-11 rounded-xl border text-sm font-semibold ${
+                      gender ===
+                      "male"
+                        ? "border-blue-200 bg-blue-50 text-blue-700"
+                        : "border-neutral-200 bg-neutral-50 text-neutral-500"
+                    }`}
+                  >
+                    {isRu
+                      ? "Мальчик"
+                      : "Junge"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setGender(
+                        "female"
+                      )
+                    }
+                    className={`h-11 rounded-xl border text-sm font-semibold ${
+                      gender ===
+                      "female"
+                        ? "border-pink-200 bg-pink-50 text-pink-700"
+                        : "border-neutral-200 bg-neutral-50 text-neutral-500"
+                    }`}
+                  >
+                    {isRu
+                      ? "Девочка"
+                      : "Mädchen"}
+                  </button>
+                </div>
+              </div>
 
               <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-neutral-700">
-                    {language === "ru"
-                      ? "Язык"
-                      : "Sprache"}
+                <div className="mb-1.5 flex items-center justify-between">
+                  <label className="text-xs font-bold text-neutral-700">
+                    {isRu
+                      ? "Языки"
+                      : "Sprachen"}
                   </label>
 
                   <span className="text-[10px] text-neutral-400">
-                    {language === "ru"
-                      ? "Можно выбрать оба"
+                    {isRu
+                      ? "Можно оба"
                       : "Mehrere möglich"}
                   </span>
                 </div>
@@ -1454,65 +2327,46 @@ export default function TeensPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      toggleLanguage("de")
+                      toggleLanguage(
+                        "de"
+                      )
                     }
-                    className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition ${
+                    className={`h-11 rounded-xl border text-sm font-semibold ${
                       selectedLanguages.includes(
                         "de"
                       )
-                        ? "border-neutral-900 bg-neutral-900 text-white"
-                        : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-white hover:text-neutral-900"
+                        ? "border-neutral-950 bg-neutral-950 text-white"
+                        : "border-neutral-200 bg-neutral-50 text-neutral-500"
                     }`}
                   >
-                    <span className="text-base">
-                      🇩🇪
-                    </span>
-
-                    Deutsch
+                    🇩🇪 Deutsch
                   </button>
 
                   <button
                     type="button"
                     onClick={() =>
-                      toggleLanguage("ru")
+                      toggleLanguage(
+                        "ru"
+                      )
                     }
-                    className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-medium transition ${
+                    className={`h-11 rounded-xl border text-sm font-semibold ${
                       selectedLanguages.includes(
                         "ru"
                       )
-                        ? "border-neutral-900 bg-neutral-900 text-white"
-                        : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-white hover:text-neutral-900"
+                        ? "border-neutral-950 bg-neutral-950 text-white"
+                        : "border-neutral-200 bg-neutral-50 text-neutral-500"
                     }`}
                   >
-                    <span className="text-base">
-                      🇷🇺
-                    </span>
-
-                    Русский
+                    🇷🇺 Русский
                   </button>
                 </div>
-
-                {selectedLanguages.length >
-                  0 && (
-                  <p className="mt-2 text-xs text-neutral-400">
-                    {language === "ru"
-                      ? `Выбрано: ${getLanguagesLabel(
-                          selectedLanguages
-                        )}`
-                      : `Ausgewählt: ${getLanguagesLabel(
-                          selectedLanguages
-                        )}`}
-                  </p>
-                )}
               </div>
 
-              {/* PHONE */}
-
               <div>
-                <label className="mb-2 block text-xs font-semibold text-neutral-700">
-                  {language === "ru"
-                    ? "Номер телефона"
-                    : "Telefonnummer"}
+                <label className="mb-1.5 block text-xs font-bold text-neutral-700">
+                  {isRu
+                    ? "Телефон"
+                    : "Telefon"}
                 </label>
 
                 <input
@@ -1524,123 +2378,100 @@ export default function TeensPage() {
                     )
                   }
                   placeholder="+49 ..."
-                  className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3.5 text-sm outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:bg-white"
+                  className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
                 />
               </div>
 
-              {/* STATUS */}
+              <div className="flex items-center justify-between rounded-2xl bg-neutral-50 p-4">
+                <div>
+                  <p className="text-sm font-bold">
+                    {isRu
+                      ? "Активный"
+                      : "Aktiv"}
+                  </p>
 
-              <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-semibold text-neutral-700">
-                      {language === "ru"
-                        ? "Статус"
-                        : "Status"}
-                    </p>
+                  <p className="mt-0.5 text-[10px] text-neutral-400">
+                    {isRu
+                      ? "Неактивные скрываются по умолчанию."
+                      : "Inaktive werden standardmäßig ausgeblendet."}
+                  </p>
+                </div>
 
-                    <p className="mt-1 text-[11px] text-neutral-400">
-                      {language === "ru"
-                        ? "Неактивных можно скрыть из списка."
-                        : "Inaktive können ausgeblendet werden."}
-                    </p>
-                  </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setIsActive(
+                      (current) =>
+                        !current
+                    )
+                  }
+                  className={`relative h-7 w-12 rounded-full ${
+                    isActive
+                      ? "bg-neutral-950"
+                      : "bg-neutral-300"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${
+                      isActive
+                        ? "left-6"
+                        : "left-1"
+                    }`}
+                  />
+                </button>
+              </div>
 
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={
+                    saveTeen
+                  }
+                  disabled={
+                    !firstName.trim() ||
+                    !lastName.trim() ||
+                    !birthDate ||
+                    saving ||
+                    deleting
+                  }
+                  className="h-12 rounded-2xl bg-neutral-950 text-sm font-bold text-white disabled:bg-neutral-300"
+                >
+                  {saving
+                    ? isRu
+                      ? "Сохранение..."
+                      : "Wird gespeichert..."
+                    : editingTeen
+                      ? isRu
+                        ? "Сохранить"
+                        : "Speichern"
+                      : isRu
+                        ? "Добавить"
+                        : "Hinzufügen"}
+                </button>
+
+                {editingTeen && (
                   <button
                     type="button"
                     onClick={() =>
-                      setIsActive(
-                        (current) =>
-                          !current
+                      setIsDeleteConfirmOpen(
+                        true
                       )
                     }
-                    className={`relative h-6 w-11 shrink-0 rounded-full transition ${
-                      isActive
-                        ? "bg-neutral-900"
-                        : "bg-neutral-300"
-                    }`}
+                    disabled={
+                      saving ||
+                      deleting
+                    }
+                    className="flex h-11 items-center justify-center gap-2 rounded-2xl text-sm font-semibold text-red-500"
                   >
-                    <span
-                      className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${
-                        isActive
-                          ? "left-6"
-                          : "left-1"
-                      }`}
+                    <Trash2
+                      size={15}
                     />
+
+                    {isRu
+                      ? "Удалить подростка"
+                      : "Teenager löschen"}
                   </button>
-                </div>
-              </div>
-
-              {/* BUTTONS */}
-
-              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  {editingTeen && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setIsDeleteConfirmOpen(
-                          true
-                        )
-                      }
-                      disabled={
-                        saving ||
-                        deleting
-                      }
-                      className="flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium text-red-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-40 sm:w-auto"
-                    >
-                      <Trash2
-                        size={15}
-                        strokeWidth={1.8}
-                      />
-
-                      {language === "ru"
-                        ? "Удалить"
-                        : "Löschen"}
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    disabled={
-                      saving ||
-                      deleting
-                    }
-                    className="h-11 w-full rounded-xl px-5 text-sm font-medium text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-40 sm:w-auto"
-                  >
-                    {language === "ru"
-                      ? "Отмена"
-                      : "Abbrechen"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={saveTeen}
-                    disabled={
-                      !firstName.trim() ||
-                      !lastName.trim() ||
-                      !birthDate ||
-                      saving ||
-                      deleting
-                    }
-                    className="h-11 w-full rounded-xl bg-neutral-900 px-5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-300 sm:w-auto"
-                  >
-                    {saving
-                      ? language === "ru"
-                        ? "Сохранение..."
-                        : "Wird gespeichert..."
-                      : editingTeen
-                        ? language === "ru"
-                          ? "Сохранить"
-                          : "Speichern"
-                        : language === "ru"
-                          ? "Добавить"
-                          : "Hinzufügen"}
-                  </button>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -1652,7 +2483,7 @@ export default function TeensPage() {
       {isDeleteConfirmOpen &&
         editingTeen && (
           <div
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 px-4 backdrop-blur-sm"
+            className="fixed inset-0 z-[130] flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
             onClick={() => {
               if (!deleting) {
                 setIsDeleteConfirmOpen(
@@ -1662,7 +2493,7 @@ export default function TeensPage() {
             }}
           >
             <div
-              className="w-full max-w-sm rounded-2xl border border-neutral-200 bg-white p-6 shadow-2xl"
+              className="w-full max-w-sm rounded-[24px] bg-white p-5 shadow-2xl"
               onClick={(event) =>
                 event.stopPropagation()
               }
@@ -1670,23 +2501,22 @@ export default function TeensPage() {
               <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-500">
                 <Trash2
                   size={19}
-                  strokeWidth={1.8}
                 />
               </div>
 
-              <h3 className="mt-5 text-lg font-semibold tracking-tight text-neutral-950">
-                {language === "ru"
+              <h3 className="mt-4 text-lg font-bold">
+                {isRu
                   ? "Удалить подростка?"
                   : "Teenager löschen?"}
               </h3>
 
               <p className="mt-2 text-sm leading-6 text-neutral-500">
-                {language === "ru"
-                  ? `Ты действительно хочешь удалить ${editingTeen.first_name} ${editingTeen.last_name}? Это действие нельзя отменить.`
-                  : `Möchtest du ${editingTeen.first_name} ${editingTeen.last_name} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`}
+                {isRu
+                  ? `Удалить ${editingTeen.first_name} ${editingTeen.last_name}? Это действие нельзя отменить.`
+                  : `${editingTeen.first_name} ${editingTeen.last_name} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`}
               </p>
 
-              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <div className="mt-5 flex gap-2">
                 <button
                   type="button"
                   onClick={() =>
@@ -1695,29 +2525,24 @@ export default function TeensPage() {
                     )
                   }
                   disabled={deleting}
-                  className="h-11 rounded-xl px-5 text-sm font-medium text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-40"
+                  className="h-11 flex-1 rounded-xl bg-neutral-100 text-sm font-semibold text-neutral-600"
                 >
-                  {language === "ru"
+                  {isRu
                     ? "Отмена"
                     : "Abbrechen"}
                 </button>
 
                 <button
                   type="button"
-                  onClick={deleteTeen}
+                  onClick={
+                    deleteTeen
+                  }
                   disabled={deleting}
-                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-5 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="h-11 flex-1 rounded-xl bg-red-500 text-sm font-bold text-white"
                 >
-                  <Trash2
-                    size={15}
-                    strokeWidth={1.8}
-                  />
-
                   {deleting
-                    ? language === "ru"
-                      ? "Удаление..."
-                      : "Wird gelöscht..."
-                    : language === "ru"
+                    ? "..."
+                    : isRu
                       ? "Удалить"
                       : "Löschen"}
                 </button>

@@ -34,7 +34,7 @@ type TeamMember = {
 type ScheduleEntry = {
   id: number;
   schedule_date: string;
-  service_time: "10:00" | "12:30";
+  service_time: "10:00" | "13:00";
   entry_type: "lesson" | "event";
   title_de: string | null;
   title_ru: string | null;
@@ -53,7 +53,7 @@ type ScheduleMember = {
 
 type EntryForm = {
   schedule_date: string;
-  service_time: "10:00" | "12:30";
+  service_time: "10:00" | "13:00";
   entry_type: "lesson" | "event";
   title_de: string;
   title_ru: string;
@@ -428,7 +428,7 @@ export default function SchedulePage() {
     date?: string,
     time:
       | "10:00"
-      | "12:30" = "10:00",
+      | "13:00" = "10:00",
   ) {
     if (!isAdmin) return;
 
@@ -490,21 +490,21 @@ export default function SchedulePage() {
   }
 
   function changeServiceTime(
-    time: "10:00" | "12:30",
+    time: "10:00" | "13:00",
   ) {
     setForm((current) => ({
       ...current,
       service_time: time,
 
       // 10:00 = German only
-      // 12:30 = Russian only
+      // 13:00 = Russian only
       title_de:
         time === "10:00"
           ? current.title_de
           : "",
 
       title_ru:
-        time === "12:30"
+        time === "13:00"
           ? current.title_ru
           : "",
     }));
@@ -580,9 +580,9 @@ export default function SchedulePage() {
           ? form.title_de.trim() || null
           : null,
 
-      // 12:30 → RU
+      // 13:00 → RU
       title_ru:
-        form.service_time === "12:30"
+        form.service_time === "13:00"
           ? form.title_ru.trim() || null
           : null,
 
@@ -1240,7 +1240,7 @@ export default function SchedulePage() {
                               onClick={() =>
                                 openCreateModal(
                                   date,
-                                  "12:30",
+                                  "13:00",
                                 )
                               }
                               className="flex h-10 items-center justify-center gap-1.5 rounded-[12px] border border-[#dedfe2] bg-white text-[11px] font-bold text-[#68717d] active:bg-[#f4f5f5]"
@@ -1248,7 +1248,7 @@ export default function SchedulePage() {
                               <Plus
                                 size={14}
                               />
-                              12:30 · RU
+                              13:00 · RU
                             </button>
                           </div>
                         )}
@@ -1576,8 +1576,8 @@ export default function SchedulePage() {
                           ? "10:00 · немецкое служение"
                           : "10:00 · Deutscher Gottesdienst"
                         : isRu
-                          ? "12:30 · русское служение"
-                          : "12:30 · Russischer Gottesdienst"}
+                          ? "13:00 · русское служение"
+                          : "13:00 · Russischer Gottesdienst"}
                     </p>
                   </div>
 
@@ -1671,24 +1671,24 @@ export default function SchedulePage() {
                         type="button"
                         onClick={() =>
                           changeServiceTime(
-                            "12:30",
+                            "13:00",
                           )
                         }
                         className={`rounded-[15px] border px-3 py-3 text-left ${
                           form.service_time ===
-                          "12:30"
+                          "13:00"
                             ? "border-[#111820] bg-[#111820] text-white"
                             : "border-[#dfe1e4] bg-[#fafafa] text-[#66707d]"
                         }`}
                       >
                         <div className="text-[15px] font-bold">
-                          12:30
+                          13:00
                         </div>
 
                         <div
                           className={`mt-1 text-[10px] ${
                             form.service_time ===
-                            "12:30"
+                            "13:00"
                               ? "text-white/60"
                               : "text-[#9aa2ad]"
                           }`}
@@ -1903,7 +1903,7 @@ export default function SchedulePage() {
                         </label>
 
                         <span className="rounded-full bg-[#eef0f2] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.08em] text-[#707987]">
-                          12:30
+                          13:00
                         </span>
                       </div>
 
@@ -1932,8 +1932,8 @@ export default function SchedulePage() {
 
                       <p className="mt-1.5 px-1 text-[10px] text-[#9aa2ad]">
                         {isRu
-                          ? "Для служения в 12:30 используется только русская тема."
-                          : "Für den Gottesdienst um 12:30 wird nur das russische Thema verwendet."}
+                          ? "Для служения в 13:00 используется только русская тема."
+                          : "Für den Gottesdienst um 13:00 wird nur das russische Thema verwendet."}
                       </p>
                     </div>
                   )}
@@ -2069,7 +2069,7 @@ export default function SchedulePage() {
                         "10:00" &&
                         !form.title_de.trim()) ||
                       (form.service_time ===
-                        "12:30" &&
+                        "13:00" &&
                         !form.title_ru.trim())
                     }
                     className="h-[54px] flex-1 rounded-[15px] bg-[#111820] text-[13px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"

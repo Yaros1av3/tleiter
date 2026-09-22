@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CalendarDays,
@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Edit3,
   Filter,
+  ImagePlus,
   ListTodo,
   Phone,
   Plus,
@@ -41,6 +42,7 @@ type TeamMember = {
   languages: string[];
   status: Status;
   notes: string | null;
+  avatar_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -71,6 +73,28 @@ type WorkProject = {
   title: string;
 };
 
+type ScheduleEntry = {
+  id: number;
+  schedule_date: string;
+  service_time: string;
+  entry_type: string;
+  title_de: string | null;
+  title_ru: string | null;
+  bible_text: string | null;
+  series: string | null;
+};
+
+type ScheduleMember = {
+  id: number;
+  schedule_entry_id: number;
+  team_member_id: number;
+};
+
+type UpcomingService = {
+  entry: ScheduleEntry;
+  assignment: ScheduleMember;
+};
+
 const emptyForm: MemberForm = {
   first_name: "",
   last_name: "",
@@ -93,7 +117,7 @@ const positionOrder: Record<Position, number> = {
 function calculateAge(date: string | null) {
   if (!date) return null;
 
-  const birth = new Date(date);
+  const birth = new Date(`${date}T00:00:00`);
 
   if (Number.isNaN(birth.getTime())) {
     return null;
@@ -118,7 +142,7 @@ function calculateAge(date: string | null) {
 function formatDate(date: string | null, language: Language) {
   if (!date) return "—";
 
-  const parsed = new Date(date);
+  const parsed = new Date(`${date}T00:00:00`);
 
   if (Number.isNaN(parsed.getTime())) {
     return "—";
@@ -137,7 +161,7 @@ function formatDate(date: string | null, language: Language) {
 function formatShortDate(date: string | null, language: Language) {
   if (!date) return "—";
 
-  const parsed = new Date(date);
+  const parsed = new Date(`${date}T00:00:00`);
 
   if (Number.isNaN(parsed.getTime())) {
     return "—";
@@ -150,6 +174,25 @@ function formatShortDate(date: string | null, language: Language) {
       month: "short",
     },
   );
+}
+
+function getTodayString() {
+  const today = new Date();
+
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentTimeString() {
+  const now = new Date();
+
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+
+  return `${hours}:${minutes}`;
 }
 
 function getPositionLabel(position: Position, language: Language) {
@@ -268,6 +311,37 @@ function getPriorityLabel(
   return labels[priority][language];
 }
 
+function getServiceTitle(
+  entry: ScheduleEntry,
+  language: Language,
+) {
+  return (
+    (language === "de"
+      ? entry.title_de
+      : entry.title_ru) ??
+    entry.title_de ??
+    entry.title_ru ??
+    (language === "de" ? "Dienst" : "Служение")
+  );
+}
+
+function getEntryTypeLabel(
+  type: string,
+  language: Language,
+) {
+  const normalized = type.toLowerCase();
+
+  if (normalized === "lesson") {
+    return language === "de" ? "Lektion" : "Урок";
+  }
+
+  if (normalized === "event") {
+    return language === "de" ? "Event" : "Событие";
+  }
+
+  return type;
+}
+
 export default function TeamPage() {
   const router = useRouter();
 
@@ -277,6 +351,12 @@ export default function TeamPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
   const [projects, setProjects] = useState<WorkProject[]>([]);
+  const [scheduleEntries, setScheduleEntries] = useState<
+    ScheduleEntry[]
+  >([]);
+  const [scheduleMembers, setScheduleMembers] = useState<
+    ScheduleMember[]
+  >([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -290,9 +370,9 @@ export default function TeamPage() {
     "all" | "DE" | "RU"
   >("all");
 
-  const [statusFilter, setStatusFilter] = useState<Status | "all">(
-    "all",
-  );
+  const [statusFilter, setStatusFilter] = useState<
+    Status | "all"
+  >("all");
 
   const [showFilters, setShowFilters] = useState(false);
 
@@ -305,7 +385,16 @@ export default function TeamPage() {
 
   const [form, setForm] = useState<MemberForm>(emptyForm);
 
+  const [selectedFile, setSelectedFile] =
+    useState<File | null>(null);
+
+  const [previewUrl, setPreviewUrl] = useState<string | null>(
+    null,
+  );
+
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] =
+    useState(false);
 
   const [deleteMember, setDeleteMember] =
     useState<TeamMember | null>(null);
@@ -323,6 +412,14 @@ export default function TeamPage() {
     };
   }, [showModal, deleteMember, selectedMember]);
 
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   async function loadData() {
     setLoading(true);
 
@@ -330,6 +427,8 @@ export default function TeamPage() {
       membersResponse,
       workItemsResponse,
       projectsResponse,
+      scheduleEntriesResponse,
+      scheduleMembersResponse,
     ] = await Promise.all([
       supabase
         .from("team_members")
@@ -345,6 +444,21 @@ export default function TeamPage() {
       supabase
         .from("work_projects")
         .select("id,title"),
+
+      supabase
+        .from("schedule_entries")
+        .select(
+          "id,schedule_date,service_time,entry_type,title_de,title_ru,bible_text,series",
+        )
+        .order("schedule_date", {
+          ascending: true,
+        }),
+
+      supabase
+        .from("schedule_entry_members")
+        .select(
+          "id,schedule_entry_id,team_member_id",
+        ),
     ]);
 
     if (membersResponse.error) {
@@ -354,19 +468,21 @@ export default function TeamPage() {
       );
       setMembers([]);
     } else {
-      const sorted = [...(membersResponse.data ?? [])].sort(
-        (a, b) => {
-          const positionDifference =
-            positionOrder[a.position as Position] -
-            positionOrder[b.position as Position];
+      const sorted = [
+        ...(membersResponse.data ?? []),
+      ].sort((a, b) => {
+        const positionDifference =
+          positionOrder[a.position as Position] -
+          positionOrder[b.position as Position];
 
-          if (positionDifference !== 0) {
-            return positionDifference;
-          }
+        if (positionDifference !== 0) {
+          return positionDifference;
+        }
 
-          return a.first_name.localeCompare(b.first_name);
-        },
-      );
+        return a.first_name.localeCompare(
+          b.first_name,
+        );
+      });
 
       setMembers(sorted as TeamMember[]);
     }
@@ -378,7 +494,10 @@ export default function TeamPage() {
       );
       setWorkItems([]);
     } else {
-      setWorkItems((workItemsResponse.data ?? []) as WorkItem[]);
+      setWorkItems(
+        (workItemsResponse.data ??
+          []) as WorkItem[],
+      );
     }
 
     if (projectsResponse.error) {
@@ -388,7 +507,36 @@ export default function TeamPage() {
       );
       setProjects([]);
     } else {
-      setProjects((projectsResponse.data ?? []) as WorkProject[]);
+      setProjects(
+        (projectsResponse.data ??
+          []) as WorkProject[],
+      );
+    }
+
+    if (scheduleEntriesResponse.error) {
+      console.error(
+        "Error loading schedule entries:",
+        scheduleEntriesResponse.error,
+      );
+      setScheduleEntries([]);
+    } else {
+      setScheduleEntries(
+        (scheduleEntriesResponse.data ??
+          []) as ScheduleEntry[],
+      );
+    }
+
+    if (scheduleMembersResponse.error) {
+      console.error(
+        "Error loading schedule assignments:",
+        scheduleMembersResponse.error,
+      );
+      setScheduleMembers([]);
+    } else {
+      setScheduleMembers(
+        (scheduleMembersResponse.data ??
+          []) as ScheduleMember[],
+      );
     }
 
     setLoading(false);
@@ -405,7 +553,9 @@ export default function TeamPage() {
       const fullName =
         `${member.first_name} ${member.last_name}`.toLowerCase();
 
-      const phone = (member.phone ?? "").toLowerCase();
+      const phone = (
+        member.phone ?? ""
+      ).toLowerCase();
 
       const matchesSearch =
         !query ||
@@ -473,8 +623,12 @@ export default function TeamPage() {
       .filter((item) => item.deadline)
       .sort((a, b) => {
         return (
-          new Date(a.deadline as string).getTime() -
-          new Date(b.deadline as string).getTime()
+          new Date(
+            `${a.deadline}T00:00:00`,
+          ).getTime() -
+          new Date(
+            `${b.deadline}T00:00:00`,
+          ).getTime()
         );
       });
 
@@ -485,8 +639,69 @@ export default function TeamPage() {
     if (!projectId) return null;
 
     return (
-      projects.find((project) => project.id === projectId)
-        ?.title ?? null
+      projects.find(
+        (project) => project.id === projectId,
+      )?.title ?? null
+    );
+  }
+
+  function getMemberServices(memberId: number) {
+    const today = getTodayString();
+    const currentTime = getCurrentTimeString();
+
+    const assignedEntryIds = scheduleMembers
+      .filter(
+        (item) =>
+          item.team_member_id === memberId,
+      )
+      .map((item) => item.schedule_entry_id);
+
+    return scheduleEntries
+      .filter((entry) => {
+        if (!assignedEntryIds.includes(entry.id)) {
+          return false;
+        }
+
+        if (entry.schedule_date > today) {
+          return true;
+        }
+
+        if (entry.schedule_date < today) {
+          return false;
+        }
+
+        return entry.service_time >= currentTime;
+      })
+      .sort((a, b) => {
+        const dateDifference =
+          a.schedule_date.localeCompare(
+            b.schedule_date,
+          );
+
+        if (dateDifference !== 0) {
+          return dateDifference;
+        }
+
+        return a.service_time.localeCompare(
+          b.service_time,
+        );
+      });
+  }
+
+  function getNextService(memberId: number) {
+    return getMemberServices(memberId)[0] ?? null;
+  }
+
+  function getServiceAssignment(
+    memberId: number,
+    entryId: number,
+  ) {
+    return (
+      scheduleMembers.find(
+        (item) =>
+          item.team_member_id === memberId &&
+          item.schedule_entry_id === entryId,
+      ) ?? null
     );
   }
 
@@ -494,6 +709,8 @@ export default function TeamPage() {
     setSelectedMember(null);
     setEditingMember(null);
     setForm(emptyForm);
+    setSelectedFile(null);
+    setPreviewUrl(null);
     setShowModal(true);
   }
 
@@ -512,28 +729,119 @@ export default function TeamPage() {
       notes: member.notes ?? "",
     });
 
+    setSelectedFile(null);
+    setPreviewUrl(member.avatar_url);
     setShowModal(true);
   }
 
   function closeModal() {
-    if (saving) return;
+    if (saving || uploadingAvatar) return;
 
     setShowModal(false);
     setEditingMember(null);
     setForm(emptyForm);
+    setSelectedFile(null);
+    setPreviewUrl(null);
   }
 
   function toggleLanguage(value: string) {
     setForm((current) => {
-      const exists = current.languages.includes(value);
+      const exists =
+        current.languages.includes(value);
 
       return {
         ...current,
         languages: exists
-          ? current.languages.filter((item) => item !== value)
+          ? current.languages.filter(
+              (item) => item !== value,
+            )
           : [...current.languages, value],
       };
     });
+  }
+
+  function handleAvatarChange(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      return;
+    }
+
+    if (previewUrl && previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  }
+
+  async function uploadAvatar(
+    memberId: number,
+  ) {
+    if (!selectedFile) {
+      return editingMember?.avatar_url ?? null;
+    }
+
+    setUploadingAvatar(true);
+
+    try {
+      const extension =
+        selectedFile.name.split(".").pop()?.toLowerCase() ??
+        "jpg";
+
+      const filePath = `${memberId}-${Date.now()}.${extension}`;
+
+      const { error: uploadError } =
+        await supabase.storage
+          .from("team-avatars")
+          .upload(filePath, selectedFile, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: selectedFile.type,
+          });
+
+      if (uploadError) {
+        console.error(
+          "Avatar upload error:",
+          uploadError,
+        );
+        return editingMember?.avatar_url ?? null;
+      }
+
+      const {
+        data: publicUrlData,
+      } = supabase.storage
+        .from("team-avatars")
+        .getPublicUrl(filePath);
+
+      const avatarUrl =
+        publicUrlData.publicUrl;
+
+      if (editingMember?.avatar_url) {
+        const oldPath =
+          editingMember.avatar_url.split(
+            "/team-avatars/",
+          )[1];
+
+        if (oldPath) {
+          await supabase.storage
+            .from("team-avatars")
+            .remove([oldPath]);
+        }
+      }
+
+      return avatarUrl;
+    } finally {
+      setUploadingAvatar(false);
+    }
   }
 
   async function saveMember() {
@@ -546,7 +854,7 @@ export default function TeamPage() {
 
     setSaving(true);
 
-    const payload = {
+    const basePayload = {
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
       position: form.position,
@@ -558,38 +866,91 @@ export default function TeamPage() {
       updated_at: new Date().toISOString(),
     };
 
-    if (editingMember) {
-      const { error } = await supabase
-        .from("team_members")
-        .update(payload)
-        .eq("id", editingMember.id);
+    try {
+      if (editingMember) {
+        let avatarUrl =
+          editingMember.avatar_url;
 
-      if (error) {
-        console.error(
-          "Error updating team member:",
-          error,
-        );
-        setSaving(false);
-        return;
-      }
-    } else {
-      const { error } = await supabase
-        .from("team_members")
-        .insert(payload);
+        if (selectedFile) {
+          avatarUrl = await uploadAvatar(
+            editingMember.id,
+          );
+        }
 
-      if (error) {
-        console.error(
-          "Error creating team member:",
-          error,
-        );
-        setSaving(false);
-        return;
+        const { error } = await supabase
+          .from("team_members")
+          .update({
+            ...basePayload,
+            avatar_url: avatarUrl,
+          })
+          .eq("id", editingMember.id);
+
+        if (error) {
+          console.error(
+            "Error updating team member:",
+            error,
+          );
+          return;
+        }
+      } else {
+        const { data, error } = await supabase
+          .from("team_members")
+          .insert(basePayload)
+          .select()
+          .single();
+
+        if (error) {
+          console.error(
+            "Error creating team member:",
+            error,
+          );
+          return;
+        }
+
+        if (data?.id && selectedFile) {
+          const avatarUrl =
+            await uploadAvatar(data.id);
+
+          await supabase
+            .from("team_members")
+            .update({
+              avatar_url: avatarUrl,
+              updated_at:
+                new Date().toISOString(),
+            })
+            .eq("id", data.id);
+        }
       }
+
+      closeModal();
+      await loadData();
+    } finally {
+      setSaving(false);
     }
+  }
 
-    setSaving(false);
-    closeModal();
-    await loadData();
+  async function deleteAvatar(
+    member: TeamMember,
+  ) {
+    if (!member.avatar_url) return;
+
+    const marker = "/team-avatars/";
+    const index =
+      member.avatar_url.indexOf(marker);
+
+    if (index === -1) return;
+
+    const path = decodeURIComponent(
+      member.avatar_url.slice(
+        index + marker.length,
+      ),
+    );
+
+    if (!path) return;
+
+    await supabase.storage
+      .from("team-avatars")
+      .remove([path]);
   }
 
   async function confirmDelete() {
@@ -597,25 +958,29 @@ export default function TeamPage() {
 
     setDeleting(true);
 
-    const { error } = await supabase
-      .from("team_members")
-      .delete()
-      .eq("id", deleteMember.id);
+    try {
+      await deleteAvatar(deleteMember);
 
-    if (error) {
-      console.error(
-        "Error deleting team member:",
-        error,
-      );
+      const { error } = await supabase
+        .from("team_members")
+        .delete()
+        .eq("id", deleteMember.id);
+
+      if (error) {
+        console.error(
+          "Error deleting team member:",
+          error,
+        );
+        return;
+      }
+
+      setDeleteMember(null);
+      setSelectedMember(null);
+
+      await loadData();
+    } finally {
       setDeleting(false);
-      return;
     }
-
-    setDeleting(false);
-    setDeleteMember(null);
-    setSelectedMember(null);
-
-    await loadData();
   }
 
   function resetFilters() {
@@ -637,13 +1002,32 @@ export default function TeamPage() {
     ? getMemberTasks(selectedMember.id)
     : [];
 
-  const selectedCompletedTasks = selectedMember
-    ? getCompletedMemberTasks(selectedMember.id)
-    : [];
+  const selectedCompletedTasks =
+    selectedMember
+      ? getCompletedMemberTasks(
+          selectedMember.id,
+        )
+      : [];
 
   const selectedNextTask = selectedMember
     ? getNextTask(selectedMember.id)
     : null;
+
+  const selectedNextService =
+    selectedMember
+      ? getNextService(selectedMember.id)
+      : null;
+
+  const selectedServiceAssignment =
+    selectedMember && selectedNextService
+      ? getServiceAssignment(
+          selectedMember.id,
+          selectedNextService.id,
+        )
+      : null;
+
+  void selectedServiceAssignment;
+  void t;
 
   return (
     <div className="min-h-screen bg-[#f5f5f4] text-neutral-900">
@@ -661,7 +1045,10 @@ export default function TeamPage() {
                   : "Назад"
               }
             >
-              <ArrowLeft size={18} strokeWidth={2} />
+              <ArrowLeft
+                size={18}
+                strokeWidth={2}
+              />
             </button>
 
             <div className="flex items-center gap-2">
@@ -669,12 +1056,16 @@ export default function TeamPage() {
                 type="button"
                 onClick={() =>
                   setLanguage(
-                    language === "de" ? "ru" : "de",
+                    language === "de"
+                      ? "ru"
+                      : "de",
                   )
                 }
                 className="flex h-9 items-center gap-1 rounded-xl border border-neutral-200 bg-white px-2.5 text-[10px] font-bold text-neutral-500"
               >
-                {language === "de" ? "DE" : "RU"}
+                {language === "de"
+                  ? "DE"
+                  : "RU"}
               </button>
 
               <button
@@ -682,7 +1073,11 @@ export default function TeamPage() {
                 onClick={openCreateModal}
                 className="flex h-10 items-center gap-2 rounded-xl bg-neutral-900 px-3.5 text-xs font-semibold text-white shadow-sm transition active:scale-95"
               >
-                <Plus size={16} strokeWidth={2.2} />
+                <Plus
+                  size={16}
+                  strokeWidth={2.2}
+                />
+
                 <span className="hidden min-[390px]:inline">
                   {language === "de"
                     ? "Hinzufügen"
@@ -695,36 +1090,37 @@ export default function TeamPage() {
 
         {/* Heading */}
         <section className="pt-6">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400">
-                <Users size={14} strokeWidth={2} />
+          <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400">
+            <Users
+              size={14}
+              strokeWidth={2}
+            />
 
-                {language === "de"
-                  ? "Team"
-                  : "Команда"}
-              </div>
-
-              <h1 className="text-[28px] font-bold tracking-tight text-neutral-950">
-                {language === "de"
-                  ? "Unser Team"
-                  : "Наша команда"}
-              </h1>
-
-              <p className="mt-1 text-sm leading-5 text-neutral-500">
-                {language === "de"
-                  ? "Menschen, Aufgaben und Dienste an einem Ort."
-                  : "Люди, задачи и служения в одном месте."}
-              </p>
-            </div>
+            {language === "de"
+              ? "Team"
+              : "Команда"}
           </div>
+
+          <h1 className="text-[28px] font-bold tracking-tight text-neutral-950">
+            {language === "de"
+              ? "Unser Team"
+              : "Наша команда"}
+          </h1>
+
+          <p className="mt-1 text-sm leading-5 text-neutral-500">
+            {language === "de"
+              ? "Menschen, Aufgaben und Dienste an einem Ort."
+              : "Люди, задачи и служения в одном месте."}
+          </p>
         </section>
 
         {/* Stats */}
         <section className="mt-5 grid grid-cols-3 gap-2">
           <div className="rounded-2xl border border-neutral-200 bg-white p-3.5">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
-              {language === "de" ? "Gesamt" : "Всего"}
+              {language === "de"
+                ? "Gesamt"
+                : "Всего"}
             </div>
 
             <div className="mt-1 text-2xl font-bold tracking-tight">
@@ -735,7 +1131,10 @@ export default function TeamPage() {
           <div className="rounded-2xl border border-neutral-200 bg-white p-3.5">
             <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              {language === "de" ? "Aktiv" : "Активны"}
+
+              {language === "de"
+                ? "Aktiv"
+                : "Активны"}
             </div>
 
             <div className="mt-1 text-2xl font-bold tracking-tight">
@@ -746,6 +1145,7 @@ export default function TeamPage() {
           <div className="rounded-2xl border border-neutral-200 bg-white p-3.5">
             <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
               <span className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
+
               {language === "de"
                 ? "Inaktiv"
                 : "Неактивны"}
@@ -782,7 +1182,9 @@ export default function TeamPage() {
               {search && (
                 <button
                   type="button"
-                  onClick={() => setSearch("")}
+                  onClick={() =>
+                    setSearch("")
+                  }
                   className="absolute right-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-neutral-400"
                 >
                   <X size={15} />
@@ -793,10 +1195,13 @@ export default function TeamPage() {
             <button
               type="button"
               onClick={() =>
-                setShowFilters((value) => !value)
+                setShowFilters(
+                  (value) => !value,
+                )
               }
               className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border transition ${
-                showFilters || activeFiltersCount > 0
+                showFilters ||
+                activeFiltersCount > 0
                   ? "border-neutral-900 bg-neutral-900 text-white"
                   : "border-neutral-200 bg-white text-neutral-600"
               }`}
@@ -961,7 +1366,8 @@ export default function TeamPage() {
                   : `${filteredMembers.length} участников`}
             </span>
 
-            {(search || activeFiltersCount > 0) &&
+            {(search ||
+              activeFiltersCount > 0) &&
               !loading && (
                 <button
                   type="button"
@@ -977,21 +1383,23 @@ export default function TeamPage() {
         </section>
 
         {/* Team list */}
-        <section className="mt-4 space-y-2.5">
+        <section className="mt-4 space-y-3">
           {loading ? (
             <>
               {[1, 2, 3].map((item) => (
                 <div
                   key={item}
-                  className="animate-pulse rounded-3xl border border-neutral-200 bg-white p-4"
+                  className="animate-pulse rounded-[28px] border border-neutral-200 bg-white p-4"
                 >
                   <div className="flex gap-3">
-                    <div className="h-12 w-12 rounded-2xl bg-neutral-100" />
+                    <div className="h-14 w-14 rounded-[20px] bg-neutral-100" />
 
                     <div className="flex-1">
-                      <div className="h-4 w-32 rounded bg-neutral-100" />
-                      <div className="mt-2 h-3 w-20 rounded bg-neutral-100" />
-                      <div className="mt-4 h-3 w-full rounded bg-neutral-100" />
+                      <div className="h-4 w-36 rounded bg-neutral-100" />
+
+                      <div className="mt-2 h-3 w-24 rounded bg-neutral-100" />
+
+                      <div className="mt-5 h-10 w-full rounded-2xl bg-neutral-100" />
                     </div>
                   </div>
                 </div>
@@ -1017,172 +1425,249 @@ export default function TeamPage() {
             </div>
           ) : (
             filteredMembers.map((member) => {
-              const openTasks = getMemberTasks(
-                member.id,
-              );
+              const openTasks =
+                getMemberTasks(member.id);
 
               const completedTasks =
-                getCompletedMemberTasks(member.id);
+                getCompletedMemberTasks(
+                  member.id,
+                );
 
-              const nextTask = getNextTask(member.id);
+              const nextTask =
+                getNextTask(member.id);
+
+              const nextService =
+                getNextService(member.id);
 
               return (
                 <article
                   key={member.id}
-                  onClick={() => openMember(member)}
-                  className="group cursor-pointer rounded-3xl border border-neutral-200 bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.025)] transition active:scale-[0.99] sm:hover:border-neutral-300 sm:hover:shadow-[0_4px_18px_rgba(0,0,0,0.05)]"
+                  onClick={() =>
+                    openMember(member)
+                  }
+                  className="group cursor-pointer overflow-hidden rounded-[28px] border border-neutral-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.025)] transition active:scale-[0.99] sm:hover:border-neutral-300 sm:hover:shadow-[0_8px_25px_rgba(0,0,0,0.06)]"
                 >
-                  <div className="flex items-start gap-3">
-                    {/* Avatar */}
-                    <div
-                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-bold ${getAvatarTone(
-                        member,
-                      )}`}
-                    >
-                      {getInitials(member)}
+                  <div className="p-4">
+                    <div className="flex items-start gap-3.5">
+                      {/* Avatar */}
+                      {member.avatar_url ? (
+                        <img
+                          src={member.avatar_url}
+                          alt={`${member.first_name} ${member.last_name}`}
+                          className="h-14 w-14 shrink-0 rounded-[20px] object-cover"
+                        />
+                      ) : (
+                        <div
+                          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] text-sm font-bold ${getAvatarTone(
+                            member,
+                          )}`}
+                        >
+                          {getInitials(member)}
+                        </div>
+                      )}
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h2 className="truncate text-[16px] font-bold text-neutral-950">
+                              {member.first_name}{" "}
+                              {member.last_name}
+                            </h2>
+
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={`rounded-lg px-2 py-1 text-[9px] font-bold ${getPositionStyle(
+                                  member.position,
+                                )}`}
+                              >
+                                {getPositionLabel(
+                                  member.position,
+                                  language,
+                                )}
+                              </span>
+
+                              <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-neutral-400">
+                                <span
+                                  className={`h-1.5 w-1.5 rounded-full ${
+                                    member.status ===
+                                    "active"
+                                      ? "bg-emerald-500"
+                                      : "bg-neutral-300"
+                                  }`}
+                                />
+
+                                {getStatusLabel(
+                                  member.status,
+                                  language,
+                                )}
+                              </span>
+                            </div>
+                          </div>
+
+                          <ChevronRight
+                            size={17}
+                            className="mt-1 shrink-0 text-neutral-300"
+                          />
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Main */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h2 className="truncate text-[15px] font-bold text-neutral-950">
-                            {member.first_name}{" "}
-                            {member.last_name}
-                          </h2>
+                    {/* Next service */}
+                    <div className="mt-4">
+                      {nextService ? (
+                        <div className="rounded-[22px] bg-neutral-900 p-3.5 text-white">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/10">
+                                <CalendarDays
+                                  size={14}
+                                />
+                              </div>
 
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            <span
-                              className={`rounded-lg px-2 py-1 text-[9px] font-bold ${getPositionStyle(
-                                member.position,
-                              )}`}
-                            >
-                              {getPositionLabel(
-                                member.position,
+                              <div className="min-w-0">
+                                <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-neutral-400">
+                                  {language === "de"
+                                    ? "Nächster Dienst"
+                                    : "Ближайшее служение"}
+                                </div>
+
+                                <div className="mt-0.5 text-xs font-bold text-white">
+                                  {formatShortDate(
+                                    nextService.schedule_date,
+                                    language,
+                                  )}{" "}
+                                  ·{" "}
+                                  {
+                                    nextService.service_time
+                                  }
+                                </div>
+                              </div>
+                            </div>
+
+                            <span className="shrink-0 rounded-lg bg-white/10 px-2 py-1 text-[9px] font-bold text-neutral-300">
+                              {getEntryTypeLabel(
+                                nextService.entry_type,
                                 language,
                               )}
                             </span>
-
-                            <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-neutral-400">
-                              <span
-                                className={`h-1.5 w-1.5 rounded-full ${
-                                  member.status ===
-                                  "active"
-                                    ? "bg-emerald-500"
-                                    : "bg-neutral-300"
-                                }`}
-                              />
-
-                              {getStatusLabel(
-                                member.status,
-                                language,
-                              )}
-                            </span>
-                          </div>
-                        </div>
-
-                        <ChevronRight
-                          size={17}
-                          className="mt-1 shrink-0 text-neutral-300 transition group-hover:text-neutral-500"
-                        />
-                      </div>
-
-                      {/* Contact */}
-                      <div className="mt-3 flex items-center gap-2">
-                        {member.phone ? (
-                          <a
-                            href={`tel:${member.phone}`}
-                            onClick={(event) =>
-                              event.stopPropagation()
-                            }
-                            className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-neutral-50 px-3 text-xs font-semibold text-neutral-600 transition active:bg-neutral-100"
-                          >
-                            <Phone size={13} />
-                            {member.phone}
-                          </a>
-                        ) : (
-                          <span className="text-[11px] text-neutral-300">
-                            {language === "de"
-                              ? "Keine Telefonnummer"
-                              : "Нет телефона"}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Work summary */}
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <div className="rounded-2xl bg-neutral-50 p-3">
-                          <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-neutral-400">
-                            <ListTodo size={12} />
-                            {language === "de"
-                              ? "Aufgaben"
-                              : "Задачи"}
                           </div>
 
-                          <div className="mt-1.5 flex items-end gap-1">
-                            <span className="text-lg font-bold text-neutral-900">
-                              {openTasks.length}
-                            </span>
-
-                            <span className="pb-0.5 text-[10px] text-neutral-400">
-                              {language === "de"
-                                ? "offen"
-                                : "открыто"}
-                            </span>
+                          <div className="mt-3 line-clamp-2 text-xs font-medium leading-5 text-neutral-200">
+                            {getServiceTitle(
+                              nextService,
+                              language,
+                            )}
                           </div>
-                        </div>
-
-                        <div className="rounded-2xl bg-neutral-50 p-3">
-                          <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-neutral-400">
-                            <CheckCircle2 size={12} />
-                            {language === "de"
-                              ? "Erledigt"
-                              : "Готово"}
-                          </div>
-
-                          <div className="mt-1.5 text-lg font-bold text-neutral-900">
-                            {completedTasks.length}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Next task */}
-                      {nextTask ? (
-                        <div className="mt-2.5 flex items-center justify-between gap-3 rounded-2xl border border-neutral-100 bg-white">
-                          <div className="min-w-0 px-3 py-2.5">
-                            <div className="text-[9px] font-bold uppercase tracking-[0.08em] text-neutral-400">
-                              {language === "de"
-                                ? "Nächste Aufgabe"
-                                : "Ближайшая задача"}
-                            </div>
-
-                            <div className="mt-1 truncate text-xs font-semibold text-neutral-800">
-                              {nextTask.title}
-                            </div>
-                          </div>
-
-                          {nextTask.deadline && (
-                            <div className="mr-2.5 flex shrink-0 items-center gap-1.5 rounded-xl bg-neutral-100 px-2.5 py-2 text-[10px] font-bold text-neutral-600">
-                              <CalendarDays
-                                size={12}
-                              />
-                              {formatShortDate(
-                                nextTask.deadline,
-                                language,
-                              )}
-                            </div>
-                          )}
                         </div>
                       ) : (
-                        <div className="mt-2.5 flex items-center gap-2 rounded-2xl bg-neutral-50 px-3 py-2.5 text-[10px] font-medium text-neutral-400">
-                          <CheckCircle2 size={13} />
+                        <div className="flex items-center gap-2 rounded-[22px] bg-neutral-50 px-3.5 py-3 text-[10px] font-medium text-neutral-400">
+                          <CalendarDays
+                            size={14}
+                          />
+
                           {language === "de"
-                            ? "Keine offenen Aufgaben"
-                            : "Нет открытых задач"}
+                            ? "Kein zukünftiger Dienst eingetragen"
+                            : "Будущих служений пока нет"}
                         </div>
                       )}
                     </div>
+
+                    {/* Work stats */}
+                    <div className="mt-2.5 grid grid-cols-2 gap-2">
+                      <div className="rounded-[20px] bg-neutral-50 p-3">
+                        <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-neutral-400">
+                          <ListTodo size={12} />
+
+                          {language === "de"
+                            ? "Aufgaben"
+                            : "Задачи"}
+                        </div>
+
+                        <div className="mt-1.5 flex items-end gap-1">
+                          <span className="text-lg font-bold text-neutral-900">
+                            {openTasks.length}
+                          </span>
+
+                          <span className="pb-0.5 text-[10px] text-neutral-400">
+                            {language === "de"
+                              ? "offen"
+                              : "открыто"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="rounded-[20px] bg-neutral-50 p-3">
+                        <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.08em] text-neutral-400">
+                          <CheckCircle2
+                            size={12}
+                          />
+
+                          {language === "de"
+                            ? "Erledigt"
+                            : "Готово"}
+                        </div>
+
+                        <div className="mt-1.5 text-lg font-bold text-neutral-900">
+                          {completedTasks.length}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Next task */}
+                    {nextTask ? (
+                      <div className="mt-2.5 flex items-center justify-between gap-3 rounded-[20px] border border-neutral-100 bg-white px-3 py-2.5">
+                        <div className="min-w-0">
+                          <div className="text-[9px] font-bold uppercase tracking-[0.08em] text-neutral-400">
+                            {language === "de"
+                              ? "Nächste Aufgabe"
+                              : "Ближайшая задача"}
+                          </div>
+
+                          <div className="mt-1 truncate text-xs font-semibold text-neutral-800">
+                            {nextTask.title}
+                          </div>
+                        </div>
+
+                        {nextTask.deadline && (
+                          <div className="flex shrink-0 items-center gap-1.5 rounded-xl bg-neutral-100 px-2.5 py-2 text-[10px] font-bold text-neutral-600">
+                            <CalendarDays
+                              size={12}
+                            />
+
+                            {formatShortDate(
+                              nextTask.deadline,
+                              language,
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-2.5 flex items-center gap-2 rounded-[20px] bg-neutral-50 px-3 py-2.5 text-[10px] font-medium text-neutral-400">
+                        <CheckCircle2
+                          size={13}
+                        />
+
+                        {language === "de"
+                          ? "Keine offenen Aufgaben"
+                          : "Нет открытых задач"}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Phone */}
+                  {member.phone && (
+                    <a
+                      href={`tel:${member.phone}`}
+                      onClick={(event) =>
+                        event.stopPropagation()
+                      }
+                      className="flex h-11 items-center justify-center gap-2 border-t border-neutral-100 bg-white text-xs font-bold text-neutral-600 transition active:bg-neutral-50"
+                    >
+                      <Phone size={14} />
+
+                      {member.phone}
+                    </a>
+                  )}
                 </article>
               );
             })
@@ -1195,13 +1680,14 @@ export default function TeamPage() {
         <div
           className="fixed inset-0 z-[80] bg-black/35 backdrop-blur-[2px]"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
+            if (
+              event.target === event.currentTarget
+            ) {
               setSelectedMember(null);
             }
           }}
         >
-          <div className="absolute bottom-0 left-0 right-0 mx-auto max-h-[90vh] w-full max-w-[760px] overflow-y-auto rounded-t-[30px] bg-[#f5f5f4] shadow-2xl">
-            {/* Sheet header */}
+          <div className="absolute bottom-0 left-0 right-0 mx-auto max-h-[92vh] w-full max-w-[760px] overflow-y-auto rounded-t-[30px] bg-[#f5f5f4] shadow-2xl">
             <div className="sticky top-0 z-10 border-b border-neutral-200 bg-[#f5f5f4]/95 px-4 pb-3 pt-3 backdrop-blur-xl">
               <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-neutral-300" />
 
@@ -1220,11 +1706,14 @@ export default function TeamPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      openEditModal(selectedMember)
+                      openEditModal(
+                        selectedMember,
+                      )
                     }
                     className="flex h-10 items-center gap-2 rounded-xl bg-white px-3 text-xs font-semibold text-neutral-700"
                   >
                     <Edit3 size={14} />
+
                     {language === "de"
                       ? "Bearbeiten"
                       : "Изменить"}
@@ -1233,7 +1722,9 @@ export default function TeamPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      setDeleteMember(selectedMember)
+                      setDeleteMember(
+                        selectedMember,
+                      )
                     }
                     className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-500"
                   >
@@ -1245,19 +1736,33 @@ export default function TeamPage() {
 
             <div className="space-y-3 p-4 pb-8">
               {/* Profile */}
-              <section className="rounded-3xl border border-neutral-200 bg-white p-5">
+              <section className="rounded-[28px] border border-neutral-200 bg-white p-5">
                 <div className="flex items-center gap-4">
-                  <div
-                    className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-[22px] text-lg font-bold ${getAvatarTone(
-                      selectedMember,
-                    )}`}
-                  >
-                    {getInitials(selectedMember)}
-                  </div>
+                  {selectedMember.avatar_url ? (
+                    <img
+                      src={
+                        selectedMember.avatar_url
+                      }
+                      alt={`${selectedMember.first_name} ${selectedMember.last_name}`}
+                      className="h-[72px] w-[72px] shrink-0 rounded-[24px] object-cover"
+                    />
+                  ) : (
+                    <div
+                      className={`flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-[24px] text-xl font-bold ${getAvatarTone(
+                        selectedMember,
+                      )}`}
+                    >
+                      {getInitials(
+                        selectedMember,
+                      )}
+                    </div>
+                  )}
 
                   <div className="min-w-0">
                     <h2 className="text-xl font-bold tracking-tight text-neutral-950">
-                      {selectedMember.first_name}{" "}
+                      {
+                        selectedMember.first_name
+                      }{" "}
                       {selectedMember.last_name}
                     </h2>
 
@@ -1298,13 +1803,81 @@ export default function TeamPage() {
                     className="mt-5 flex h-12 items-center justify-center gap-2 rounded-2xl bg-neutral-900 text-sm font-semibold text-white transition active:scale-[0.99]"
                   >
                     <Phone size={16} />
-                    {selectedMember.phone}
+
+                    {language === "de"
+                      ? `Anrufen · ${selectedMember.phone}`
+                      : `Позвонить · ${selectedMember.phone}`}
                   </a>
                 )}
               </section>
 
+              {/* Next service */}
+              <section className="rounded-[28px] bg-neutral-900 p-5 text-white">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10">
+                    <CalendarDays
+                      size={16}
+                    />
+                  </div>
+
+                  <div>
+                    <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-neutral-400">
+                      {language === "de"
+                        ? "Nächster Dienst"
+                        : "Ближайшее служение"}
+                    </div>
+
+                    {selectedNextService && (
+                      <div className="mt-0.5 text-xs font-bold">
+                        {formatDate(
+                          selectedNextService.schedule_date,
+                          language,
+                        )}{" "}
+                        ·{" "}
+                        {
+                          selectedNextService.service_time
+                        }
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {selectedNextService ? (
+                  <>
+                    <div className="mt-4 text-base font-bold leading-6">
+                      {getServiceTitle(
+                        selectedNextService,
+                        language,
+                      )}
+                    </div>
+
+                    {selectedNextService.series && (
+                      <div className="mt-2 text-xs text-neutral-400">
+                        {
+                          selectedNextService.series
+                        }
+                      </div>
+                    )}
+
+                    {selectedNextService.bible_text && (
+                      <div className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-xs text-neutral-300">
+                        {
+                          selectedNextService.bible_text
+                        }
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="mt-4 text-sm text-neutral-400">
+                    {language === "de"
+                      ? "Kein zukünftiger Dienst eingetragen."
+                      : "Будущих служений пока нет."}
+                  </div>
+                )}
+              </section>
+
               {/* Personal information */}
-              <section className="rounded-3xl border border-neutral-200 bg-white p-4">
+              <section className="rounded-[28px] border border-neutral-200 bg-white p-4">
                 <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.15em] text-neutral-400">
                   {language === "de"
                     ? "Informationen"
@@ -1387,7 +1960,7 @@ export default function TeamPage() {
               </section>
 
               {/* Tasks */}
-              <section className="rounded-3xl border border-neutral-200 bg-white p-4">
+              <section className="rounded-[28px] border border-neutral-200 bg-white p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-neutral-400">
@@ -1398,6 +1971,7 @@ export default function TeamPage() {
 
                     <div className="mt-1 text-lg font-bold text-neutral-900">
                       {selectedTasks.length}
+
                       <span className="ml-1 text-xs font-medium text-neutral-400">
                         {language === "de"
                           ? "offen"
@@ -1413,18 +1987,18 @@ export default function TeamPage() {
 
                 {selectedTasks.length > 0 ? (
                   <div className="mt-4 space-y-2">
-                    {selectedTasks
+                    {[...selectedTasks]
                       .sort((a, b) => {
-                        if (!a.deadline) return 1;
-                        if (!b.deadline) return -1;
+                        if (!a.deadline)
+                          return 1;
+
+                        if (!b.deadline)
+                          return -1;
 
                         return (
-                          new Date(
-                            a.deadline,
-                          ).getTime() -
-                          new Date(
+                          a.deadline.localeCompare(
                             b.deadline,
-                          ).getTime()
+                          )
                         );
                       })
                       .slice(0, 6)
@@ -1483,6 +2057,7 @@ export default function TeamPage() {
                                 <CalendarDays
                                   size={11}
                                 />
+
                                 {formatDate(
                                   task.deadline,
                                   language,
@@ -1504,8 +2079,13 @@ export default function TeamPage() {
                 {selectedCompletedTasks.length >
                   0 && (
                   <div className="mt-3 flex items-center gap-2 text-[10px] font-medium text-neutral-400">
-                    <CheckCircle2 size={13} />
-                    {selectedCompletedTasks.length}{" "}
+                    <CheckCircle2
+                      size={13}
+                    />
+
+                    {
+                      selectedCompletedTasks.length
+                    }{" "}
                     {language === "de"
                       ? "Aufgaben erledigt"
                       : "задач выполнено"}
@@ -1515,20 +2095,22 @@ export default function TeamPage() {
 
               {/* Next task */}
               {selectedNextTask && (
-                <section className="rounded-3xl bg-neutral-900 p-5 text-white">
+                <section className="rounded-[28px] bg-white p-5">
                   <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-neutral-400">
                     {language === "de"
                       ? "Nächste Aufgabe"
                       : "Ближайшая задача"}
                   </div>
 
-                  <div className="mt-2 text-base font-bold">
+                  <div className="mt-2 text-base font-bold text-neutral-900">
                     {selectedNextTask.title}
                   </div>
 
                   {selectedNextTask.deadline && (
-                    <div className="mt-3 flex items-center gap-2 text-xs text-neutral-300">
-                      <CalendarDays size={14} />
+                    <div className="mt-3 flex items-center gap-2 text-xs text-neutral-500">
+                      <CalendarDays
+                        size={14}
+                      />
 
                       {language === "de"
                         ? `Fällig am ${formatDate(
@@ -1553,7 +2135,9 @@ export default function TeamPage() {
         <div
           className="fixed inset-0 z-[100] flex items-end justify-center bg-black/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
+            if (
+              event.target === event.currentTarget
+            ) {
               closeModal();
             }
           }}
@@ -1592,6 +2176,67 @@ export default function TeamPage() {
             </div>
 
             <div className="space-y-5 p-5 sm:p-6">
+              {/* Avatar */}
+              <div>
+                <label className="mb-2 block text-xs font-bold text-neutral-700">
+                  {language === "de"
+                    ? "Foto"
+                    : "Фото"}
+                </label>
+
+                <div className="flex items-center gap-4">
+                  {previewUrl ? (
+                    <img
+                      src={previewUrl}
+                      alt="Avatar Vorschau"
+                      className="h-20 w-20 rounded-[24px] object-cover"
+                    />
+                  ) : (
+                    <div
+                      className={`flex h-20 w-20 items-center justify-center rounded-[24px] text-lg font-bold ${
+                        editingMember
+                          ? getAvatarTone(
+                              editingMember,
+                            )
+                          : "bg-neutral-100 text-neutral-400"
+                      }`}
+                    >
+                      {editingMember
+                        ? getInitials(
+                            editingMember,
+                          )
+                        : "?"}
+                    </div>
+                  )}
+
+                  <div className="min-w-0">
+                    <label className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-neutral-900 px-4 text-xs font-bold text-white">
+                      <ImagePlus size={15} />
+
+                      {language === "de"
+                        ? "Foto auswählen"
+                        : "Выбрать фото"}
+
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={
+                          handleAvatarChange
+                        }
+                        className="hidden"
+                      />
+                    </label>
+
+                    <p className="mt-2 text-[10px] leading-4 text-neutral-400">
+                      {language === "de"
+                        ? "JPG, PNG oder WEBP · max. 5 MB"
+                        : "JPG, PNG или WEBP · максимум 5 МБ"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Name */}
               <div>
                 <label className="mb-2 block text-xs font-bold text-neutral-700">
                   {language === "de"
@@ -1636,6 +2281,7 @@ export default function TeamPage() {
                 </div>
               </div>
 
+              {/* Position + Status */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-2 block text-xs font-bold text-neutral-700">
@@ -1725,6 +2371,7 @@ export default function TeamPage() {
                 </div>
               </div>
 
+              {/* Phone + Birthday */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-2 block text-xs font-bold text-neutral-700">
@@ -1769,6 +2416,7 @@ export default function TeamPage() {
                 </div>
               </div>
 
+              {/* Languages */}
               <div>
                 <label className="mb-2 block text-xs font-bold text-neutral-700">
                   {language === "de"
@@ -1779,7 +2427,9 @@ export default function TeamPage() {
                 <div className="flex gap-2">
                   {["DE", "RU"].map((item) => {
                     const selected =
-                      form.languages.includes(item);
+                      form.languages.includes(
+                        item,
+                      );
 
                     return (
                       <button
@@ -1801,6 +2451,7 @@ export default function TeamPage() {
                 </div>
               </div>
 
+              {/* Notes */}
               <div>
                 <label className="mb-2 block text-xs font-bold text-neutral-700">
                   {language === "de"
@@ -1827,11 +2478,14 @@ export default function TeamPage() {
               </div>
             </div>
 
+            {/* Save */}
             <div className="sticky bottom-0 flex gap-2 border-t border-neutral-100 bg-white p-4 sm:px-6">
               <button
                 type="button"
                 onClick={closeModal}
-                disabled={saving}
+                disabled={
+                  saving || uploadingAvatar
+                }
                 className="h-12 flex-1 rounded-xl border border-neutral-200 bg-white text-sm font-semibold text-neutral-600 disabled:opacity-50"
               >
                 {language === "de"
@@ -1844,12 +2498,14 @@ export default function TeamPage() {
                 onClick={saveMember}
                 disabled={
                   saving ||
+                  uploadingAvatar ||
                   !form.first_name.trim() ||
                   !form.last_name.trim()
                 }
                 className="h-12 flex-1 rounded-xl bg-neutral-900 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {saving
+                {saving ||
+                uploadingAvatar
                   ? language === "de"
                     ? "Speichern..."
                     : "Сохранение..."
@@ -1871,10 +2527,11 @@ export default function TeamPage() {
         <div
           className="fixed inset-0 z-[120] flex items-end justify-center bg-black/35 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              if (!deleting) {
-                setDeleteMember(null);
-              }
+            if (
+              event.target === event.currentTarget &&
+              !deleting
+            ) {
+              setDeleteMember(null);
             }
           }}
         >
@@ -1898,7 +2555,9 @@ export default function TeamPage() {
             <div className="mt-6 flex gap-2">
               <button
                 type="button"
-                onClick={() => setDeleteMember(null)}
+                onClick={() =>
+                  setDeleteMember(null)
+                }
                 disabled={deleting}
                 className="h-12 flex-1 rounded-xl border border-neutral-200 bg-white text-sm font-semibold text-neutral-600 disabled:opacity-50"
               >

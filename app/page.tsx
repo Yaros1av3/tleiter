@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   BriefcaseBusiness,
+  Cake,
   CalendarDays,
   CalendarRange,
   Clock3,
@@ -61,6 +62,94 @@ type ScheduleMember = {
   schedule_entry_id: number;
   team_member_id: number;
 };
+
+type Teen = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  birth_date: string;
+  is_active: boolean;
+};
+
+type BirthdayCelebration = {
+  id: number;
+  teen_id: number;
+  birthday_year: number;
+  celebration_date: string;
+  celebrated: boolean;
+};
+
+function parseLocalDate(date: string) {
+  return new Date(`${date}T00:00:00`);
+}
+
+function dateToString(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getPreviousSunday(date: Date) {
+  const result = new Date(date);
+  const day = result.getDay();
+  const daysBack = day === 0 ? 0 : day;
+
+  result.setDate(result.getDate() - daysBack);
+  return result;
+}
+
+function getNextSunday(date: Date) {
+  const result = new Date(date);
+  const day = result.getDay();
+  const daysForward = day === 0 ? 0 : 7 - day;
+
+  result.setDate(result.getDate() + daysForward);
+  return result;
+}
+
+function getBirthdayDateForYear(
+  birthDate: string,
+  year: number,
+) {
+  const original = parseLocalDate(birthDate);
+  const month = original.getMonth();
+  const day = original.getDate();
+
+  if (month === 1 && day === 29) {
+    const isLeapYear =
+      year % 4 === 0 &&
+      (year % 100 !== 0 || year % 400 === 0);
+
+    return new Date(
+      year,
+      1,
+      isLeapYear ? 29 : 28,
+    );
+  }
+
+  return new Date(year, month, day);
+}
+
+function getBirthdayCelebrationCandidate(
+  birthDate: string,
+  today: Date,
+) {
+  const previousSunday = getPreviousSunday(today);
+  const nextSunday = getNextSunday(today);
+  const isSunday = today.getDay() === 0;
+  const birthday = getBirthdayDateForYear(
+    birthDate,
+    today.getFullYear(),
+  );
+
+  const isInWindow = isSunday
+    ? birthday >= previousSunday && birthday <= nextSunday
+    : birthday > previousSunday && birthday <= nextSunday;
+
+  return isInWindow ? dateToString(nextSunday) : null;
+}
 
 function formatDate(
   date: string,
@@ -141,6 +230,11 @@ export default function Home() {
 
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
 
+  const [teens, setTeens] = useState<Teen[]>([]);
+  const [birthdayCelebrations, setBirthdayCelebrations] = useState<
+    BirthdayCelebration[]
+  >([]);
+
   const [loading, setLoading] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -158,6 +252,8 @@ export default function Home() {
       { data: teamData, error: teamError },
       { data: projectsData, error: projectsError },
       { data: workItemsData, error: workItemsError },
+      { data: teensData, error: teensError },
+      { data: birthdayData, error: birthdayError },
     ] = await Promise.all([
       supabase
         .from("schedule_entries")
@@ -193,6 +289,21 @@ export default function Home() {
           ascending: true,
           nullsFirst: false,
         }),
+
+      supabase
+        .from("teens")
+        .select(
+          "id, first_name, last_name, birth_date, is_active",
+        )
+        .eq("is_active", true)
+        .order("last_name", { ascending: true }),
+
+      supabase
+        .from("teen_birthday_celebrations")
+        .select(
+          "id, teen_id, birthday_year, celebration_date, celebrated",
+        )
+        .eq("birthday_year", new Date().getFullYear()),
     ]);
 
     if (scheduleError) {
@@ -217,6 +328,17 @@ export default function Home() {
       console.error(
         "Dashboard work items:",
         workItemsError,
+      );
+    }
+
+    if (teensError) {
+      console.error("Dashboard teens:", teensError);
+    }
+
+    if (birthdayError) {
+      console.error(
+        "Dashboard birthday celebrations:",
+        birthdayError,
       );
     }
 
@@ -250,13 +372,14 @@ export default function Home() {
     setScheduleMembers(scheduleMemberData);
     setWorkProjects(projectsData ?? []);
     setWorkItems(workItemsData ?? []);
+    setTeens(teensData ?? []);
+    setBirthdayCelebrations(birthdayData ?? []);
 
     setLoading(false);
   }
 
-  const todayString = new Date().toLocaleDateString(
-    "en-CA",
-  );
+  const today = useMemo(() => new Date(), []);
+  const todayString = dateToString(today);
 
   const upcomingSchedule = useMemo(() => {
     return scheduleEntries.filter(
@@ -306,6 +429,126 @@ export default function Home() {
 
     return dates;
   }, [upcomingSchedule]);
+
+  const upcomingBirthdays = useMemo(() => {
+    const currentYear = today.getFullYear();
+
+    return teens
+      .map((teen) => {
+        const celebration = birthdayCelebrations.find(
+          (item) =>
+            item.teen_id === teen.id &&
+            item.birthday_year === currentYear,
+        );
+
+        if (celebration?.celebrated) {
+          return null;
+        }
+
+        const celebrationDate =
+          getBirthdayCelebrationCandidate(
+            teen.birth_date,
+            today,
+          );
+
+        if (!celebrationDate) {
+          return null;
+        }
+
+        return {
+          teen,
+          birthdayDate: getBirthdayDateForYear(
+            teen.birth_date,
+            currentYear,
+          ),
+          celebrationDate,
+        };
+      })
+      .filter(
+        (item): item is NonNullable<typeof item> =>
+          item !== null,
+      )
+      .sort(
+        (a, b) =>
+          a.birthdayDate.getTime() -
+          b.birthdayDate.getTime(),
+      );
+  }, [teens, birthdayCelebrations, today]);
+
+  async function markBirthdayCelebrated(teenId: number) {
+    const year = today.getFullYear();
+    const existing = birthdayCelebrations.find(
+      (item) =>
+        item.teen_id === teenId &&
+        item.birthday_year === year,
+    );
+
+    if (existing) {
+      const { error } = await supabase
+        .from("teen_birthday_celebrations")
+        .update({
+          celebrated: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id);
+
+      if (error) {
+        console.error(
+          "Dashboard birthday update:",
+          error,
+        );
+        return;
+      }
+
+      setBirthdayCelebrations((current) =>
+        current.map((item) =>
+          item.id === existing.id
+            ? { ...item, celebrated: true }
+            : item,
+        ),
+      );
+
+      return;
+    }
+
+    const teen = teens.find((item) => item.id === teenId);
+    if (!teen) return;
+
+    const candidate = getBirthdayCelebrationCandidate(
+      teen.birth_date,
+      today,
+    );
+
+    if (!candidate) return;
+
+    const { data, error } = await supabase
+      .from("teen_birthday_celebrations")
+      .insert({
+        teen_id: teenId,
+        birthday_year: year,
+        celebration_date: candidate,
+        celebrated: true,
+      })
+      .select(
+        "id, teen_id, birthday_year, celebration_date, celebrated",
+      )
+      .single();
+
+    if (error) {
+      console.error(
+        "Dashboard birthday insert:",
+        error,
+      );
+      return;
+    }
+
+    if (data) {
+      setBirthdayCelebrations((current) => [
+        ...current,
+        data,
+      ]);
+    }
+  }
 
   /*
    * Текущая работа.
@@ -663,6 +906,107 @@ export default function Home() {
               </div>
             )}
           </section>
+
+          {/* =====================================================
+              TEEN BIRTHDAYS
+          ====================================================== */}
+          {!loading && upcomingBirthdays.length > 0 && (
+            <section className="mt-4">
+              <div className="overflow-hidden rounded-[23px] border border-neutral-200 bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
+                <div className="flex items-center justify-between gap-3 border-b border-neutral-100 px-4 py-3.5">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[#111820] text-white">
+                      <Cake size={18} strokeWidth={1.8} />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-bold text-neutral-900">
+                        {isRu ? "Дни рождения" : "Geburtstage"}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-neutral-400">
+                        {isRu
+                          ? "Кого не забыть поздравить"
+                          : "Wen ihr nicht vergessen solltet"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => router.push("/teens")}
+                    className="shrink-0 text-[12px] font-semibold text-neutral-500"
+                  >
+                    {isRu ? "Подростки" : "Teens"}
+                  </button>
+                </div>
+
+                <div className="divide-y divide-neutral-100">
+                  {upcomingBirthdays.map(
+                    ({ teen, birthdayDate, celebrationDate }) => (
+                      <div
+                        key={teen.id}
+                        className="flex items-center gap-3 px-4 py-3.5"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
+                          <span className="text-[13px] font-bold">
+                            {teen.first_name.charAt(0)}
+                            {teen.last_name.charAt(0)}
+                          </span>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13px] font-semibold text-neutral-900">
+                            {teen.first_name} {teen.last_name}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-neutral-400">
+                            {formatDate(
+                              dateToString(birthdayDate),
+                              language,
+                              { day: "2-digit", month: "long" },
+                            )}
+                          </p>
+                          <p className="mt-1 text-[10px] font-medium text-neutral-500">
+                            {isRu
+                              ? `Поздравить ${formatDate(
+                                  celebrationDate,
+                                  language,
+                                  {
+                                    weekday: "long",
+                                    day: "2-digit",
+                                    month: "long",
+                                  },
+                                )}`
+                              : `Am ${formatDate(
+                                  celebrationDate,
+                                  language,
+                                  {
+                                    weekday: "long",
+                                    day: "2-digit",
+                                    month: "long",
+                                  },
+                                )} gratulieren`}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => markBirthdayCelebrated(teen.id)}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-[15px] font-semibold text-neutral-600 transition active:scale-95"
+                          aria-label={
+                            isRu
+                              ? "Поздравление выполнено"
+                              : "Als gratuliert markieren"
+                          }
+                        >
+                          ✓
+                        </button>
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* =====================================================
               SERVICE DATE SUMMARY
