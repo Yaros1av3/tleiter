@@ -195,14 +195,7 @@ export default function SettingsPage() {
 
         {/* Mobile header */}
         <div className="mb-7 flex items-center gap-3 md:hidden">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e0e3e6] bg-white text-[#303b48] shadow-sm"
-            aria-label={t.settings.back}
-          >
-            <ArrowLeft size={19} />
-          </button>
+          
 
           <div>
             <h1 className="text-[24px] font-bold tracking-[-0.04em] text-[#111820]">

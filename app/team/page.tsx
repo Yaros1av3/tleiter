@@ -1033,86 +1033,42 @@ export default function TeamPage() {
     <div className="min-h-screen bg-[#f5f5f4] text-neutral-900">
       <main className="mx-auto min-h-screen w-full max-w-[760px] px-4 pb-8 sm:px-6">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 -mx-4 border-b border-neutral-200/80 bg-[#f5f5f4]/95 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6">
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-neutral-600 shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition active:scale-95"
-              aria-label={
-                language === "de"
-                  ? "Zurück"
-                  : "Назад"
-              }
-            >
-              <ArrowLeft
-                size={18}
-                strokeWidth={2}
-              />
-            </button>
+        {/* Top bar */}
+{/* Top bar */}
+<header className="sticky top-0 z-30 -mx-4 border-b border-neutral-200/80 bg-[#f5f5f4]/95 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6">
+  <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400">
+    <Users size={13} strokeWidth={1.8} />
+    <span>{language === "de" ? "Team" : "Команда"}</span>
+  </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setLanguage(
-                    language === "de"
-                      ? "ru"
-                      : "de",
-                  )
-                }
-                className="flex h-9 items-center gap-1 rounded-xl border border-neutral-200 bg-white px-2.5 text-[10px] font-bold text-neutral-500"
-              >
-                {language === "de"
-                  ? "DE"
-                  : "RU"}
-              </button>
+  <div className="flex items-center justify-between gap-3">
+    <h1 className="text-[28px] font-bold tracking-tight text-neutral-950">
+      {language === "de" ? "Unser Team" : "Наша команда"}
+    </h1>
 
-              <button
-                type="button"
-                onClick={openCreateModal}
-                className="flex h-10 items-center gap-2 rounded-xl bg-neutral-900 px-3.5 text-xs font-semibold text-white shadow-sm transition active:scale-95"
-              >
-                <Plus
-                  size={16}
-                  strokeWidth={2.2}
-                />
+    <button
+      type="button"
+      onClick={openCreateModal}
+      aria-label={
+        language === "de"
+          ? "Teammitglied hinzufügen"
+          : "Добавить участника"
+      }
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white shadow-sm transition active:scale-95"
+    >
+      <Plus size={18} strokeWidth={2.2} />
+    </button>
+  </div>
+</header>
 
-                <span className="hidden min-[390px]:inline">
-                  {language === "de"
-                    ? "Hinzufügen"
-                    : "Добавить"}
-                </span>
-              </button>
-            </div>
-          </div>
-        </header>
-
-        {/* Heading */}
-        <section className="pt-6">
-          <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400">
-            <Users
-              size={14}
-              strokeWidth={2}
-            />
-
-            {language === "de"
-              ? "Team"
-              : "Команда"}
-          </div>
-
-          <h1 className="text-[28px] font-bold tracking-tight text-neutral-950">
-            {language === "de"
-              ? "Unser Team"
-              : "Наша команда"}
-          </h1>
-
-          <p className="mt-1 text-sm leading-5 text-neutral-500">
-            {language === "de"
-              ? "Menschen, Aufgaben und Dienste an einem Ort."
-              : "Люди, задачи и служения в одном месте."}
-          </p>
-        </section>
+{/* Subtitle */}
+<section className="pt-2">
+  <p className="text-sm leading-5 text-neutral-500">
+    {language === "de"
+      ? "Menschen, Aufgaben und Dienste an einem Ort."
+      : "Люди, задачи и служения в одном месте."}
+  </p>
+</section>
 
         {/* Stats */}
         <section className="mt-5 grid grid-cols-3 gap-2">

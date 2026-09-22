@@ -302,6 +302,79 @@ export const translations = {
         "Подросток будет удалён из списка.",
     },
 
+work: {
+  title: "Работа",
+  sectionLabel: "Командная работа",
+  description:
+    "Здесь собраны общие работы, проекты и подготовки команды.",
+
+  newWork: "Новая работа",
+  createWork: "Создать работу",
+  editWork: "Изменить работу",
+  saveChanges: "Сохранить изменения",
+  deleteWork: "Удалить работу?",
+  deleteConfirm:
+    "Хочешь действительно удалить эту работу?",
+
+  noPeriod: "Период не указан",
+  from: "С",
+  until: "До",
+
+  current: "Текущие",
+  activeWorks: "Текущие работы",
+  overview: "Обзор",
+  allWorks: "Все работы",
+  noOtherWorks: "Других работ нет",
+
+  progress: "Прогресс",
+  tasks: "Задачи",
+  tasksCompleted: "выполнено",
+  open: "Открыто",
+  inProgress: "В работе",
+  active: "Активно",
+  completed: "Готово",
+  planned: "Запланировано",
+  archived: "В архиве",
+
+  titleLabel: "Название",
+  descriptionLabel: "Описание",
+  start: "Начало",
+  end: "Конец",
+  status: "Статус",
+
+  titlePlaceholder: "например, Рождественский вечер 2026",
+  descriptionPlaceholder:
+    "О чём эта работа?",
+
+  createSaving: "Создаём...",
+  saveSaving: "Сохраняем...",
+  deleteSaving: "Удаляем...",
+
+  createError:
+    "Не удалось создать работу.",
+  saveError:
+    "Не удалось сохранить работу.",
+  deleteError:
+    "Не удалось удалить работу.",
+  noUser:
+    "Авторизованный пользователь не найден.",
+  invalidDate:
+    "Дата окончания не может быть раньше даты начала.",
+
+  deleteWarning:
+    "Это действие нельзя отменить.",
+  deleteDescription:
+    "Все задачи, чек-листы и связанные данные этой работы также будут удалены.",
+
+  cancel: "Отмена",
+  deleteForever: "Удалить навсегда",
+
+  close: "Закрыть",
+  edit: "Изменить",
+  delete: "Удалить",
+},
+
+
     settings: {
       title: "Настройки",
       subtitle: "Твой аккаунт TLite",
@@ -376,6 +449,77 @@ export const translations = {
       error: "Ein Fehler ist aufgetreten.",
       tryAgain: "Erneut versuchen",
     },
+work: {
+  title: "Arbeit",
+  sectionLabel: "Team Work",
+  description:
+    "Hier seht ihr alle gemeinsamen Arbeiten, Projekte und Vorbereitungen des Teams.",
+
+  newWork: "Neue Arbeit",
+  createWork: "Arbeit erstellen",
+  editWork: "Arbeit bearbeiten",
+  saveChanges: "Änderungen speichern",
+  deleteWork: "Arbeit löschen?",
+  deleteConfirm:
+    "Möchtest du diese Arbeit wirklich löschen?",
+
+  noPeriod: "Kein Zeitraum festgelegt",
+  from: "Ab",
+  until: "Bis",
+
+  current: "Aktuell",
+  activeWorks: "Laufende Arbeiten",
+  overview: "Übersicht",
+  allWorks: "Alle Arbeiten",
+  noOtherWorks: "Keine weiteren Arbeiten vorhanden.",
+
+  progress: "Fortschritt",
+  tasks: "Aufgaben",
+  tasksCompleted: "erledigt",
+  open: "Offen",
+  inProgress: "In Bearbeitung",
+  active: "Aktiv",
+  completed: "Fertig",
+  planned: "Geplant",
+  archived: "Archiviert",
+
+  titleLabel: "Titel",
+  descriptionLabel: "Beschreibung",
+  start: "Start",
+  end: "Ende",
+  status: "Status",
+
+  titlePlaceholder: "z. B. Weihnachtsabend 2026",
+  descriptionPlaceholder:
+    "Worum geht es bei dieser Arbeit?",
+
+  createSaving: "Wird erstellt...",
+  saveSaving: "Wird gespeichert...",
+  deleteSaving: "Wird gelöscht...",
+
+  createError:
+    "Die Arbeit konnte nicht erstellt werden.",
+  saveError:
+    "Die Arbeit konnte nicht gespeichert werden.",
+  deleteError:
+    "Die Arbeit konnte nicht gelöscht werden.",
+  noUser:
+    "Kein eingeloggter Benutzer gefunden.",
+  invalidDate:
+    "Das Enddatum darf nicht vor dem Startdatum liegen.",
+
+  deleteWarning:
+    "Diese Aktion kann nicht rückgängig gemacht werden.",
+  deleteDescription:
+    "Alle Aufgaben, Checklisten und zugehörigen Daten dieser Arbeit werden ebenfalls gelöscht.",
+
+  cancel: "Abbrechen",
+  deleteForever: "Endgültig löschen",
+
+  close: "Schließen",
+  edit: "Bearbeiten",
+  delete: "Löschen",
+},
 
     navigation: {
       dashboard: "Home",

@@ -484,7 +484,6 @@ export default function MaterialsPage() {
     notes: "Notizen",
 
     chooseFile: "Datei auswählen",
-    uploadFile: "Datei hochladen",
     noFile: "Keine Datei ausgewählt",
 
     deleteFolderTitle:
@@ -1659,18 +1658,7 @@ export default function MaterialsPage() {
       <main className="mx-auto w-full max-w-[1500px] px-3 pb-24 pt-3 sm:px-6 sm:pb-12 sm:pt-5 lg:px-8">
 
         {/* Home */}
-        <div className="mb-3">
-          <Link
-            href="/"
-            aria-label="Startseite"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-neutral-200 bg-white text-neutral-700 shadow-sm transition hover:bg-neutral-50 active:scale-95"
-          >
-            <ArrowLeft
-              size={19}
-              strokeWidth={2}
-            />
-          </Link>
-        </div>
+        
 
         {/* HERO */}
         <section className="mb-5 overflow-hidden rounded-[26px] bg-neutral-950 p-5 text-white shadow-[0_18px_50px_rgba(15,23,42,0.12)] sm:p-6">
@@ -2300,7 +2288,7 @@ export default function MaterialsPage() {
 
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-neutral-600">
-                    {ui.uploadFile}
+                    {ui.upload}
                   </label>
 
                   <input

@@ -861,23 +861,7 @@ export default function SchedulePage() {
         <div className="sticky top-0 z-30 border-b border-[#e4e5e7] bg-[#f5f5f3]/95 px-4 py-3 backdrop-blur-xl md:hidden">
           <div className="flex items-center gap-3">
             {/* HOME */}
-            <button
-              type="button"
-              onClick={() =>
-                router.push("/")
-              }
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white text-[#111820] shadow-sm ring-1 ring-[#e2e3e5] active:scale-[0.96]"
-              aria-label={
-                isRu
-                  ? "На главную"
-                  : "Zur Startseite"
-              }
-            >
-              <ArrowLeft
-                size={20}
-                strokeWidth={2}
-              />
-            </button>
+            
 
             {/* TITLE */}
             <div className="min-w-0">

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type Project = {
   id: number;
@@ -69,37 +70,30 @@ type ChecklistItem = {
 
 const statusConfig = {
   open: {
-    label: "Offen",
     dot: "bg-[#9ca3af]",
   },
   in_progress: {
-    label: "In Arbeit",
     dot: "bg-[#f59e0b]",
   },
   completed: {
-    label: "Erledigt",
     dot: "bg-[#22c55e]",
   },
 };
 
 const projectStatusConfig = {
   planned: {
-    label: "Geplant",
     className:
       "bg-[#f1f2f3] text-[#68727c]",
   },
   active: {
-    label: "Aktiv",
     className:
       "bg-[#eef6ef] text-[#32804a]",
   },
   completed: {
-    label: "Abgeschlossen",
     className:
       "bg-[#eef1f3] text-[#68727c]",
   },
   archived: {
-    label: "Archiviert",
     className:
       "bg-[#f1f1f1] text-[#969da5]",
   },
@@ -107,28 +101,28 @@ const projectStatusConfig = {
 
 const priorityConfig = {
   low: {
-    label: "Niedrig",
     className: "text-[#7a8490]",
   },
   normal: {
-    label: "Normal",
     className: "text-[#59636f]",
   },
   high: {
-    label: "Hoch",
     className: "text-[#d97706]",
   },
   urgent: {
-    label: "Dringend",
     className: "text-[#dc2626]",
   },
 };
 
-function formatDate(date: string | null) {
-  if (!date) return "Kein Termin";
+function formatDate(
+  date: string | null,
+  language: "de" | "ru",
+  noDate: string
+) {
+  if (!date) return noDate;
 
   return new Intl.DateTimeFormat(
-    "de-DE",
+    language === "ru" ? "ru-RU" : "de-DE",
     {
       day: "2-digit",
       month: "short",
@@ -139,12 +133,14 @@ function formatDate(date: string | null) {
 }
 
 function formatFullDate(
-  date: string | null
+  date: string | null,
+  language: "de" | "ru",
+  noDate: string
 ) {
-  if (!date) return "Kein Termin";
+  if (!date) return noDate;
 
   return new Intl.DateTimeFormat(
-    "de-DE",
+    language === "ru" ? "ru-RU" : "de-DE",
     {
       day: "2-digit",
       month: "long",
@@ -156,13 +152,18 @@ function formatFullDate(
 }
 
 function formatProjectPeriod(
-  project: Project
+  project: Project,
+  language: "de" | "ru",
+  text: {
+    noPeriod: string;
+    noDate: string;
+  }
 ) {
   if (
     !project.start_date &&
     !project.end_date
   ) {
-    return "Kein Zeitraum";
+    return text.noPeriod;
   }
 
   if (
@@ -172,15 +173,21 @@ function formatProjectPeriod(
       project.end_date
   ) {
     return `${formatDate(
-      project.start_date
+      project.start_date,
+      language,
+      text.noDate
     )} – ${formatDate(
-      project.end_date
+      project.end_date,
+      language,
+      text.noDate
     )}`;
   }
 
   return formatDate(
     project.start_date ??
-      project.end_date
+      project.end_date,
+    language,
+    text.noDate
   );
 }
 
@@ -203,6 +210,249 @@ function isOverdue(
 }
 
 export default function WorkProjectPage() {
+  const { language } = useLanguage();
+
+  const text =
+    language === "ru"
+      ? {
+          teamWork: "Командная работа",
+          work: "Работа",
+
+          notFound: "Работа не найдена",
+          allWorks: "Ко всем работам",
+
+          deleteWork: "Удалить работу",
+          addTask: "Добавить задачу",
+
+          planned: "Запланировано",
+          active: "В работе",
+          completed: "Завершено",
+          archived: "В архиве",
+
+          total: "Всего",
+          open: "Открыто",
+          progress: "Активно",
+          finished: "Готово",
+
+          overview: "Обзор",
+          board: "Доска",
+
+          nextSteps: "Следующие шаги",
+          tasks: "Задачи",
+          noTasks: "Пока нет задач",
+          addTaskButton: "Добавить задачу",
+
+          workStatus: "Состояние работы",
+          noTasksColumn: "Нет задач",
+
+          task: "Задача",
+          status: "Статус",
+          priority: "Приоритет",
+          deadline: "Дедлайн",
+          responsible: "Ответственный",
+          stillOpen: "Пока не назначено",
+
+          low: "Низкий",
+          normal: "Обычный",
+          high: "Высокий",
+          urgent: "Срочный",
+
+          openStatus: "Открыто",
+          inProgress: "В работе",
+          doneStatus: "Выполнено",
+
+          checklist: "Чек-лист",
+          checklistQuestion:
+            "Что ещё нужно сделать?",
+          addChecklist:
+            "Добавить новый пункт...",
+
+          edit: "Редактировать",
+          delete: "Удалить",
+
+          reopen: "Открыть снова",
+          markCompleted:
+            "Отметить как выполненное",
+
+          close: "Закрыть",
+
+          editTask: "Редактирование задачи",
+
+          taskLabel: "Задача",
+          description: "Описание",
+
+          saveChanges: "Сохранить изменения",
+          saving: "Сохранение...",
+
+          newTask: "Новая задача",
+          createTask: "Создать задачу",
+          creating: "Создание...",
+
+          titlePlaceholder:
+            "например, Купить рождественский декор",
+          descriptionPlaceholder:
+            "Что именно нужно сделать?",
+
+          deleteTaskTitle:
+            "Удалить задачу?",
+          deleteTaskQuestion:
+            "Ты действительно хочешь удалить",
+          taskRemoved:
+            "Задача будет удалена навсегда.",
+          checklistRemoved:
+            "Связанный чек-лист также будет удалён.",
+
+          cancel: "Отмена",
+          deleting: "Удаление...",
+
+          deleteProjectTitle:
+            "Удалить работу?",
+          deleteProjectQuestion:
+            "Ты действительно хочешь удалить",
+          deleteProjectWarning:
+            "Это действие нельзя отменить.",
+          deleteProjectDescription:
+            "Все задачи и чек-листы этой работы также будут удалены.",
+          deleteForever:
+            "Удалить окончательно",
+
+          noDate: "Нет даты",
+          noPeriod: "Период не указан",
+
+          adminRoleError:
+            "Ошибка при проверке роли администратора:",
+
+          taskCreateError:
+            "Не удалось создать задачу.",
+          taskUpdateError:
+            "Не удалось сохранить задачу.",
+          taskDeleteError:
+            "Не удалось удалить задачу.",
+          projectDeleteError:
+            "Не удалось удалить работу.",
+          checklistError:
+            "Не удалось изменить чек-лист.",
+        }
+      : {
+          teamWork: "Team Work",
+          work: "Arbeit",
+
+          notFound: "Arbeit nicht gefunden",
+          allWorks: "Zu allen Arbeiten",
+
+          deleteWork: "Arbeit löschen",
+          addTask: "Aufgabe hinzufügen",
+
+          planned: "Geplant",
+          active: "Aktiv",
+          completed: "Abgeschlossen",
+          archived: "Archiviert",
+
+          total: "Gesamt",
+          open: "Offen",
+          progress: "Aktiv",
+          finished: "Fertig",
+
+          overview: "Übersicht",
+          board: "Board",
+
+          nextSteps: "Nächste Schritte",
+          tasks: "Aufgaben",
+          noTasks: "Noch keine Aufgaben",
+          addTaskButton: "Aufgabe hinzufügen",
+
+          workStatus: "Arbeitsstand",
+          noTasksColumn: "Keine Aufgaben",
+
+          task: "Aufgabe",
+          status: "Status",
+          priority: "Priorität",
+          deadline: "Deadline",
+          responsible: "Verantwortlich",
+          stillOpen: "Noch offen",
+
+          low: "Niedrig",
+          normal: "Normal",
+          high: "Hoch",
+          urgent: "Dringend",
+
+          openStatus: "Offen",
+          inProgress: "In Arbeit",
+          doneStatus: "Erledigt",
+
+          checklist: "Checkliste",
+          checklistQuestion:
+            "Was muss noch gemacht werden?",
+          addChecklist:
+            "Neuen Punkt hinzufügen...",
+
+          edit: "Bearbeiten",
+          delete: "Löschen",
+
+          reopen: "Wieder öffnen",
+          markCompleted:
+            "Als erledigt markieren",
+
+          close: "Schließen",
+
+          editTask: "Aufgabe bearbeiten",
+
+          taskLabel: "Aufgabe",
+          description: "Beschreibung",
+
+          saveChanges: "Änderungen speichern",
+          saving: "Wird gespeichert...",
+
+          newTask: "Neue Aufgabe",
+          createTask: "Aufgabe erstellen",
+          creating: "Wird erstellt...",
+
+          titlePlaceholder:
+            "z. B. Weihnachtsdeko besorgen",
+          descriptionPlaceholder:
+            "Was genau soll gemacht werden?",
+
+          deleteTaskTitle:
+            "Aufgabe löschen?",
+          deleteTaskQuestion:
+            "Möchtest du",
+          taskRemoved:
+            "Die Aufgabe wird dauerhaft entfernt.",
+          checklistRemoved:
+            "Die zugehörige Checkliste wird ebenfalls entfernt.",
+
+          cancel: "Abbrechen",
+          deleting: "Wird gelöscht...",
+
+          deleteProjectTitle:
+            "Arbeit löschen?",
+          deleteProjectQuestion:
+            "Möchtest du",
+          deleteProjectWarning:
+            "Diese Aktion kann nicht rückgängig gemacht werden.",
+          deleteProjectDescription:
+            "Alle Aufgaben und Checklisten dieser Arbeit werden ebenfalls gelöscht.",
+          deleteForever:
+            "Endgültig löschen",
+
+          noDate: "Kein Termin",
+          noPeriod: "Kein Zeitraum",
+
+          adminRoleError:
+            "Fehler beim Prüfen der Admin-Rolle:",
+
+          taskCreateError:
+            "Die Aufgabe konnte nicht erstellt werden.",
+          taskUpdateError:
+            "Die Aufgabe konnte nicht gespeichert werden.",
+          taskDeleteError:
+            "Die Aufgabe konnte nicht gelöscht werden.",
+          projectDeleteError:
+            "Die Arbeit konnte nicht gelöscht werden.",
+          checklistError:
+            "Die Checkliste konnte nicht geändert werden.",
+        };
+
   const params = useParams<{
     id: string;
   }>();
@@ -394,7 +644,7 @@ export default function WorkProjectPage() {
 
       if (profileError) {
         console.error(
-          "Fehler beim Prüfen der Admin-Rolle:",
+          text.adminRoleError,
           profileError
         );
 
@@ -537,7 +787,10 @@ export default function WorkProjectPage() {
         .eq("id", project.id);
 
     if (error) {
-      console.error(error);
+      console.error(
+        text.projectDeleteError,
+        error
+      );
       setDeleting(false);
       return;
     }
@@ -609,6 +862,48 @@ export default function WorkProjectPage() {
           member.id === id
       ) ?? null
     );
+  }
+
+  function getStatusLabel(
+    status: WorkItem["status"]
+  ) {
+    if (status === "open")
+      return text.openStatus;
+
+    if (status === "in_progress")
+      return text.inProgress;
+
+    return text.doneStatus;
+  }
+
+  function getProjectStatusLabel(
+    status: Project["status"]
+  ) {
+    if (status === "planned")
+      return text.planned;
+
+    if (status === "active")
+      return text.active;
+
+    if (status === "completed")
+      return text.completed;
+
+    return text.archived;
+  }
+
+  function getPriorityLabel(
+    priority: WorkItem["priority"]
+  ) {
+    if (priority === "low")
+      return text.low;
+
+    if (priority === "normal")
+      return text.normal;
+
+    if (priority === "high")
+      return text.high;
+
+    return text.urgent;
   }
 
   async function changeStatus(
@@ -710,7 +1005,10 @@ export default function WorkProjectPage() {
       .single();
 
     if (error) {
-      console.error(error);
+      console.error(
+        text.taskUpdateError,
+        error
+      );
       setSaving(false);
       return;
     }
@@ -764,7 +1062,10 @@ export default function WorkProjectPage() {
         .eq("id", taskId);
 
     if (error) {
-      console.error(error);
+      console.error(
+        text.taskDeleteError,
+        error
+      );
       setDeletingTask(false);
       return;
     }
@@ -802,7 +1103,10 @@ export default function WorkProjectPage() {
         .eq("id", item.id);
 
     if (error) {
-      console.error(error);
+      console.error(
+        text.checklistError,
+        error
+      );
       return;
     }
 
@@ -851,7 +1155,10 @@ export default function WorkProjectPage() {
       .single();
 
     if (error) {
-      console.error(error);
+      console.error(
+        text.checklistError,
+        error
+      );
       return;
     }
 
@@ -909,7 +1216,10 @@ export default function WorkProjectPage() {
       .single();
 
     if (error) {
-      console.error(error);
+      console.error(
+        text.taskCreateError,
+        error
+      );
       setSaving(false);
       return;
     }
@@ -985,17 +1295,18 @@ export default function WorkProjectPage() {
                 router.push("/work")
               }
               className="flex h-11 w-11 items-center justify-center rounded-full border border-[#dedfe1] bg-white text-[#303841] active:scale-95"
+              aria-label={text.close}
             >
               <ArrowLeft size={19} />
             </button>
 
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-[#969da5]">
-                Team Work
+                {text.teamWork}
               </p>
 
               <h1 className="text-[22px] font-bold text-[#111820]">
-                Arbeit
+                {text.work}
               </h1>
             </div>
           </header>
@@ -1006,7 +1317,7 @@ export default function WorkProjectPage() {
             </div>
 
             <p className="mt-3 text-sm font-bold text-[#3c454f]">
-              Arbeit nicht gefunden
+              {text.notFound}
             </p>
 
             <button
@@ -1016,7 +1327,7 @@ export default function WorkProjectPage() {
               }
               className="mt-5 rounded-[18px] bg-[#111820] px-5 py-3 text-sm font-bold text-white"
             >
-              Zu allen Arbeiten
+              {text.allWorks}
             </button>
           </section>
         </div>
@@ -1035,17 +1346,18 @@ export default function WorkProjectPage() {
                 router.push("/work")
               }
               className="flex h-11 w-11 items-center justify-center rounded-full border border-[#dedfe1] bg-white text-[#303841] active:scale-95"
+              aria-label={text.allWorks}
             >
               <ArrowLeft size={19} />
             </button>
 
             <div className="min-w-0 flex-1 px-2">
               <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-[#969da5]">
-                Team Work
+                {text.teamWork}
               </p>
 
               <h1 className="truncate text-[19px] font-bold text-[#111820]">
-                Arbeit
+                {text.work}
               </h1>
             </div>
 
@@ -1055,7 +1367,7 @@ export default function WorkProjectPage() {
                 setNewTaskOpen(true)
               }
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#111820] text-white shadow-[0_5px_18px_rgba(17,24,32,0.18)] active:scale-95"
-              aria-label="Aufgabe hinzufügen"
+              aria-label={text.addTask}
             >
               <Plus size={21} />
             </button>
@@ -1070,9 +1382,9 @@ export default function WorkProjectPage() {
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold text-white/80">
                   {
-                    projectStatusConfig[
+                    getProjectStatusLabel(
                       project.status
-                    ].label
+                    )
                   }
                 </span>
 
@@ -1093,7 +1405,9 @@ export default function WorkProjectPage() {
                       setDeleteOpen(true)
                     }
                     className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500/15 text-red-300 active:scale-95"
-                    aria-label="Arbeit löschen"
+                    aria-label={
+                      text.deleteWork
+                    }
                   >
                     <Trash2 size={17} />
                   </button>
@@ -1113,29 +1427,36 @@ export default function WorkProjectPage() {
 
             <div className="mt-6 flex items-center gap-2 text-sm font-semibold text-white/85">
               <CalendarDays size={17} />
-              {formatProjectPeriod(project)}
+              {formatProjectPeriod(
+                project,
+                language,
+                {
+                  noPeriod: text.noPeriod,
+                  noDate: text.noDate,
+                }
+              )}
             </div>
           </section>
 
           <section className="mt-4 grid grid-cols-4 gap-2">
             {[
               {
-                label: "Gesamt",
+                label: text.total,
                 value: stats.total,
                 color: "text-[#111820]",
               },
               {
-                label: "Offen",
+                label: text.open,
                 value: stats.open,
                 color: "text-[#111820]",
               },
               {
-                label: "Aktiv",
+                label: text.progress,
                 value: stats.progress,
                 color: "text-[#d97706]",
               },
               {
-                label: "Fertig",
+                label: text.finished,
                 value: stats.completed,
                 color: "text-[#16a34a]",
               },
@@ -1169,7 +1490,7 @@ export default function WorkProjectPage() {
                   : "text-[#737c86]"
               }`}
             >
-              Übersicht
+              {text.overview}
             </button>
 
             <button
@@ -1183,7 +1504,7 @@ export default function WorkProjectPage() {
                   : "text-[#737c86]"
               }`}
             >
-              Board
+              {text.board}
             </button>
           </div>
 
@@ -1192,11 +1513,11 @@ export default function WorkProjectPage() {
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#9ba1a8]">
-                    Nächste Schritte
+                    {text.nextSteps}
                   </p>
 
                   <h3 className="mt-1 text-lg font-bold text-[#111820]">
-                    Aufgaben
+                    {text.tasks}
                   </h3>
                 </div>
 
@@ -1269,9 +1590,9 @@ export default function WorkProjectPage() {
                                 "● "}
 
                               {
-                                priorityConfig[
+                                getPriorityLabel(
                                   item.priority
-                                ].label
+                                )
                               }
                             </span>
 
@@ -1285,7 +1606,9 @@ export default function WorkProjectPage() {
                               >
                                 <Clock3 size={12} />
                                 {formatDate(
-                                  item.deadline
+                                  item.deadline,
+                                  language,
+                                  text.noDate
                                 )}
                               </span>
                             )}
@@ -1344,7 +1667,7 @@ export default function WorkProjectPage() {
                   />
 
                   <p className="mt-3 text-sm font-bold text-[#3c454f]">
-                    Noch keine Aufgaben
+                    {text.noTasks}
                   </p>
                 </div>
               )}
@@ -1357,7 +1680,7 @@ export default function WorkProjectPage() {
                 className="mt-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-[22px] border border-dashed border-[#cfd2d5] bg-white text-sm font-bold text-[#59636f]"
               >
                 <Plus size={18} />
-                Aufgabe hinzufügen
+                {text.addTaskButton}
               </button>
             </section>
           )}
@@ -1366,11 +1689,11 @@ export default function WorkProjectPage() {
             <section className="mt-6">
               <div className="mb-3">
                 <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#9ba1a8]">
-                  Arbeitsstand
+                  {text.workStatus}
                 </p>
 
                 <h3 className="mt-1 text-lg font-bold">
-                  Board
+                  {text.board}
                 </h3>
               </div>
 
@@ -1379,19 +1702,22 @@ export default function WorkProjectPage() {
                   {[
                     {
                       key: "open" as const,
-                      title: "Offen",
+                      title:
+                        text.openStatus,
                       items:
                         openItems,
                     },
                     {
                       key: "in_progress" as const,
-                      title: "In Arbeit",
+                      title:
+                        text.inProgress,
                       items:
                         progressItems,
                     },
                     {
                       key: "completed" as const,
-                      title: "Erledigt",
+                      title:
+                        text.doneStatus,
                       items:
                         completedItems,
                     },
@@ -1450,9 +1776,9 @@ export default function WorkProjectPage() {
                                     className={`text-[10px] font-bold ${priorityConfig[item.priority].className}`}
                                   >
                                     {
-                                      priorityConfig[
+                                      getPriorityLabel(
                                         item.priority
-                                      ].label
+                                      )
                                     }
                                   </span>
 
@@ -1474,7 +1800,9 @@ export default function WorkProjectPage() {
                                   <div className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-[#858d95]">
                                     <Clock3 size={11} />
                                     {formatDate(
-                                      item.deadline
+                                      item.deadline,
+                                      language,
+                                      text.noDate
                                     )}
                                   </div>
                                 )}
@@ -1486,7 +1814,9 @@ export default function WorkProjectPage() {
                             .length ===
                             0 && (
                             <div className="rounded-[20px] border border-dashed border-[#cdd0d3] px-4 py-7 text-center text-xs font-semibold text-[#9299a1]">
-                              Keine Aufgaben
+                              {
+                                text.noTasksColumn
+                              }
                             </div>
                           )}
                         </div>
@@ -1505,7 +1835,7 @@ export default function WorkProjectPage() {
         <div className="fixed inset-0 z-50">
           <button
             type="button"
-            aria-label="Schließen"
+            aria-label={text.close}
             onClick={() =>
               setSelectedItem(null)
             }
@@ -1521,7 +1851,7 @@ export default function WorkProjectPage() {
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9299a1]">
-                    Aufgabe
+                    {text.task}
                   </p>
 
                   <h2 className="text-[22px] font-bold leading-tight text-[#111820]">
@@ -1537,6 +1867,7 @@ export default function WorkProjectPage() {
                     )
                   }
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#dedfe1] bg-white text-[#555f69]"
+                  aria-label={text.close}
                 >
                   <X size={18} />
                 </button>
@@ -1553,7 +1884,7 @@ export default function WorkProjectPage() {
               <div className="mt-5 grid grid-cols-2 gap-2">
                 <div className="rounded-[18px] border border-[#e0e1e3] bg-white p-3">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-[#9ba1a8]">
-                    Status
+                    {text.status}
                   </p>
 
                   <select
@@ -1570,29 +1901,31 @@ export default function WorkProjectPage() {
                     className="mt-1 w-full bg-transparent text-sm font-bold outline-none"
                   >
                     <option value="open">
-                      Offen
+                      {text.openStatus}
                     </option>
+
                     <option value="in_progress">
-                      In Arbeit
+                      {text.inProgress}
                     </option>
+
                     <option value="completed">
-                      Erledigt
+                      {text.doneStatus}
                     </option>
                   </select>
                 </div>
 
                 <div className="rounded-[18px] border border-[#e0e1e3] bg-white p-3">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-[#9ba1a8]">
-                    Priorität
+                    {text.priority}
                   </p>
 
                   <p
                     className={`mt-1 text-sm font-bold ${priorityConfig[selectedItem.priority].className}`}
                   >
                     {
-                      priorityConfig[
+                      getPriorityLabel(
                         selectedItem.priority
-                      ].label
+                      )
                     }
                   </p>
                 </div>
@@ -1601,20 +1934,23 @@ export default function WorkProjectPage() {
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <div className="rounded-[18px] border border-[#e0e1e3] bg-white p-3">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-[#9ba1a8]">
-                    Termin
+                    {text.deadline}
                   </p>
 
                   <p className="mt-1 flex items-center gap-1.5 text-sm font-bold">
                     <CalendarDays size={14} />
+
                     {formatFullDate(
-                      selectedItem.deadline
+                      selectedItem.deadline,
+                      language,
+                      text.noDate
                     )}
                   </p>
                 </div>
 
                 <div className="rounded-[18px] border border-[#e0e1e3] bg-white p-3">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-[#9ba1a8]">
-                    Verantwortlich
+                    {text.responsible}
                   </p>
 
                   <p className="mt-1 flex items-center gap-1.5 text-sm font-bold">
@@ -1626,7 +1962,7 @@ export default function WorkProjectPage() {
                       ? getMember(
                           selectedItem.assigned_to
                         )!.first_name
-                      : "Noch offen"}
+                      : text.stillOpen}
                   </p>
                 </div>
               </div>
@@ -1635,11 +1971,13 @@ export default function WorkProjectPage() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9299a1]">
-                      Checkliste
+                      {text.checklist}
                     </p>
 
                     <h3 className="mt-1 text-base font-bold">
-                      Was muss noch gemacht werden?
+                      {
+                        text.checklistQuestion
+                      }
                     </h3>
                   </div>
 
@@ -1706,7 +2044,9 @@ export default function WorkProjectPage() {
                         addChecklistItem();
                       }
                     }}
-                    placeholder="Neuen Punkt hinzufügen..."
+                    placeholder={
+                      text.addChecklist
+                    }
                     className="min-w-0 flex-1 rounded-[18px] border border-[#dedfe1] bg-white px-4 py-3 text-sm outline-none focus:border-[#111820]"
                   />
 
@@ -1716,6 +2056,9 @@ export default function WorkProjectPage() {
                       addChecklistItem
                     }
                     className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#111820] text-white"
+                    aria-label={
+                      text.addChecklist
+                    }
                   >
                     <Plus size={18} />
                   </button>
@@ -1733,7 +2076,7 @@ export default function WorkProjectPage() {
                   className="flex h-13 items-center justify-center gap-2 rounded-[20px] border border-[#dedfe1] bg-white text-sm font-bold text-[#3d4650]"
                 >
                   <Pencil size={16} />
-                  Bearbeiten
+                  {text.edit}
                 </button>
 
                 <button
@@ -1744,7 +2087,7 @@ export default function WorkProjectPage() {
                   className="flex h-13 items-center justify-center gap-2 rounded-[20px] bg-red-50 text-sm font-bold text-red-600"
                 >
                   <Trash2 size={16} />
-                  Löschen
+                  {text.delete}
                 </button>
               </div>
 
@@ -1765,12 +2108,14 @@ export default function WorkProjectPage() {
                 "completed" ? (
                   <>
                     <Circle size={17} />
-                    Wieder öffnen
+                    {text.reopen}
                   </>
                 ) : (
                   <>
                     <Check size={17} />
-                    Als erledigt markieren
+                    {
+                      text.markCompleted
+                    }
                   </>
                 )}
               </button>
@@ -1784,7 +2129,7 @@ export default function WorkProjectPage() {
         <div className="fixed inset-0 z-[70]">
           <button
             type="button"
-            aria-label="Schließen"
+            aria-label={text.close}
             onClick={() => {
               if (!saving)
                 setEditTaskOpen(
@@ -1801,11 +2146,11 @@ export default function WorkProjectPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9299a1]">
-                    Aufgabe bearbeiten
+                    {text.editTask}
                   </p>
 
                   <h2 className="mt-1 text-[22px] font-bold">
-                    Aufgabe
+                    {text.task}
                   </h2>
                 </div>
 
@@ -1817,6 +2162,7 @@ export default function WorkProjectPage() {
                     )
                   }
                   className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#555f69]"
+                  aria-label={text.close}
                 >
                   <X size={18} />
                 </button>
@@ -1825,7 +2171,7 @@ export default function WorkProjectPage() {
               <div className="mt-6 space-y-4">
                 <div>
                   <label className="mb-2 block text-xs font-bold text-[#59636f]">
-                    Aufgabe
+                    {text.taskLabel}
                   </label>
 
                   <input
@@ -1841,7 +2187,7 @@ export default function WorkProjectPage() {
 
                 <div>
                   <label className="mb-2 block text-xs font-bold text-[#59636f]">
-                    Beschreibung
+                    {text.description}
                   </label>
 
                   <textarea
@@ -1859,7 +2205,7 @@ export default function WorkProjectPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-2 block text-xs font-bold text-[#59636f]">
-                      Status
+                      {text.status}
                     </label>
 
                     <select
@@ -1872,20 +2218,22 @@ export default function WorkProjectPage() {
                       className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none"
                     >
                       <option value="open">
-                        Offen
+                        {text.openStatus}
                       </option>
+
                       <option value="in_progress">
-                        In Arbeit
+                        {text.inProgress}
                       </option>
+
                       <option value="completed">
-                        Erledigt
+                        {text.doneStatus}
                       </option>
                     </select>
                   </div>
 
                   <div>
                     <label className="mb-2 block text-xs font-bold text-[#59636f]">
-                      Priorität
+                      {text.priority}
                     </label>
 
                     <select
@@ -1898,16 +2246,19 @@ export default function WorkProjectPage() {
                       className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none"
                     >
                       <option value="low">
-                        Niedrig
+                        {text.low}
                       </option>
+
                       <option value="normal">
-                        Normal
+                        {text.normal}
                       </option>
+
                       <option value="high">
-                        Hoch
+                        {text.high}
                       </option>
+
                       <option value="urgent">
-                        Dringend
+                        {text.urgent}
                       </option>
                     </select>
                   </div>
@@ -1915,7 +2266,7 @@ export default function WorkProjectPage() {
 
                 <div>
                   <label className="mb-2 block text-xs font-bold text-[#59636f]">
-                    Deadline
+                    {text.deadline}
                   </label>
 
                   <input
@@ -1932,7 +2283,7 @@ export default function WorkProjectPage() {
 
                 <div>
                   <label className="mb-2 block text-xs font-bold text-[#59636f]">
-                    Verantwortlich
+                    {text.responsible}
                   </label>
 
                   <select
@@ -1945,7 +2296,7 @@ export default function WorkProjectPage() {
                     className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none"
                   >
                     <option value="">
-                      Noch offen
+                      {text.stillOpen}
                     </option>
 
                     {team.map(
@@ -1980,8 +2331,8 @@ export default function WorkProjectPage() {
                   <Pencil size={17} />
 
                   {saving
-                    ? "Wird gespeichert..."
-                    : "Änderungen speichern"}
+                    ? text.saving
+                    : text.saveChanges}
                 </button>
               </div>
             </div>
@@ -1994,7 +2345,7 @@ export default function WorkProjectPage() {
         <div className="fixed inset-0 z-50">
           <button
             type="button"
-            aria-label="Schließen"
+            aria-label={text.close}
             onClick={() => {
               if (!saving)
                 setNewTaskOpen(
@@ -2011,11 +2362,11 @@ export default function WorkProjectPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9299a1]">
-                    Team Work
+                    {text.teamWork}
                   </p>
 
                   <h2 className="mt-1 text-[22px] font-bold">
-                    Neue Aufgabe
+                    {text.newTask}
                   </h2>
                 </div>
 
@@ -2027,6 +2378,7 @@ export default function WorkProjectPage() {
                     )
                   }
                   className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#555f69]"
+                  aria-label={text.close}
                 >
                   <X size={18} />
                 </button>
@@ -2035,7 +2387,7 @@ export default function WorkProjectPage() {
               <div className="mt-6 space-y-4">
                 <div>
                   <label className="mb-2 block text-xs font-bold text-[#59636f]">
-                    Aufgabe
+                    {text.taskLabel}
                   </label>
 
                   <input
@@ -2045,7 +2397,9 @@ export default function WorkProjectPage() {
                         event.target.value
                       )
                     }
-                    placeholder="z. B. Weihnachtsdeko besorgen"
+                    placeholder={
+                      text.titlePlaceholder
+                    }
                     autoFocus
                     className="h-13 w-full rounded-[18px] border border-[#dedfe1] bg-white px-4 text-sm outline-none focus:border-[#111820]"
                   />
@@ -2053,7 +2407,7 @@ export default function WorkProjectPage() {
 
                 <div>
                   <label className="mb-2 block text-xs font-bold text-[#59636f]">
-                    Beschreibung
+                    {text.description}
                   </label>
 
                   <textarea
@@ -2065,7 +2419,9 @@ export default function WorkProjectPage() {
                         event.target.value
                       )
                     }
-                    placeholder="Was genau soll gemacht werden?"
+                    placeholder={
+                      text.descriptionPlaceholder
+                    }
                     rows={4}
                     className="w-full resize-none rounded-[18px] border border-[#dedfe1] bg-white px-4 py-3 text-sm outline-none focus:border-[#111820]"
                   />
@@ -2074,7 +2430,7 @@ export default function WorkProjectPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-2 block text-xs font-bold text-[#59636f]">
-                      Deadline
+                      {text.deadline}
                     </label>
 
                     <input
@@ -2094,7 +2450,7 @@ export default function WorkProjectPage() {
 
                   <div>
                     <label className="mb-2 block text-xs font-bold text-[#59636f]">
-                      Priorität
+                      {text.priority}
                     </label>
 
                     <select
@@ -2110,16 +2466,19 @@ export default function WorkProjectPage() {
                       className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none"
                     >
                       <option value="low">
-                        Niedrig
+                        {text.low}
                       </option>
+
                       <option value="normal">
-                        Normal
+                        {text.normal}
                       </option>
+
                       <option value="high">
-                        Hoch
+                        {text.high}
                       </option>
+
                       <option value="urgent">
-                        Dringend
+                        {text.urgent}
                       </option>
                     </select>
                   </div>
@@ -2127,7 +2486,7 @@ export default function WorkProjectPage() {
 
                 <div>
                   <label className="mb-2 block text-xs font-bold text-[#59636f]">
-                    Verantwortlich
+                    {text.responsible}
                   </label>
 
                   <select
@@ -2143,7 +2502,7 @@ export default function WorkProjectPage() {
                     className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none"
                   >
                     <option value="">
-                      Noch offen
+                      {text.stillOpen}
                     </option>
 
                     {team.map(
@@ -2182,8 +2541,8 @@ export default function WorkProjectPage() {
                   <Plus size={18} />
 
                   {saving
-                    ? "Wird erstellt..."
-                    : "Aufgabe erstellen"}
+                    ? text.creating
+                    : text.createTask}
                 </button>
               </div>
             </div>
@@ -2197,7 +2556,7 @@ export default function WorkProjectPage() {
           <div className="fixed inset-0 z-[100]">
             <button
               type="button"
-              aria-label="Schließen"
+              aria-label={text.close}
               disabled={
                 deletingTask
               }
@@ -2232,17 +2591,20 @@ export default function WorkProjectPage() {
                       )
                     }
                     className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f3] text-[#69727b]"
+                    aria-label={
+                      text.close
+                    }
                   >
                     <X size={18} />
                   </button>
                 </div>
 
                 <h2 className="mt-5 text-[23px] font-bold">
-                  Aufgabe löschen?
+                  {text.deleteTaskTitle}
                 </h2>
 
                 <p className="mt-2 text-[15px] leading-6 text-[#68727c]">
-                  Möchtest du{" "}
+                  {text.deleteTaskQuestion}{" "}
                   <span className="font-bold text-[#303841]">
                     „
                     {
@@ -2255,14 +2617,13 @@ export default function WorkProjectPage() {
 
                 <div className="mt-5 rounded-[20px] border border-red-100 bg-red-50 px-4 py-4">
                   <p className="text-[13px] font-bold text-red-700">
-                    Die Aufgabe wird
-                    dauerhaft entfernt.
+                    {text.taskRemoved}
                   </p>
 
                   <p className="mt-1 text-[12px] leading-5 text-red-600/85">
-                    Die zugehörige
-                    Checkliste wird
-                    ebenfalls entfernt.
+                    {
+                      text.checklistRemoved
+                    }
                   </p>
                 </div>
 
@@ -2279,7 +2640,7 @@ export default function WorkProjectPage() {
                     }
                     className="h-13 rounded-[19px] border border-[#dedfe1] bg-white text-sm font-bold text-[#59636f]"
                   >
-                    Abbrechen
+                    {text.cancel}
                   </button>
 
                   <button
@@ -2295,8 +2656,8 @@ export default function WorkProjectPage() {
                     <Trash2 size={16} />
 
                     {deletingTask
-                      ? "Wird gelöscht..."
-                      : "Löschen"}
+                      ? text.deleting
+                      : text.delete}
                   </button>
                 </div>
               </div>
@@ -2309,7 +2670,7 @@ export default function WorkProjectPage() {
         <div className="fixed inset-0 z-[110]">
           <button
             type="button"
-            aria-label="Schließen"
+            aria-label={text.close}
             disabled={deleting}
             onClick={() => {
               if (!deleting)
@@ -2338,17 +2699,20 @@ export default function WorkProjectPage() {
                     )
                   }
                   className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f3] text-[#69727b]"
+                  aria-label={
+                    text.close
+                  }
                 >
                   <X size={18} />
                 </button>
               </div>
 
               <h2 className="mt-5 text-[23px] font-bold">
-                Arbeit löschen?
+                {text.deleteProjectTitle}
               </h2>
 
               <p className="mt-2 text-[15px] leading-6 text-[#68727c]">
-                Möchtest du{" "}
+                {text.deleteProjectQuestion}{" "}
                 <span className="font-bold text-[#303841]">
                   „{project.title}“
                 </span>{" "}
@@ -2357,16 +2721,15 @@ export default function WorkProjectPage() {
 
               <div className="mt-5 rounded-[20px] border border-red-100 bg-red-50 px-4 py-4">
                 <p className="text-[13px] font-bold text-red-700">
-                  Diese Aktion kann nicht
-                  rückgängig gemacht
-                  werden.
+                  {
+                    text.deleteProjectWarning
+                  }
                 </p>
 
                 <p className="mt-1 text-[12px] leading-5 text-red-600/85">
-                  Alle Aufgaben und
-                  Checklisten dieser
-                  Arbeit werden
-                  ebenfalls gelöscht.
+                  {
+                    text.deleteProjectDescription
+                  }
                 </p>
               </div>
 
@@ -2381,7 +2744,7 @@ export default function WorkProjectPage() {
                   }
                   className="h-13 rounded-[19px] border border-[#dedfe1] bg-white text-sm font-bold text-[#59636f]"
                 >
-                  Abbrechen
+                  {text.cancel}
                 </button>
 
                 <button
@@ -2395,8 +2758,8 @@ export default function WorkProjectPage() {
                   <Trash2 size={16} />
 
                   {deleting
-                    ? "Wird gelöscht..."
-                    : "Endgültig löschen"}
+                    ? text.deleting
+                    : text.deleteForever}
                 </button>
               </div>
             </div>

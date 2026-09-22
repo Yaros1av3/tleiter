@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   useEffect,
   useState,
@@ -7,6 +8,7 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+
 
 type AuthGuardProps = {
   children: ReactNode;
@@ -72,13 +74,16 @@ export default function AuthGuard({
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f7f7f6] px-6">
         <div className="flex flex-col items-center">
-          <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-[#111820]">
-            <span className="text-2xl font-bold text-white">
-              T
-            </span>
-
-            <span className="absolute bottom-2 right-2 h-2.5 w-2.5 rounded-full bg-yellow-400" />
-          </div>
+          <div className="relative h-16 w-16">
+  <Image
+  src="/tlite-logo.png"
+  alt="TLite"
+  fill
+  priority
+  sizes="64px"
+  className="object-contain"
+/>
+</div>
 
           <div className="mt-4 text-sm font-medium text-[#687585]">
             TLite

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
@@ -18,6 +17,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type Project = {
   id: number;
@@ -47,36 +47,43 @@ type ProjectWithStats = Project & {
 
 const projectStatusConfig = {
   planned: {
-    label: "Geplant",
     className: "bg-white/[0.07] text-slate-300",
   },
   active: {
-    label: "Aktiv",
     className: "bg-emerald-400/10 text-emerald-300",
   },
   completed: {
-    label: "Abgeschlossen",
     className: "bg-blue-400/10 text-blue-300",
   },
   archived: {
-    label: "Archiviert",
     className: "bg-white/[0.07] text-slate-400",
   },
 };
 
-function formatDate(date: string | null) {
+function formatDate(
+  date: string | null,
+  language: "de" | "ru"
+) {
   if (!date) return null;
 
-  return new Intl.DateTimeFormat("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(`${date}T12:00:00`));
+  return new Intl.DateTimeFormat(
+    language === "ru" ? "ru-RU" : "de-DE",
+    {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }
+  ).format(new Date(`${date}T12:00:00`));
 }
 
-function formatProjectPeriod(project: Project) {
+function formatProjectPeriod(
+  project: Project,
+  language: "de" | "ru"
+) {
   if (!project.start_date && !project.end_date) {
-    return "Kein Zeitraum festgelegt";
+    return language === "ru"
+      ? "Период не указан"
+      : "Kein Zeitraum festgelegt";
   }
 
   if (
@@ -84,52 +91,221 @@ function formatProjectPeriod(project: Project) {
     project.end_date &&
     project.start_date === project.end_date
   ) {
-    return formatDate(project.start_date);
+    return formatDate(project.start_date, language);
   }
 
   if (project.start_date && project.end_date) {
-    return `${formatDate(project.start_date)} – ${formatDate(
-      project.end_date
-    )}`;
+    return `${formatDate(
+      project.start_date,
+      language
+    )} – ${formatDate(project.end_date, language)}`;
   }
 
   if (project.start_date) {
-    return `Ab ${formatDate(project.start_date)}`;
+    return language === "ru"
+      ? `С ${formatDate(project.start_date, language)}`
+      : `Ab ${formatDate(project.start_date, language)}`;
   }
 
-  return `Bis ${formatDate(project.end_date)}`;
+  return language === "ru"
+    ? `До ${formatDate(project.end_date, language)}`
+    : `Bis ${formatDate(project.end_date, language)}`;
 }
 
 export default function WorkPage() {
   const router = useRouter();
+  const { language } = useLanguage();
 
-  const [projects, setProjects] = useState<ProjectWithStats[]>([]);
+  const isRu = language === "ru";
+
+  const text = {
+    teamWork: isRu ? "Рабочее пространство" : "Team Work",
+    title: isRu ? "Работа" : "Arbeit",
+    description: isRu
+      ? "Здесь собраны все общие работы, проекты и подготовки команды."
+      : "Hier seht ihr alle gemeinsamen Arbeiten, Projekte und Vorbereitungen des Teams.",
+
+    newWork: isRu ? "Новая работа" : "Neue Arbeit",
+
+    current: isRu ? "Сейчас" : "Aktuell",
+    ongoing: isRu ? "Текущие работы" : "Laufende Arbeiten",
+
+    overview: isRu ? "Обзор" : "Übersicht",
+    allWork: isRu ? "Все работы" : "Alle Arbeiten",
+
+    noOtherWork: isRu
+      ? "Других работ пока нет."
+      : "Keine weiteren Arbeiten vorhanden.",
+
+    noWorkTitle: isRu
+      ? "Пока нет работ"
+      : "Noch keine Arbeiten",
+
+    noWorkDescription: isRu
+      ? "Создайте первую общую работу, например для мероприятия, поездки или другого проекта."
+      : "Erstellt eure erste gemeinsame Arbeit, zum Beispiel für einen Event, eine Freizeit oder ein anderes Vorhaben.",
+
+    progress: isRu ? "Прогресс" : "Fortschritt",
+    tasks: isRu ? "Задачи" : "Aufgaben",
+
+    tasksCompleted: isRu
+      ? "выполнено"
+      : "erledigt",
+
+    open: isRu ? "Открыто" : "Offen",
+    active: isRu ? "В работе" : "Aktiv",
+    finished: isRu ? "Готово" : "Fertig",
+
+    close: isRu ? "Закрыть" : "Schließen",
+
+    editWork: isRu
+      ? "Редактировать работу"
+      : "Arbeit bearbeiten",
+
+    editWorkShort: isRu
+      ? "Редактирование работы"
+      : "Arbeit bearbeiten",
+
+    deleteWork: isRu
+      ? "Удалить работу"
+      : "Arbeit löschen",
+
+    deleteWorkQuestion: isRu
+      ? "Удалить работу?"
+      : "Arbeit löschen?",
+
+    deleteQuestion: isRu
+      ? "Вы действительно хотите удалить"
+      : "Möchtest du",
+
+    deleteQuestionAfter: isRu
+      ? "?"
+      : "wirklich löschen?",
+
+    deleteWarning: isRu
+      ? "Это действие нельзя отменить."
+      : "Diese Aktion kann nicht rückgängig gemacht werden.",
+
+    deleteDescription: isRu
+      ? "Все задачи, чек-листы и связанные данные этой работы также будут удалены."
+      : "Alle Aufgaben, Checklisten und zugehörigen Daten dieser Arbeit werden ebenfalls gelöscht.",
+
+    cancel: isRu ? "Отмена" : "Abbrechen",
+
+    deleteForever: isRu
+      ? "Удалить окончательно"
+      : "Endgültig löschen",
+
+    deleting: isRu ? "Удаление..." : "Wird gelöscht...",
+
+    createTitle: isRu ? "Новая работа" : "Neue Arbeit",
+
+    titleLabel: isRu ? "Название" : "Titel",
+
+    titlePlaceholder: isRu
+      ? "например, Рождественский вечер 2026"
+      : "z. B. Weihnachtsabend 2026",
+
+    descriptionLabel: isRu
+      ? "Описание"
+      : "Beschreibung",
+
+    descriptionPlaceholder: isRu
+      ? "О чём эта работа?"
+      : "Worum geht es bei dieser Arbeit?",
+
+    start: isRu ? "Начало" : "Start",
+    end: isRu ? "Окончание" : "Ende",
+
+    statusLabel: isRu ? "Статус" : "Status",
+
+    planned: isRu ? "Запланировано" : "Geplant",
+    completed: isRu ? "Завершено" : "Abgeschlossen",
+    archived: isRu ? "В архиве" : "Archiviert",
+
+    createWork: isRu
+      ? "Создать работу"
+      : "Arbeit erstellen",
+
+    creating: isRu
+      ? "Создание..."
+      : "Wird erstellt...",
+
+    saveChanges: isRu
+      ? "Сохранить изменения"
+      : "Änderungen speichern",
+
+    saving: isRu
+      ? "Сохранение..."
+      : "Wird gespeichert...",
+
+    errorEndBeforeStart: isRu
+      ? "Дата окончания не может быть раньше даты начала."
+      : "Das Enddatum darf nicht vor dem Startdatum liegen.",
+
+    errorNoUser: isRu
+      ? "Не найден авторизованный пользователь."
+      : "Kein eingeloggter Benutzer gefunden.",
+
+    errorCreate: isRu
+      ? "Не удалось создать работу."
+      : "Die Arbeit konnte nicht erstellt werden.",
+
+    errorSave: isRu
+      ? "Не удалось сохранить работу."
+      : "Die Arbeit konnte nicht gespeichert werden.",
+
+    loadingProjects: isRu
+      ? "Загрузка..."
+      : "Wird geladen...",
+  };
+
+  const statusLabels = {
+    planned: text.planned,
+    active: text.active,
+    completed: text.completed,
+    archived: text.archived,
+  };
+
+  const [projects, setProjects] = useState<ProjectWithStats[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
 
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const [newProjectOpen, setNewProjectOpen] = useState(false);
-  const [editProjectOpen, setEditProjectOpen] = useState(false);
-  const [deleteProjectOpen, setDeleteProjectOpen] = useState(false);
+  const [newProjectOpen, setNewProjectOpen] =
+    useState(false);
+  const [editProjectOpen, setEditProjectOpen] =
+    useState(false);
+  const [deleteProjectOpen, setDeleteProjectOpen] =
+    useState(false);
 
   const [selectedProject, setSelectedProject] =
     useState<ProjectWithStats | null>(null);
 
   const [newTitle, setNewTitle] = useState("");
-  const [newDescription, setNewDescription] = useState("");
-  const [newStartDate, setNewStartDate] = useState("");
-  const [newEndDate, setNewEndDate] = useState("");
+  const [newDescription, setNewDescription] =
+    useState("");
+  const [newStartDate, setNewStartDate] =
+    useState("");
+  const [newEndDate, setNewEndDate] =
+    useState("");
 
   const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] = useState("");
+  const [editDescription, setEditDescription] =
+    useState("");
   const [editStatus, setEditStatus] =
     useState<Project["status"]>("active");
-  const [editStartDate, setEditStartDate] = useState("");
-  const [editEndDate, setEditEndDate] = useState("");
+  const [editStartDate, setEditStartDate] =
+    useState("");
+  const [editEndDate, setEditEndDate] =
+    useState("");
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errorMessage, setErrorMessage] =
+    useState("");
 
   useEffect(() => {
     const sheetOpen =
@@ -165,13 +341,16 @@ export default function WorkPage() {
     } = await supabase.auth.getUser();
 
     if (user) {
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
+      const { data: profileData } =
+        await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .maybeSingle();
 
-      setIsAdmin(profileData?.role === "admin");
+      setIsAdmin(
+        profileData?.role === "admin"
+      );
     } else {
       setIsAdmin(false);
     }
@@ -211,10 +390,9 @@ export default function WorkPage() {
       return;
     }
 
-    const projectIds =
-      loadedProjects.map(
-        (project) => project.id
-      );
+    const projectIds = loadedProjects.map(
+      (project) => project.id
+    );
 
     const {
       data: itemsData,
@@ -238,11 +416,10 @@ export default function WorkPage() {
 
     const projectsWithStats =
       loadedProjects.map((project) => {
-        const projectItems =
-          items.filter(
-            (item) =>
-              item.project_id === project.id
-          );
+        const projectItems = items.filter(
+          (item) =>
+            item.project_id === project.id
+        );
 
         return {
           ...project,
@@ -299,7 +476,7 @@ export default function WorkPage() {
       newEndDate < newStartDate
     ) {
       setErrorMessage(
-        "Das Enddatum darf nicht vor dem Startdatum liegen."
+        text.errorEndBeforeStart
       );
       return;
     }
@@ -312,9 +489,7 @@ export default function WorkPage() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      setErrorMessage(
-        "Kein eingeloggter Benutzer gefunden."
-      );
+      setErrorMessage(text.errorNoUser);
       setSaving(false);
       return;
     }
@@ -340,9 +515,7 @@ export default function WorkPage() {
 
     if (error) {
       console.error(error);
-      setErrorMessage(
-        "Die Arbeit konnte nicht erstellt werden."
-      );
+      setErrorMessage(text.errorCreate);
       setSaving(false);
       return;
     }
@@ -396,7 +569,7 @@ export default function WorkPage() {
       editEndDate < editStartDate
     ) {
       setErrorMessage(
-        "Das Enddatum darf nicht vor dem Startdatum liegen."
+        text.errorEndBeforeStart
       );
       return;
     }
@@ -427,9 +600,7 @@ export default function WorkPage() {
 
     if (error) {
       console.error(error);
-      setErrorMessage(
-        "Die Arbeit konnte nicht gespeichert werden."
-      );
+      setErrorMessage(text.errorSave);
       setSaving(false);
       return;
     }
@@ -551,7 +722,9 @@ export default function WorkPage() {
                       }`}
                     />
 
-                    {status.label}
+                    {statusLabels[
+                      project.status
+                    ]}
                   </span>
 
                   {(project.start_date ||
@@ -561,7 +734,8 @@ export default function WorkPage() {
                         size={13}
                       />
                       {formatProjectPeriod(
-                        project
+                        project,
+                        language
                       )}
                     </span>
                   )}
@@ -579,13 +753,15 @@ export default function WorkPage() {
               <div className="mb-2 flex items-end justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-medium text-slate-400">
-                    Fortschritt
+                    {text.progress}
                   </p>
 
                   <p className="mt-0.5 text-[13px] font-medium text-slate-200">
-                    {project.completed} von{" "}
-                    {project.total} Aufgaben
-                    erledigt
+                    {project.completed}{" "}
+                    {isRu ? "из" : "von"}{" "}
+                    {project.total}{" "}
+                    {text.tasks.toLowerCase()}{" "}
+                    {text.tasksCompleted}
                   </p>
                 </div>
 
@@ -625,7 +801,7 @@ export default function WorkPage() {
                 </div>
 
                 <div className="mt-0.5 text-[10px] text-slate-500">
-                  Aufgaben
+                  {text.tasks}
                 </div>
               </div>
 
@@ -639,7 +815,7 @@ export default function WorkPage() {
                 </div>
 
                 <div className="mt-0.5 text-[10px] text-slate-500">
-                  Offen
+                  {text.open}
                 </div>
               </div>
 
@@ -653,7 +829,7 @@ export default function WorkPage() {
                 </div>
 
                 <div className="mt-0.5 text-[10px] text-slate-500">
-                  Aktiv
+                  {text.active}
                 </div>
               </div>
 
@@ -667,7 +843,7 @@ export default function WorkPage() {
                 </div>
 
                 <div className="mt-0.5 text-[10px] text-slate-500">
-                  Fertig
+                  {text.finished}
                 </div>
               </div>
             </div>
@@ -681,7 +857,7 @@ export default function WorkPage() {
               openEditProject(project)
             }
             className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.08] text-white/80 active:scale-95"
-            aria-label="Arbeit bearbeiten"
+            aria-label={text.editWork}
           >
             <Pencil size={15} />
           </button>
@@ -693,7 +869,7 @@ export default function WorkPage() {
                 openDeleteProject(project)
               }
               className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500/10 text-red-300 active:scale-95"
-              aria-label="Arbeit löschen"
+              aria-label={text.deleteWork}
             >
               <Trash2 size={15} />
             </button>
@@ -708,22 +884,13 @@ export default function WorkPage() {
       <div className="mx-auto min-h-screen w-full max-w-[720px] px-4 pb-28">
         <header className="flex items-center justify-between py-5">
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#111820] active:scale-95"
-              aria-label="Zurück"
-            >
-              <ArrowLeft size={20} />
-            </button>
-
             <div>
               <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-                Team Work
+                {text.teamWork}
               </p>
 
               <h1 className="mt-0.5 text-[24px] font-bold tracking-tight">
-                Arbeit
+                {text.title}
               </h1>
             </div>
           </div>
@@ -734,7 +901,7 @@ export default function WorkPage() {
               setNewProjectOpen(true)
             }
             className="flex h-10 w-10 items-center justify-center rounded-full bg-[#111820] text-white active:scale-95"
-            aria-label="Neue Arbeit"
+            aria-label={text.newWork}
           >
             <Plus size={21} />
           </button>
@@ -742,9 +909,7 @@ export default function WorkPage() {
 
         <section className="mb-5">
           <p className="max-w-[560px] text-[14px] leading-6 text-slate-500">
-            Hier seht ihr alle gemeinsamen
-            Arbeiten, Projekte und
-            Vorbereitungen des Teams.
+            {text.description}
           </p>
         </section>
 
@@ -777,14 +942,11 @@ export default function WorkPage() {
             </div>
 
             <h2 className="mt-5 text-[19px] font-semibold">
-              Noch keine Arbeiten
+              {text.noWorkTitle}
             </h2>
 
             <p className="mx-auto mt-2 max-w-[320px] text-[13px] leading-5 text-slate-500">
-              Erstellt eure erste gemeinsame
-              Arbeit, zum Beispiel für einen
-              Event, eine Freizeit oder ein
-              anderes Vorhaben.
+              {text.noWorkDescription}
             </p>
 
             <button
@@ -795,7 +957,7 @@ export default function WorkPage() {
               className="mt-6 inline-flex h-11 items-center gap-2 rounded-full bg-[#111820] px-5 text-[13px] font-semibold text-white active:scale-[0.98]"
             >
               <Plus size={17} />
-              Neue Arbeit
+              {text.newWork}
             </button>
           </section>
         ) : (
@@ -805,11 +967,11 @@ export default function WorkPage() {
                 <div className="mb-3 flex items-center justify-between px-1">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">
-                      Aktuell
+                      {text.current}
                     </p>
 
                     <h2 className="mt-1 text-[18px] font-semibold">
-                      Laufende Arbeiten
+                      {text.ongoing}
                     </h2>
                   </div>
 
@@ -839,11 +1001,11 @@ export default function WorkPage() {
             <section>
               <div className="mb-3 px-1">
                 <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">
-                  Übersicht
+                  {text.overview}
                 </p>
 
                 <h2 className="mt-1 text-[18px] font-semibold">
-                  Alle Arbeiten
+                  {text.allWork}
                 </h2>
               </div>
 
@@ -860,8 +1022,7 @@ export default function WorkPage() {
                 ) : activeProjects.length > 0 ? (
                   <div className="rounded-[24px] bg-white px-5 py-6 text-center">
                     <p className="text-[13px] text-slate-400">
-                      Keine weiteren Arbeiten
-                      vorhanden.
+                      {text.noOtherWork}
                     </p>
                   </div>
                 ) : null}
@@ -876,7 +1037,7 @@ export default function WorkPage() {
               className="flex w-full items-center justify-center gap-2 rounded-[22px] border border-dashed border-slate-300 bg-transparent py-4 text-[13px] font-semibold text-slate-500 active:scale-[0.99]"
             >
               <Plus size={17} />
-              Neue Arbeit
+              {text.newWork}
             </button>
           </div>
         )}
@@ -887,7 +1048,7 @@ export default function WorkPage() {
         <div className="fixed inset-0 z-50">
           <button
             type="button"
-            aria-label="Schließen"
+            aria-label={text.close}
             onClick={() => {
               if (!saving)
                 setNewProjectOpen(false);
@@ -902,11 +1063,11 @@ export default function WorkPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">
-                    Team Work
+                    {text.teamWork}
                   </p>
 
                   <h2 className="mt-1 text-[22px] font-bold">
-                    Neue Arbeit
+                    {text.createTitle}
                   </h2>
                 </div>
 
@@ -927,7 +1088,7 @@ export default function WorkPage() {
               <div className="mt-6 space-y-4">
                 <div>
                   <label className="mb-2 block text-[12px] font-semibold text-slate-600">
-                    Titel
+                    {text.titleLabel}
                   </label>
 
                   <input
@@ -937,7 +1098,9 @@ export default function WorkPage() {
                         event.target.value
                       )
                     }
-                    placeholder="z. B. Weihnachtsabend 2026"
+                    placeholder={
+                      text.titlePlaceholder
+                    }
                     autoFocus
                     className="h-12 w-full rounded-2xl bg-[#f7f7f5] px-4 text-[14px] outline-none focus:ring-2 focus:ring-[#111820]/10"
                   />
@@ -945,7 +1108,7 @@ export default function WorkPage() {
 
                 <div>
                   <label className="mb-2 block text-[12px] font-semibold text-slate-600">
-                    Beschreibung
+                    {text.descriptionLabel}
                   </label>
 
                   <textarea
@@ -955,7 +1118,9 @@ export default function WorkPage() {
                         event.target.value
                       )
                     }
-                    placeholder="Worum geht es bei dieser Arbeit?"
+                    placeholder={
+                      text.descriptionPlaceholder
+                    }
                     rows={4}
                     className="w-full resize-none rounded-2xl bg-[#f7f7f5] px-4 py-3 text-[14px] leading-5 outline-none focus:ring-2 focus:ring-[#111820]/10"
                   />
@@ -964,7 +1129,7 @@ export default function WorkPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-2 block text-[12px] font-semibold text-slate-600">
-                      Start
+                      {text.start}
                     </label>
 
                     <div className="relative">
@@ -988,7 +1153,7 @@ export default function WorkPage() {
 
                   <div>
                     <label className="mb-2 block text-[12px] font-semibold text-slate-600">
-                      Ende
+                      {text.end}
                     </label>
 
                     <div className="relative">
@@ -1027,9 +1192,10 @@ export default function WorkPage() {
                   className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#111820] text-[14px] font-semibold text-white disabled:opacity-40"
                 >
                   <Plus size={18} />
+
                   {saving
-                    ? "Wird erstellt..."
-                    : "Arbeit erstellen"}
+                    ? text.creating
+                    : text.createWork}
                 </button>
               </div>
             </div>
@@ -1043,7 +1209,7 @@ export default function WorkPage() {
           <div className="fixed inset-0 z-[60]">
             <button
               type="button"
-              aria-label="Schließen"
+              aria-label={text.close}
               onClick={() => {
                 if (!saving)
                   setEditProjectOpen(
@@ -1060,11 +1226,11 @@ export default function WorkPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">
-                      Arbeit bearbeiten
+                      {text.editWorkShort}
                     </p>
 
                     <h2 className="mt-1 text-[22px] font-bold">
-                      Arbeit
+                      {text.title}
                     </h2>
                   </div>
 
@@ -1085,7 +1251,7 @@ export default function WorkPage() {
                 <div className="mt-6 space-y-4">
                   <div>
                     <label className="mb-2 block text-[12px] font-semibold text-slate-600">
-                      Titel
+                      {text.titleLabel}
                     </label>
 
                     <input
@@ -1101,7 +1267,7 @@ export default function WorkPage() {
 
                   <div>
                     <label className="mb-2 block text-[12px] font-semibold text-slate-600">
-                      Beschreibung
+                      {text.descriptionLabel}
                     </label>
 
                     <textarea
@@ -1118,7 +1284,7 @@ export default function WorkPage() {
 
                   <div>
                     <label className="mb-2 block text-[12px] font-semibold text-slate-600">
-                      Status
+                      {text.statusLabel}
                     </label>
 
                     <select
@@ -1131,16 +1297,19 @@ export default function WorkPage() {
                       className="h-12 w-full rounded-2xl bg-[#f7f7f5] px-4 text-[14px] outline-none"
                     >
                       <option value="planned">
-                        Geplant
+                        {text.planned}
                       </option>
+
                       <option value="active">
-                        Aktiv
+                        {text.active}
                       </option>
+
                       <option value="completed">
-                        Abgeschlossen
+                        {text.completed}
                       </option>
+
                       <option value="archived">
-                        Archiviert
+                        {text.archived}
                       </option>
                     </select>
                   </div>
@@ -1148,7 +1317,7 @@ export default function WorkPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="mb-2 block text-[12px] font-semibold text-slate-600">
-                        Start
+                        {text.start}
                       </label>
 
                       <input
@@ -1165,7 +1334,7 @@ export default function WorkPage() {
 
                     <div>
                       <label className="mb-2 block text-[12px] font-semibold text-slate-600">
-                        Ende
+                        {text.end}
                       </label>
 
                       <input
@@ -1197,9 +1366,10 @@ export default function WorkPage() {
                     className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#111820] text-[14px] font-semibold text-white disabled:opacity-40"
                   >
                     <Pencil size={17} />
+
                     {saving
-                      ? "Wird gespeichert..."
-                      : "Änderungen speichern"}
+                      ? text.saving
+                      : text.saveChanges}
                   </button>
                 </div>
               </div>
@@ -1214,7 +1384,7 @@ export default function WorkPage() {
           <div className="fixed inset-0 z-[100]">
             <button
               type="button"
-              aria-label="Schließen"
+              aria-label={text.close}
               disabled={deleting}
               onClick={() => {
                 if (!deleting)
@@ -1249,29 +1419,36 @@ export default function WorkPage() {
                 </div>
 
                 <h2 className="mt-5 text-[23px] font-bold">
-                  Arbeit löschen?
+                  {text.deleteWorkQuestion}
                 </h2>
 
                 <p className="mt-2 text-[15px] leading-6 text-[#68727c]">
-                  Möchtest du{" "}
-                  <span className="font-bold text-[#303841]">
-                    „{selectedProject.title}“
-                  </span>{" "}
-                  wirklich löschen?
+                  {isRu ? (
+                    <>
+                      {text.deleteQuestion}{" "}
+                      <span className="font-bold text-[#303841]">
+                        „{selectedProject.title}“
+                      </span>
+                      {text.deleteQuestionAfter}
+                    </>
+                  ) : (
+                    <>
+                      {text.deleteQuestion}{" "}
+                      <span className="font-bold text-[#303841]">
+                        „{selectedProject.title}“
+                      </span>{" "}
+                      {text.deleteQuestionAfter}
+                    </>
+                  )}
                 </p>
 
                 <div className="mt-5 rounded-[20px] border border-red-100 bg-red-50 px-4 py-4">
                   <p className="text-[13px] font-bold text-red-700">
-                    Diese Aktion kann nicht
-                    rückgängig gemacht werden.
+                    {text.deleteWarning}
                   </p>
 
                   <p className="mt-1 text-[12px] leading-5 text-red-600/85">
-                    Alle Aufgaben,
-                    Checklisten und
-                    zugehörigen Daten dieser
-                    Arbeit werden ebenfalls
-                    gelöscht.
+                    {text.deleteDescription}
                   </p>
                 </div>
 
@@ -1286,7 +1463,7 @@ export default function WorkPage() {
                     }
                     className="h-13 rounded-[19px] border border-[#dedfe1] bg-white text-sm font-bold text-[#59636f]"
                   >
-                    Abbrechen
+                    {text.cancel}
                   </button>
 
                   <button
@@ -1298,8 +1475,8 @@ export default function WorkPage() {
                     <Trash2 size={16} />
 
                     {deleting
-                      ? "Wird gelöscht..."
-                      : "Endgültig löschen"}
+                      ? text.deleting
+                      : text.deleteForever}
                   </button>
                 </div>
               </div>

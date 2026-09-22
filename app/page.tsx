@@ -9,7 +9,6 @@ import {
   CalendarDays,
   CalendarRange,
   Clock3,
-  Lightbulb,
   Users,
   UserRound,
   X,
@@ -139,6 +138,7 @@ function getBirthdayCelebrationCandidate(
   const previousSunday = getPreviousSunday(today);
   const nextSunday = getNextSunday(today);
   const isSunday = today.getDay() === 0;
+
   const birthday = getBirthdayDateForYear(
     birthDate,
     today.getFullYear(),
@@ -387,15 +387,9 @@ export default function Home() {
     );
   }, [scheduleEntries, todayString]);
 
-  /*
-   * Ближайшая дата служения.
-   */
   const nextScheduleDate =
     upcomingSchedule[0]?.schedule_date ?? null;
 
-  /*
-   * Все служения в ближайшую дату.
-   */
   const nextServiceEntries = useMemo(() => {
     if (!nextScheduleDate) {
       return [];
@@ -411,9 +405,6 @@ export default function Home() {
       );
   }, [nextScheduleDate, upcomingSchedule]);
 
-  /*
-   * Следующие даты календаря.
-   */
   const calendarPreview = useMemo(() => {
     const dates: string[] = [];
 
@@ -477,6 +468,7 @@ export default function Home() {
 
   async function markBirthdayCelebrated(teenId: number) {
     const year = today.getFullYear();
+
     const existing = birthdayCelebrations.find(
       (item) =>
         item.teen_id === teenId &&
@@ -512,6 +504,7 @@ export default function Home() {
     }
 
     const teen = teens.find((item) => item.id === teenId);
+
     if (!teen) return;
 
     const candidate = getBirthdayCelebrationCandidate(
@@ -550,12 +543,6 @@ export default function Home() {
     }
   }
 
-  /*
-   * Текущая работа.
-   *
-   * Сначала показываем active.
-   * Если active нет — показываем ближайшую planned.
-   */
   const currentWork = useMemo(() => {
     const active = workProjects.find(
       (project) => project.status === "active",
@@ -565,9 +552,11 @@ export default function Home() {
       return active;
     }
 
-    return workProjects.find(
-      (project) => project.status === "planned",
-    ) ?? null;
+    return (
+      workProjects.find(
+        (project) => project.status === "planned",
+      ) ?? null
+    );
   }, [workProjects]);
 
   const currentWorkItems = useMemo(() => {
@@ -641,9 +630,7 @@ export default function Home() {
   /*
    * Menü "Mehr".
    *
-   * Старые Ziele / Aufgaben / Deadlines убраны,
-   * потому что теперь основная рабочая структура
-   * находится внутри "Arbeit".
+   * Идеи убраны.
    */
   const moreItems = [
     {
@@ -653,14 +640,6 @@ export default function Home() {
         ? "Общие работы команды"
         : "Gemeinsame Arbeiten",
       icon: BriefcaseBusiness,
-    },
-    {
-      href: "/ideas",
-      label: isRu ? "Идеи" : "Ideen",
-      description: isRu
-        ? "Идеи команды"
-        : "Ideen des Teams",
-      icon: Lightbulb,
     },
     {
       href: "/team",
@@ -921,8 +900,11 @@ export default function Home() {
 
                     <div className="min-w-0">
                       <p className="text-[14px] font-bold text-neutral-900">
-                        {isRu ? "Дни рождения" : "Geburtstage"}
+                        {isRu
+                          ? "Дни рождения"
+                          : "Geburtstage"}
                       </p>
+
                       <p className="mt-0.5 text-[11px] text-neutral-400">
                         {isRu
                           ? "Кого не забыть поздравить"
@@ -933,16 +915,24 @@ export default function Home() {
 
                   <button
                     type="button"
-                    onClick={() => router.push("/teens")}
+                    onClick={() =>
+                      router.push("/teens")
+                    }
                     className="shrink-0 text-[12px] font-semibold text-neutral-500"
                   >
-                    {isRu ? "Подростки" : "Teens"}
+                    {isRu
+                      ? "Подростки"
+                      : "Teens"}
                   </button>
                 </div>
 
                 <div className="divide-y divide-neutral-100">
                   {upcomingBirthdays.map(
-                    ({ teen, birthdayDate, celebrationDate }) => (
+                    ({
+                      teen,
+                      birthdayDate,
+                      celebrationDate,
+                    }) => (
                       <div
                         key={teen.id}
                         className="flex items-center gap-3 px-4 py-3.5"
@@ -956,22 +946,31 @@ export default function Home() {
 
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[13px] font-semibold text-neutral-900">
-                            {teen.first_name} {teen.last_name}
+                            {teen.first_name}{" "}
+                            {teen.last_name}
                           </p>
+
                           <p className="mt-0.5 text-[11px] text-neutral-400">
                             {formatDate(
-                              dateToString(birthdayDate),
+                              dateToString(
+                                birthdayDate,
+                              ),
                               language,
-                              { day: "2-digit", month: "long" },
+                              {
+                                day: "2-digit",
+                                month: "long",
+                              },
                             )}
                           </p>
+
                           <p className="mt-1 text-[10px] font-medium text-neutral-500">
                             {isRu
                               ? `Поздравить ${formatDate(
                                   celebrationDate,
                                   language,
                                   {
-                                    weekday: "long",
+                                    weekday:
+                                      "long",
                                     day: "2-digit",
                                     month: "long",
                                   },
@@ -980,7 +979,8 @@ export default function Home() {
                                   celebrationDate,
                                   language,
                                   {
-                                    weekday: "long",
+                                    weekday:
+                                      "long",
                                     day: "2-digit",
                                     month: "long",
                                   },
@@ -990,7 +990,11 @@ export default function Home() {
 
                         <button
                           type="button"
-                          onClick={() => markBirthdayCelebrated(teen.id)}
+                          onClick={() =>
+                            markBirthdayCelebrated(
+                              teen.id,
+                            )
+                          }
                           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-[15px] font-semibold text-neutral-600 transition active:scale-95"
                           aria-label={
                             isRu
@@ -1022,9 +1026,7 @@ export default function Home() {
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-neutral-100 text-neutral-600">
-                    <CalendarRange
-                      size={19}
-                    />
+                    <CalendarRange size={19} />
                   </div>
 
                   <div className="min-w-0">
@@ -1087,9 +1089,7 @@ export default function Home() {
                 }
                 className="shrink-0 text-[13px] font-semibold text-neutral-500"
               >
-                {isRu
-                  ? "Alle"
-                  : "Alle"}
+                Alle
               </button>
             </div>
 
@@ -1211,9 +1211,7 @@ export default function Home() {
                     {currentWorkStats.open > 0 && (
                       <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-neutral-300">
                         {currentWorkStats.open}{" "}
-                        {isRu
-                          ? "открыто"
-                          : "offen"}
+                        {isRu ? "открыто" : "offen"}
                       </span>
                     )}
 
@@ -1353,8 +1351,7 @@ export default function Home() {
                               date,
                               language,
                               {
-                                weekday:
-                                  "short",
+                                weekday: "short",
                               },
                             )}
                           </p>
@@ -1499,10 +1496,6 @@ export default function Home() {
   );
 }
 
-/*
- * Красивая иконка "Ещё":
- * три точки без текста.
- */
 function MoreIcon({
   size = 20,
 }: {
