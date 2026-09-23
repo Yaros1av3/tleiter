@@ -1,7 +1,7 @@
 export const translations = {
   ru: {
     common: {
-      appName: "TLite",
+      appName: "TLight",
       teamWorkspace: "РАБОЧЕЕ ПРОСТРАНСТВО КОМАНДЫ",
       loading: "Загрузка...",
       until: "До",
@@ -46,7 +46,7 @@ export const translations = {
     },
 
     dashboard: {
-      title: "TLite",
+      title: "TLight",
       subtitle: "Цели, идеи и задачи — в одном месте.",
 
       overview: "Обзор команды",
@@ -377,7 +377,7 @@ work: {
 
     settings: {
       title: "Настройки",
-      subtitle: "Твой аккаунт TLite",
+      subtitle: "Твой аккаунт TLight",
 
       account: "Аккаунт",
       fullName: "Полное имя",
@@ -388,7 +388,7 @@ work: {
 
       security: "Безопасность",
       securityDescription:
-        "Управляй паролем своего аккаунта TLite.",
+        "Управляй паролем своего аккаунта TLight.",
       changePassword: "Изменить пароль",
       newPassword: "Новый пароль",
       repeatPassword: "Повтори пароль",
@@ -407,7 +407,7 @@ work: {
 
       language: "Язык",
       languageDescription:
-        "Выбери язык всего интерфейса TLite.",
+        "Выбери язык всего интерфейса TLight.",
       german: "Немецкий",
       russian: "Русский",
 
@@ -422,7 +422,7 @@ work: {
 
   de: {
     common: {
-      appName: "TLite",
+      appName: "TLight",
       teamWorkspace: "TEAM WORKSPACE",
       loading: "Wird geladen...",
       until: "Bis",
@@ -538,7 +538,7 @@ work: {
     },
 
     dashboard: {
-      title: "TLite",
+      title: "TLight",
       subtitle: "Ziele, Ideen und Aufgaben — an einem Ort.",
 
       overview: "Teamübersicht",
@@ -797,7 +797,7 @@ work: {
 
     settings: {
       title: "Einstellungen",
-      subtitle: "Dein TLite-Konto",
+      subtitle: "Dein TLight-Konto",
 
       account: "Konto",
       fullName: "Vollständiger Name",
@@ -808,7 +808,7 @@ work: {
 
       security: "Sicherheit",
       securityDescription:
-        "Verwalte dein Passwort für dein TLite-Konto.",
+        "Verwalte dein Passwort für dein TLight-Konto.",
       changePassword: "Passwort ändern",
       newPassword: "Neues Passwort",
       repeatPassword: "Passwort wiederholen",
@@ -827,7 +827,7 @@ work: {
 
       language: "Sprache",
       languageDescription:
-        "Wähle die Sprache für die gesamte TLite-Oberfläche.",
+        "Wähle die Sprache für die gesamte TLight-Oberfläche.",
       german: "Deutsch",
       russian: "Russisch",
 

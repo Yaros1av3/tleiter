@@ -12,7 +12,13 @@ import {
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/translations";
 
-const publicRoutes = ["/login", "/register"];
+const publicRoutes = [
+  "/",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/update-password",
+];
 
 export default function BottomNav() {
   const pathname = usePathname();

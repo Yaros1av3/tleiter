@@ -1020,7 +1020,7 @@ export default function TeensPage() {
         <header className="mb-5 flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400">
-              TLite
+              TLight
             </p>
 
             <h1 className="mt-1 text-[28px] font-bold tracking-[-0.05em] text-neutral-950">

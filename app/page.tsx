@@ -678,7 +678,7 @@ export default function Home() {
             <div className="flex min-w-0 items-center gap-3">
               <Image
                 src="/tlite-logo.png"
-                alt="TLite"
+                alt="TLight"
                 width={46}
                 height={46}
                 priority
@@ -687,7 +687,7 @@ export default function Home() {
 
               <div className="min-w-0">
                 <div className="text-[20px] font-bold leading-none tracking-[-0.04em] text-[#111820]">
-                  TLite
+                  TLight
                 </div>
 
                 <div className="mt-1 text-[8px] font-semibold uppercase leading-[1.1] tracking-[0.14em] text-[#8a939d]">
@@ -1421,7 +1421,7 @@ export default function Home() {
 
                   <p className="mt-0.5 text-[13px] text-[#7a8490]">
                     {isRu
-                      ? "Все разделы TLite"
+                      ? "Все разделы TLight"
                       : "Weitere Bereiche"}
                   </p>
                 </div>

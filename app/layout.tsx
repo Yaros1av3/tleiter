@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TLite",
-  description: "TLite — Team Workspace",
+  title: "TLight",
+  description: "TLight — Team Workspace",
 };
 
 export default function RootLayout({

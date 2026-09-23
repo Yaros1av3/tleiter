@@ -181,7 +181,7 @@ export default function SettingsPage() {
             </div>
 
             <p className="mt-4 text-sm font-medium text-[#7a8490]">
-              TLite
+              TLight
             </p>
           </div>
         </div>
