@@ -78,6 +78,33 @@ type BirthdayCelebration = {
   celebrated: boolean;
 };
 
+/**
+ * Единый помощник для логирования ошибок Supabase.
+ * PostgrestError почти никогда не сериализуется красиво через
+ * console.error(label, error) — в консоли/оверлее Next.js это
+ * часто выглядит как пустой объект "{}". Логируем явные поля.
+ */
+function logSupabaseError(
+  label: string,
+  error: unknown,
+) {
+  if (!error) return;
+
+  const err = error as {
+    message?: string;
+    details?: string;
+    hint?: string;
+    code?: string;
+  };
+
+  console.error(label, {
+    message: err?.message ?? String(error),
+    code: err?.code ?? null,
+    details: err?.details ?? null,
+    hint: err?.hint ?? null,
+  });
+}
+
 function parseLocalDate(date: string) {
   return new Date(`${date}T00:00:00`);
 }
@@ -237,6 +264,9 @@ export default function Home() {
 
   const [loading, setLoading] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(
+    null,
+  );
 
   const isRu = language === "ru";
 
@@ -246,136 +276,153 @@ export default function Home() {
 
   async function loadDashboard() {
     setLoading(true);
+    setLoadError(null);
 
-    const [
-      { data: scheduleData, error: scheduleError },
-      { data: teamData, error: teamError },
-      { data: projectsData, error: projectsError },
-      { data: workItemsData, error: workItemsError },
-      { data: teensData, error: teensError },
-      { data: birthdayData, error: birthdayError },
-    ] = await Promise.all([
-      supabase
-        .from("schedule_entries")
-        .select(
-          "id, schedule_date, service_time, entry_type, title_de, title_ru, bible_text, series, notes",
-        )
-        .order("schedule_date", { ascending: true })
-        .order("service_time", { ascending: true }),
+    try {
+      const [
+        { data: scheduleData, error: scheduleError },
+        { data: teamData, error: teamError },
+        { data: projectsData, error: projectsError },
+        { data: workItemsData, error: workItemsError },
+        { data: teensData, error: teensError },
+        { data: birthdayData, error: birthdayError },
+      ] = await Promise.all([
+        supabase
+          .from("schedule_entries")
+          .select(
+            "id, schedule_date, service_time, entry_type, title_de, title_ru, bible_text, series, notes",
+          )
+          .order("schedule_date", { ascending: true })
+          .order("service_time", { ascending: true }),
 
-      supabase
-        .from("team_members")
-        .select(
-          "id, first_name, last_name, position, status",
-        )
-        .eq("status", "active")
-        .order("last_name", { ascending: true }),
+        supabase
+          .from("team_members")
+          .select(
+            "id, first_name, last_name, position, status",
+          )
+          .eq("status", "active")
+          .order("last_name", { ascending: true }),
 
-      supabase
-        .from("work_projects")
-        .select(
-          "id, title, description, status, start_date, end_date",
-        )
-        .in("status", ["planned", "active"])
-        .order("start_date", { ascending: true })
-        .order("created_at", { ascending: false }),
+        supabase
+          .from("work_projects")
+          .select(
+            "id, title, description, status, start_date, end_date",
+          )
+          .in("status", ["planned", "active"])
+          .order("start_date", { ascending: true })
+          .order("created_at", { ascending: false }),
 
-      supabase
-        .from("work_items")
-        .select(
-          "id, project_id, title, status, priority, deadline",
-        )
-        .order("deadline", {
-          ascending: true,
-          nullsFirst: false,
-        }),
+        supabase
+          .from("work_items")
+          .select(
+            "id, project_id, title, status, priority, deadline",
+          )
+          .order("deadline", {
+            ascending: true,
+            nullsFirst: false,
+          }),
 
-      supabase
-        .from("teens")
-        .select(
-          "id, first_name, last_name, birth_date, is_active",
-        )
-        .eq("is_active", true)
-        .order("last_name", { ascending: true }),
+        supabase
+          .from("teens")
+          .select(
+            "id, first_name, last_name, birth_date, is_active",
+          )
+          .eq("is_active", true)
+          .order("last_name", { ascending: true }),
 
-      supabase
-        .from("teen_birthday_celebrations")
-        .select(
-          "id, teen_id, birthday_year, celebration_date, celebrated",
-        )
-        .eq("birthday_year", new Date().getFullYear()),
-    ]);
+        supabase
+          .from("teen_birthday_celebrations")
+          .select(
+            "id, teen_id, birthday_year, celebration_date, celebrated",
+          )
+          .eq("birthday_year", new Date().getFullYear()),
+      ]);
 
-    if (scheduleError) {
-      console.error(
-        "Dashboard schedule:",
-        scheduleError,
-      );
-    }
-
-    if (teamError) {
-      console.error("Dashboard team:", teamError);
-    }
-
-    if (projectsError) {
-      console.error(
-        "Dashboard work projects:",
-        projectsError,
-      );
-    }
-
-    if (workItemsError) {
-      console.error(
-        "Dashboard work items:",
-        workItemsError,
-      );
-    }
-
-    if (teensError) {
-      console.error("Dashboard teens:", teensError);
-    }
-
-    if (birthdayError) {
-      console.error(
-        "Dashboard birthday celebrations:",
-        birthdayError,
-      );
-    }
-
-    const entries = scheduleData ?? [];
-
-    let scheduleMemberData: ScheduleMember[] = [];
-
-    if (entries.length > 0) {
-      const { data, error } = await supabase
-        .from("schedule_entry_members")
-        .select(
-          "schedule_entry_id, team_member_id",
-        )
-        .in(
-          "schedule_entry_id",
-          entries.map((entry) => entry.id),
-        );
-
-      if (error) {
-        console.error(
-          "Dashboard schedule members:",
-          error,
+      if (scheduleError) {
+        logSupabaseError(
+          "Dashboard schedule:",
+          scheduleError,
         );
       }
 
-      scheduleMemberData = data ?? [];
+      if (teamError) {
+        logSupabaseError("Dashboard team:", teamError);
+      }
+
+      if (projectsError) {
+        logSupabaseError(
+          "Dashboard work projects:",
+          projectsError,
+        );
+      }
+
+      if (workItemsError) {
+        logSupabaseError(
+          "Dashboard work items:",
+          workItemsError,
+        );
+      }
+
+      if (teensError) {
+        logSupabaseError("Dashboard teens:", teensError);
+      }
+
+      if (birthdayError) {
+        logSupabaseError(
+          "Dashboard birthday celebrations:",
+          birthdayError,
+        );
+      }
+
+      const entries = scheduleData ?? [];
+
+      let scheduleMemberData: ScheduleMember[] = [];
+
+      if (entries.length > 0) {
+        const { data, error } = await supabase
+          .from("schedule_entry_members")
+          .select(
+            "schedule_entry_id, team_member_id",
+          )
+          .in(
+            "schedule_entry_id",
+            entries.map((entry) => entry.id),
+          );
+
+        if (error) {
+          logSupabaseError(
+            "Dashboard schedule members:",
+            error,
+          );
+        }
+
+        scheduleMemberData = data ?? [];
+      }
+
+      setScheduleEntries(entries);
+      setTeamMembers(teamData ?? []);
+      setScheduleMembers(scheduleMemberData);
+      setWorkProjects(projectsData ?? []);
+      setWorkItems(workItemsData ?? []);
+      setTeens(teensData ?? []);
+      setBirthdayCelebrations(birthdayData ?? []);
+    } catch (err) {
+      /*
+       * Сеть недоступна, Supabase-проект на паузе, CORS и т.п.
+       * Ловим здесь, чтобы неотловленный reject не ронял рендер
+       * (из-за чего в dev-режиме Next.js мог перекрывать весь
+       * экран оверлеем ошибки, включая нижнюю навигацию).
+       */
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Unbekannter Fehler";
+
+      console.error("Dashboard load failed:", message);
+      setLoadError(message);
+    } finally {
+      setLoading(false);
     }
-
-    setScheduleEntries(entries);
-    setTeamMembers(teamData ?? []);
-    setScheduleMembers(scheduleMemberData);
-    setWorkProjects(projectsData ?? []);
-    setWorkItems(workItemsData ?? []);
-    setTeens(teensData ?? []);
-    setBirthdayCelebrations(birthdayData ?? []);
-
-    setLoading(false);
   }
 
   const today = useMemo(() => new Date(), []);
@@ -485,7 +532,7 @@ export default function Home() {
         .eq("id", existing.id);
 
       if (error) {
-        console.error(
+        logSupabaseError(
           "Dashboard birthday update:",
           error,
         );
@@ -528,7 +575,7 @@ export default function Home() {
       .single();
 
     if (error) {
-      console.error(
+      logSupabaseError(
         "Dashboard birthday insert:",
         error,
       );
@@ -724,6 +771,21 @@ export default function Home() {
         </header>
 
         <div className="mx-auto w-full max-w-[760px] px-4 pb-28 sm:px-6">
+          {loadError && (
+            <div className="mt-4 rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
+              {isRu
+                ? "Не удалось загрузить данные. Проверьте подключение и попробуйте ещё раз."
+                : "Daten konnten nicht geladen werden. Bitte Verbindung prüfen und erneut versuchen."}
+              <button
+                type="button"
+                onClick={() => loadDashboard()}
+                className="ml-2 font-semibold underline"
+              >
+                {isRu ? "Повторить" : "Erneut versuchen"}
+              </button>
+            </div>
+          )}
+
           {/* =====================================================
               NEXT SERVICE
           ====================================================== */}

@@ -13,7 +13,6 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/translations";
 
 const publicRoutes = [
-  "/",
   "/login",
   "/register",
   "/forgot-password",
