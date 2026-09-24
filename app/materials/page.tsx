@@ -384,6 +384,16 @@ export default function MaterialsPage() {
   const [loading, setLoading] = useState(true);
 
   /*
+   * Deep-link из расписания: /materials?folder=..&material=..
+   * Открывает нужную папку и подсвечивает файл темы.
+   */
+  const [highlightedMaterialId, setHighlightedMaterialId] =
+    useState<number | null>(null);
+
+  const highlightedMaterialRef =
+    useRef<HTMLDivElement | null>(null);
+
+  /*
    * WICHTIG:
    * Admin wird nicht mehr über den profiles-SELECT
    * erkannt, sondern über die SECURITY DEFINER Funktion
@@ -637,10 +647,65 @@ export default function MaterialsPage() {
       },
     );
 
+    /*
+     * Читаем query-параметры вручную (window.location), а не
+     * через useSearchParams — это client-only компонент, и так
+     * не нужен Suspense boundary.
+     */
+    const params = new URLSearchParams(
+      window.location.search,
+    );
+
+    const folderParam = params.get("folder");
+    const materialParam = params.get("material");
+
+    if (folderParam) {
+      const folderId = Number(folderParam);
+
+      if (!Number.isNaN(folderId)) {
+        setCurrentFolderId(folderId);
+      }
+    }
+
+    if (materialParam) {
+      const materialId = Number(materialParam);
+
+      if (!Number.isNaN(materialId)) {
+        setHighlightedMaterialId(materialId);
+      }
+    }
+
     return () => {
       authListener.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (
+      highlightedMaterialId == null ||
+      loading
+    ) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      highlightedMaterialRef.current?.scrollIntoView(
+        {
+          behavior: "smooth",
+          block: "center",
+        },
+      );
+    }, 150);
+
+    const clearHighlight = setTimeout(() => {
+      setHighlightedMaterialId(null);
+    }, 4000);
+
+    return () => {
+      clearTimeout(timeout);
+      clearTimeout(clearHighlight);
+    };
+  }, [highlightedMaterialId, loading]);
 
   const currentFolder = useMemo(() => {
     if (currentFolderId == null) {
@@ -1960,7 +2025,18 @@ export default function MaterialsPage() {
                 (material) => (
                   <div
                     key={`material-${material.id}`}
-                    className="flex items-center gap-3 px-3 py-4 sm:px-5"
+                    ref={
+                      material.id ===
+                      highlightedMaterialId
+                        ? highlightedMaterialRef
+                        : undefined
+                    }
+                    className={`flex items-center gap-3 px-3 py-4 transition-colors sm:px-5 ${
+                      material.id ===
+                      highlightedMaterialId
+                        ? "bg-amber-50 ring-2 ring-inset ring-amber-300"
+                        : ""
+                    }`}
                   >
                     <button
                       type="button"

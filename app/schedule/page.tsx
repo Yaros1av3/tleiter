@@ -16,6 +16,9 @@ import {
   ShieldCheck,
   AlertCircle,
   ArrowLeft,
+  FileText,
+  Search,
+  Link2,
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
@@ -41,8 +44,29 @@ type ScheduleEntry = {
   bible_text: string | null;
   series: string | null;
   notes: string | null;
+  material_id: number | null;
   created_at: string;
   updated_at: string;
+};
+
+/*
+ * Упрощённый материал для пикера "тема из материалов".
+ * folder_id нужен, чтобы при клике по теме в расписании
+ * сразу открыть правильную папку в /materials.
+ */
+type PickerMaterial = {
+  id: number;
+  folder_id: number | null;
+  title: string;
+  file_name: string | null;
+  material_type: string;
+};
+
+type PickerFolder = {
+  id: number;
+  name: string;
+  name_de: string | null;
+  name_ru: string | null;
 };
 
 type ScheduleMember = {
@@ -61,6 +85,7 @@ type EntryForm = {
   series: string;
   notes: string;
   member_ids: number[];
+  material_id: number | null;
 };
 
 const emptyForm: EntryForm = {
@@ -73,6 +98,7 @@ const emptyForm: EntryForm = {
   series: "",
   notes: "",
   member_ids: [],
+  material_id: null,
 };
 
 export default function SchedulePage() {
@@ -113,6 +139,18 @@ export default function SchedulePage() {
   const [deleting, setDeleting] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState("");
+
+  const [pickerMaterials, setPickerMaterials] = useState<
+    PickerMaterial[]
+  >([]);
+
+  const [pickerFolders, setPickerFolders] = useState<
+    PickerFolder[]
+  >([]);
+
+  const [materialSearch, setMaterialSearch] = useState("");
+  const [materialPickerOpen, setMaterialPickerOpen] =
+    useState(false);
 
   /*
    * =====================================================
@@ -162,6 +200,108 @@ export default function SchedulePage() {
   useEffect(() => {
     loadData();
   }, [currentMonth]);
+
+  useEffect(() => {
+    loadPickerMaterials();
+  }, []);
+
+  async function loadPickerMaterials() {
+    const [materialsResult, foldersResult] =
+      await Promise.all([
+        supabase
+          .from("materials")
+          .select(
+            "id, folder_id, title, file_name, material_type",
+          )
+          .order("title", { ascending: true }),
+
+        supabase
+          .from("material_folders")
+          .select("id, name, name_de, name_ru"),
+      ]);
+
+    if (materialsResult.error) {
+      console.error(
+        "Error loading materials for picker:",
+        materialsResult.error,
+      );
+    } else {
+      setPickerMaterials(materialsResult.data ?? []);
+    }
+
+    if (foldersResult.error) {
+      console.error(
+        "Error loading material folders for picker:",
+        foldersResult.error,
+      );
+    } else {
+      setPickerFolders(foldersResult.data ?? []);
+    }
+  }
+
+  function getPickerFolderName(
+    folderId: number | null,
+  ) {
+    if (folderId == null) return "";
+
+    const folder = pickerFolders.find(
+      (item) => item.id === folderId,
+    );
+
+    if (!folder) return "";
+
+    return (
+      (isRu
+        ? folder.name_ru
+        : folder.name_de) ||
+      folder.name
+    );
+  }
+
+  const filteredPickerMaterials = useMemo(() => {
+    const query = materialSearch
+      .trim()
+      .toLocaleLowerCase();
+
+    if (!query) {
+      return pickerMaterials.slice(0, 30);
+    }
+
+    return pickerMaterials
+      .filter((material) => {
+        const haystack = `${material.title} ${material.file_name ?? ""}`.toLocaleLowerCase();
+
+        return haystack.includes(query);
+      })
+      .slice(0, 30);
+  }, [pickerMaterials, materialSearch]);
+
+  function selectPickerMaterial(
+    material: PickerMaterial,
+  ) {
+    setForm((current) => ({
+      ...current,
+      material_id: material.id,
+      title_de:
+        current.service_time === "10:00"
+          ? material.title
+          : current.title_de,
+      title_ru:
+        current.service_time === "13:00"
+          ? material.title
+          : current.title_ru,
+    }));
+
+    setMaterialPickerOpen(false);
+    setMaterialSearch("");
+  }
+
+  function clearPickerMaterial() {
+    setForm((current) => ({
+      ...current,
+      material_id: null,
+    }));
+  }
 
   async function loadData() {
     setLoading(true);
@@ -386,6 +526,36 @@ export default function SchedulePage() {
     );
   }
 
+  function getLinkedMaterial(entry: ScheduleEntry) {
+    if (entry.material_id == null) return null;
+
+    return (
+      pickerMaterials.find(
+        (material) =>
+          material.id === entry.material_id,
+      ) ?? null
+    );
+  }
+
+  function goToMaterial(entry: ScheduleEntry) {
+    const material = getLinkedMaterial(entry);
+
+    if (!material) return;
+
+    const params = new URLSearchParams();
+
+    params.set("material", String(material.id));
+
+    if (material.folder_id != null) {
+      params.set(
+        "folder",
+        String(material.folder_id),
+      );
+    }
+
+    router.push(`/materials?${params.toString()}`);
+  }
+
   function getMemberIds(entryId: number) {
     return entryMembers
       .filter(
@@ -434,6 +604,8 @@ export default function SchedulePage() {
 
     setErrorMessage("");
     setEditingEntry(null);
+    setMaterialSearch("");
+    setMaterialPickerOpen(false);
 
     setForm({
       ...emptyForm,
@@ -455,6 +627,8 @@ export default function SchedulePage() {
 
     setErrorMessage("");
     setEditingEntry(entry);
+    setMaterialSearch("");
+    setMaterialPickerOpen(false);
 
     setForm({
       schedule_date:
@@ -475,6 +649,8 @@ export default function SchedulePage() {
         entry.notes ?? "",
       member_ids:
         getMemberIds(entry.id),
+      material_id:
+        entry.material_id ?? null,
     });
 
     setModalOpen(true);
@@ -597,6 +773,9 @@ export default function SchedulePage() {
       notes:
         form.notes.trim() ||
         null,
+
+      material_id:
+        form.material_id ?? null,
 
       updated_at:
         new Date().toISOString(),
@@ -1315,11 +1494,38 @@ export default function SchedulePage() {
                                             )}
                                           </div>
 
-                                          <h3 className="break-words text-[16px] font-bold leading-[1.25] tracking-[-0.025em] text-[#111820]">
-                                            {getEntryTitle(
-                                              entry,
-                                            )}
-                                          </h3>
+                                          {getLinkedMaterial(
+                                            entry,
+                                          ) ? (
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                goToMaterial(
+                                                  entry,
+                                                )
+                                              }
+                                              className="group inline-flex items-start gap-1.5 text-left"
+                                            >
+                                              <h3 className="break-words text-[16px] font-bold leading-[1.25] tracking-[-0.025em] text-[#111820] underline decoration-[#c7cbd1] decoration-2 underline-offset-2 group-active:text-[#4e5966]">
+                                                {getEntryTitle(
+                                                  entry,
+                                                )}
+                                              </h3>
+
+                                              <FileText
+                                                size={
+                                                  13
+                                                }
+                                                className="mt-1 shrink-0 text-[#9aa2ad]"
+                                              />
+                                            </button>
+                                          ) : (
+                                            <h3 className="break-words text-[16px] font-bold leading-[1.25] tracking-[-0.025em] text-[#111820]">
+                                              {getEntryTitle(
+                                                entry,
+                                              )}
+                                            </h3>
+                                          )}
                                         </div>
 
                                         {isAdmin && (
@@ -1831,6 +2037,182 @@ export default function SchedulePage() {
                         )
                       )}
                     </div>
+                  </div>
+
+                  {/* =================================================
+                      MATERIAL PICKER (тема из материалов)
+                  ================================================= */}
+                  <div>
+                    <label className="mb-2 block px-1 text-[11px] font-bold text-[#65707d]">
+                      {isRu
+                        ? "Тема из материалов"
+                        : "Thema aus Materialien"}
+                    </label>
+
+                    {form.material_id != null ? (
+                      (() => {
+                        const linked =
+                          pickerMaterials.find(
+                            (item) =>
+                              item.id ===
+                              form.material_id,
+                          );
+
+                        return (
+                          <div className="flex items-center gap-2.5 rounded-[15px] border border-[#dfe1e4] bg-[#fafafa] px-4 py-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#111820] text-white">
+                              <FileText
+                                size={15}
+                              />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-[13px] font-semibold text-[#111820]">
+                                {linked?.title ??
+                                  (isRu
+                                    ? "Материал"
+                                    : "Material")}
+                              </div>
+
+                              {linked?.folder_id !=
+                                null && (
+                                <div className="truncate text-[10px] text-[#9aa2ad]">
+                                  {getPickerFolderName(
+                                    linked.folder_id,
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={
+                                clearPickerMaterial
+                              }
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-[#9aa2ad] active:bg-[#eceef0]"
+                              aria-label={
+                                isRu
+                                  ? "Отвязать материал"
+                                  : "Material trennen"
+                              }
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div className="relative">
+                        <div className="relative">
+                          <Search
+                            size={15}
+                            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#b1b7bf]"
+                          />
+
+                          <input
+                            value={
+                              materialSearch
+                            }
+                            onChange={(
+                              event,
+                            ) => {
+                              setMaterialSearch(
+                                event.target
+                                  .value,
+                              );
+                              setMaterialPickerOpen(
+                                true,
+                              );
+                            }}
+                            onFocus={() =>
+                              setMaterialPickerOpen(
+                                true,
+                              )
+                            }
+                            placeholder={
+                              isRu
+                                ? "Искать по названию файла..."
+                                : "Nach Dateiname suchen..."
+                            }
+                            className="h-[54px] w-full rounded-[15px] border border-[#dfe1e4] bg-[#fafafa] pl-10 pr-4 text-[15px] outline-none placeholder:text-[#b1b7bf] focus:border-[#111820] focus:bg-white"
+                          />
+                        </div>
+
+                        {materialPickerOpen && (
+                          <div className="absolute z-20 mt-1.5 max-h-[260px] w-full overflow-y-auto rounded-[15px] border border-[#e1e3e6] bg-white p-1.5 shadow-[0_10px_30px_rgba(17,24,32,0.12)]">
+                            {filteredPickerMaterials.length ===
+                            0 ? (
+                              <div className="px-3 py-4 text-center text-[12px] text-[#9aa2ad]">
+                                {isRu
+                                  ? "Ничего не найдено в материалах."
+                                  : "Keine Materialien gefunden."}
+                              </div>
+                            ) : (
+                              filteredPickerMaterials.map(
+                                (material) => (
+                                  <button
+                                    key={
+                                      material.id
+                                    }
+                                    type="button"
+                                    onClick={() =>
+                                      selectPickerMaterial(
+                                        material,
+                                      )
+                                    }
+                                    className="flex w-full items-center gap-2.5 rounded-[11px] px-2.5 py-2.5 text-left active:bg-[#f4f5f5]"
+                                  >
+                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-[#f0f1f2] text-[#4d5864]">
+                                      <FileText
+                                        size={
+                                          14
+                                        }
+                                      />
+                                    </div>
+
+                                    <div className="min-w-0 flex-1">
+                                      <div className="truncate text-[13px] font-semibold text-[#111820]">
+                                        {
+                                          material.title
+                                        }
+                                      </div>
+
+                                      <div className="truncate text-[10px] text-[#9aa2ad]">
+                                        {getPickerFolderName(
+                                          material.folder_id,
+                                        ) ||
+                                          material.file_name ||
+                                          ""}
+                                      </div>
+                                    </div>
+                                  </button>
+                                ),
+                              )
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setMaterialPickerOpen(
+                                  false,
+                                )
+                              }
+                              className="mt-1 w-full rounded-[11px] px-2.5 py-2 text-center text-[11px] font-semibold text-[#9aa2ad] active:bg-[#f4f5f5]"
+                            >
+                              {isRu
+                                ? "Закрыть"
+                                : "Schließen"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <p className="mt-1.5 px-1 text-[10px] text-[#9aa2ad]">
+                      {isRu
+                        ? "Выбери файл из раздела Материалы — название темы подставится автоматически, его можно поправить ниже."
+                        : "Wähle eine Datei aus dem Bereich Materialien — das Thema wird automatisch übernommen und kann unten angepasst werden."}
+                    </p>
                   </div>
 
                   {/* =================================================
