@@ -67,6 +67,7 @@ type PickerFolder = {
   name: string;
   name_de: string | null;
   name_ru: string | null;
+  parent_id: number | null;
 };
 
 type ScheduleMember = {
@@ -152,6 +153,10 @@ export default function SchedulePage() {
   const [materialPickerOpen, setMaterialPickerOpen] =
     useState(false);
 
+  const [pickerFolderId, setPickerFolderId] = useState<
+    number | null
+  >(null);
+
   /*
    * =====================================================
    * AUTH / ROLE
@@ -217,7 +222,7 @@ export default function SchedulePage() {
 
         supabase
           .from("material_folders")
-          .select("id, name, name_de, name_ru"),
+          .select("id, name, name_de, name_ru, parent_id"),
       ]);
 
     if (materialsResult.error) {
@@ -258,6 +263,35 @@ export default function SchedulePage() {
     );
   }
 
+  function getPickerFolderPath(
+    folderId: number | null,
+  ) {
+    if (folderId == null) return "";
+
+    const chain: string[] = [];
+    let current =
+      pickerFolders.find(
+        (item) => item.id === folderId,
+      ) ?? null;
+
+    while (current) {
+      const name =
+        (isRu
+          ? current.name_ru
+          : current.name_de) ||
+        current.name;
+
+      chain.unshift(name);
+
+      current =
+        pickerFolders.find(
+          (item) => item.id === current!.parent_id,
+        ) ?? null;
+    }
+
+    return chain.join(" / ");
+  }
+
   const filteredPickerMaterials = useMemo(() => {
     const query = materialSearch
       .trim()
@@ -275,6 +309,42 @@ export default function SchedulePage() {
       })
       .slice(0, 30);
   }, [pickerMaterials, materialSearch]);
+
+  /*
+   * Хлебные крошки для навигации по папкам в пикере темы.
+   */
+  const pickerBreadcrumbs = useMemo(() => {
+    const chain: PickerFolder[] = [];
+    let current =
+      pickerFolders.find(
+        (item) => item.id === pickerFolderId,
+      ) ?? null;
+
+    while (current) {
+      chain.unshift(current);
+
+      current =
+        pickerFolders.find(
+          (item) => item.id === current!.parent_id,
+        ) ?? null;
+    }
+
+    return chain;
+  }, [pickerFolders, pickerFolderId]);
+
+  const pickerVisibleFolders = useMemo(() => {
+    return pickerFolders.filter(
+      (folder) =>
+        folder.parent_id === pickerFolderId,
+    );
+  }, [pickerFolders, pickerFolderId]);
+
+  const pickerVisibleMaterials = useMemo(() => {
+    return pickerMaterials.filter(
+      (material) =>
+        material.folder_id === pickerFolderId,
+    );
+  }, [pickerMaterials, pickerFolderId]);
 
   function selectPickerMaterial(
     material: PickerMaterial,
@@ -301,6 +371,9 @@ export default function SchedulePage() {
       ...current,
       material_id: null,
     }));
+
+    setPickerFolderId(null);
+    setMaterialSearch("");
   }
 
   async function loadData() {
@@ -606,6 +679,7 @@ export default function SchedulePage() {
     setEditingEntry(null);
     setMaterialSearch("");
     setMaterialPickerOpen(false);
+    setPickerFolderId(null);
 
     setForm({
       ...emptyForm,
@@ -629,6 +703,7 @@ export default function SchedulePage() {
     setEditingEntry(entry);
     setMaterialSearch("");
     setMaterialPickerOpen(false);
+    setPickerFolderId(null);
 
     setForm({
       schedule_date:
@@ -1079,7 +1154,7 @@ export default function SchedulePage() {
           </div>
         </div>
 
-        <div className="mx-auto w-full max-w-[1180px] px-4 pb-10 pt-5 sm:px-6 md:pt-8 lg:px-8">
+        <div className="mx-auto w-full max-w-[1180px] px-4 pb-32 pt-5 sm:px-6 md:pt-8 lg:px-8">
           {/* =================================================
               DESKTOP HEADING
           ================================================= */}
@@ -1430,6 +1505,18 @@ export default function SchedulePage() {
                               entry.entry_type ===
                               "event";
 
+                            const linkedMaterial =
+                              getLinkedMaterial(
+                                entry,
+                              );
+
+                            const materialPath =
+                              linkedMaterial
+                                ? getPickerFolderPath(
+                                    linkedMaterial.folder_id,
+                                  )
+                                : "";
+
                             return (
                               <article
                                 key={
@@ -1669,7 +1756,7 @@ export default function SchedulePage() {
 
                                   {/* META */}
                                   {(entry.bible_text ||
-                                    entry.series) && (
+                                    materialPath) && (
                                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
                                       {entry.bible_text && (
                                         <div className="flex min-w-0 gap-2 rounded-[13px] bg-[#f1f2f3] px-3 py-2.5">
@@ -1696,18 +1783,27 @@ export default function SchedulePage() {
                                         </div>
                                       )}
 
-                                      {entry.series && (
-                                        <div className="rounded-[13px] bg-[#f1f2f3] px-3 py-2.5">
-                                          <div className="text-[8px] font-bold uppercase tracking-[0.08em] text-[#9aa2ad]">
-                                            {isRu
-                                              ? "Серия"
-                                              : "Serie"}
-                                          </div>
-
-                                          <div className="mt-0.5 break-words text-[11px] font-semibold leading-4 text-[#5f6975]">
-                                            {
-                                              entry.series
+                                      {materialPath && (
+                                        <div className="flex min-w-0 gap-2 rounded-[13px] bg-[#f1f2f3] px-3 py-2.5">
+                                          <Link2
+                                            size={
+                                              15
                                             }
+                                            className="mt-0.5 shrink-0 text-[#7f8893]"
+                                          />
+
+                                          <div className="min-w-0">
+                                            <div className="text-[8px] font-bold uppercase tracking-[0.08em] text-[#9aa2ad]">
+                                              {isRu
+                                                ? "Путь к теме"
+                                                : "Pfad zum Thema"}
+                                            </div>
+
+                                            <div className="mt-0.5 break-words text-[11px] font-semibold leading-4 text-[#5f6975]">
+                                              {
+                                                materialPath
+                                              }
+                                            </div>
                                           </div>
                                         </div>
                                       )}
@@ -2077,7 +2173,7 @@ export default function SchedulePage() {
                               {linked?.folder_id !=
                                 null && (
                                 <div className="truncate text-[10px] text-[#9aa2ad]">
-                                  {getPickerFolderName(
+                                  {getPickerFolderPath(
                                     linked.folder_id,
                                   )}
                                 </div>
@@ -2102,11 +2198,12 @@ export default function SchedulePage() {
                         );
                       })()
                     ) : (
-                      <div className="relative">
-                        <div className="relative">
+                      <div className="overflow-hidden rounded-[15px] border border-[#dfe1e4] bg-[#fafafa]">
+                        {/* SEARCH */}
+                        <div className="relative p-2">
                           <Search
                             size={15}
-                            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#b1b7bf]"
+                            className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-[#b1b7bf]"
                           />
 
                           <input
@@ -2115,18 +2212,10 @@ export default function SchedulePage() {
                             }
                             onChange={(
                               event,
-                            ) => {
+                            ) =>
                               setMaterialSearch(
                                 event.target
                                   .value,
-                              );
-                              setMaterialPickerOpen(
-                                true,
-                              );
-                            }}
-                            onFocus={() =>
-                              setMaterialPickerOpen(
-                                true,
                               )
                             }
                             placeholder={
@@ -2134,15 +2223,18 @@ export default function SchedulePage() {
                                 ? "Искать по названию файла..."
                                 : "Nach Dateiname suchen..."
                             }
-                            className="h-[54px] w-full rounded-[15px] border border-[#dfe1e4] bg-[#fafafa] pl-10 pr-4 text-[15px] outline-none placeholder:text-[#b1b7bf] focus:border-[#111820] focus:bg-white"
+                            className="h-11 w-full rounded-[12px] border border-[#dfe1e4] bg-white pl-9 pr-4 text-[14px] outline-none placeholder:text-[#b1b7bf] focus:border-[#111820]"
                           />
                         </div>
 
-                        {materialPickerOpen && (
-                          <div className="absolute z-20 mt-1.5 max-h-[260px] w-full overflow-y-auto rounded-[15px] border border-[#e1e3e6] bg-white p-1.5 shadow-[0_10px_30px_rgba(17,24,32,0.12)]">
+                        {materialSearch.trim() ? (
+                          /* =========================
+                             ПОИСК ПО ВСЕМ ПАПКАМ
+                          ========================== */
+                          <div className="max-h-[260px] overflow-y-auto border-t border-[#e6e8ea] p-1.5">
                             {filteredPickerMaterials.length ===
                             0 ? (
-                              <div className="px-3 py-4 text-center text-[12px] text-[#9aa2ad]">
+                              <div className="px-3 py-6 text-center text-[12px] text-[#9aa2ad]">
                                 {isRu
                                   ? "Ничего не найдено в материалах."
                                   : "Keine Materialien gefunden."}
@@ -2160,9 +2252,9 @@ export default function SchedulePage() {
                                         material,
                                       )
                                     }
-                                    className="flex w-full items-center gap-2.5 rounded-[11px] px-2.5 py-2.5 text-left active:bg-[#f4f5f5]"
+                                    className="flex w-full items-center gap-2.5 rounded-[11px] px-2.5 py-2.5 text-left active:bg-[#eceef0]"
                                   >
-                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-[#f0f1f2] text-[#4d5864]">
+                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-white text-[#4d5864] ring-1 ring-[#e6e8ea]">
                                       <FileText
                                         size={
                                           14
@@ -2178,7 +2270,7 @@ export default function SchedulePage() {
                                       </div>
 
                                       <div className="truncate text-[10px] text-[#9aa2ad]">
-                                        {getPickerFolderName(
+                                        {getPickerFolderPath(
                                           material.folder_id,
                                         ) ||
                                           material.file_name ||
@@ -2189,20 +2281,154 @@ export default function SchedulePage() {
                                 ),
                               )
                             )}
+                          </div>
+                        ) : (
+                          /* =========================
+                             НАВИГАЦИЯ ПО ПАПКАМ
+                          ========================== */
+                          <div className="border-t border-[#e6e8ea]">
+                            {/* BREADCRUMBS */}
+                            <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap px-2 py-1.5">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPickerFolderId(
+                                    null,
+                                  )
+                                }
+                                className={`shrink-0 rounded-lg px-2 py-1 text-[11px] ${
+                                  pickerFolderId ==
+                                  null
+                                    ? "font-bold text-[#111820]"
+                                    : "text-[#8a929c]"
+                                }`}
+                              >
+                                {isRu
+                                  ? "Материалы"
+                                  : "Materialien"}
+                              </button>
 
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setMaterialPickerOpen(
-                                  false,
-                                )
-                              }
-                              className="mt-1 w-full rounded-[11px] px-2.5 py-2 text-center text-[11px] font-semibold text-[#9aa2ad] active:bg-[#f4f5f5]"
-                            >
-                              {isRu
-                                ? "Закрыть"
-                                : "Schließen"}
-                            </button>
+                              {pickerBreadcrumbs.map(
+                                (
+                                  folder,
+                                  index,
+                                ) => (
+                                  <div
+                                    key={
+                                      folder.id
+                                    }
+                                    className="flex shrink-0 items-center gap-1"
+                                  >
+                                    <span className="text-[#c7cbd1]">
+                                      /
+                                    </span>
+
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setPickerFolderId(
+                                          folder.id,
+                                        )
+                                      }
+                                      className={`rounded-lg px-2 py-1 text-[11px] ${
+                                        index ===
+                                        pickerBreadcrumbs.length -
+                                          1
+                                          ? "font-bold text-[#111820]"
+                                          : "text-[#8a929c]"
+                                      }`}
+                                    >
+                                      {(isRu
+                                        ? folder.name_ru
+                                        : folder.name_de) ||
+                                        folder.name}
+                                    </button>
+                                  </div>
+                                ),
+                              )}
+                            </div>
+
+                            {/* LIST */}
+                            <div className="max-h-[220px] overflow-y-auto p-1.5">
+                              {pickerVisibleFolders.length ===
+                                0 &&
+                              pickerVisibleMaterials.length ===
+                                0 ? (
+                                <div className="px-3 py-6 text-center text-[12px] text-[#9aa2ad]">
+                                  {isRu
+                                    ? "Эта папка пуста."
+                                    : "Dieser Ordner ist leer."}
+                                </div>
+                              ) : (
+                                <>
+                                  {pickerVisibleFolders.map(
+                                    (folder) => (
+                                      <button
+                                        key={`folder-${folder.id}`}
+                                        type="button"
+                                        onClick={() =>
+                                          setPickerFolderId(
+                                            folder.id,
+                                          )
+                                        }
+                                        className="flex w-full items-center gap-2.5 rounded-[11px] px-2.5 py-2.5 text-left active:bg-[#eceef0]"
+                                      >
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-white text-[#4d5864] ring-1 ring-[#e6e8ea]">
+                                          <BookOpen
+                                            size={
+                                              14
+                                            }
+                                          />
+                                        </div>
+
+                                        <span className="truncate text-[13px] font-semibold text-[#111820]">
+                                          {(isRu
+                                            ? folder.name_ru
+                                            : folder.name_de) ||
+                                            folder.name}
+                                        </span>
+
+                                        <ChevronRight
+                                          size={
+                                            15
+                                          }
+                                          className="ml-auto shrink-0 text-[#c7cbd1]"
+                                        />
+                                      </button>
+                                    ),
+                                  )}
+
+                                  {pickerVisibleMaterials.map(
+                                    (material) => (
+                                      <button
+                                        key={`material-${material.id}`}
+                                        type="button"
+                                        onClick={() =>
+                                          selectPickerMaterial(
+                                            material,
+                                          )
+                                        }
+                                        className="flex w-full items-center gap-2.5 rounded-[11px] px-2.5 py-2.5 text-left active:bg-[#eceef0]"
+                                      >
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-white text-[#4d5864] ring-1 ring-[#e6e8ea]">
+                                          <FileText
+                                            size={
+                                              14
+                                            }
+                                          />
+                                        </div>
+
+                                        <span className="truncate text-[13px] font-semibold text-[#111820]">
+                                          {
+                                            material.title
+                                          }
+                                        </span>
+                                      </button>
+                                    ),
+                                  )}
+                                </>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -2214,6 +2440,7 @@ export default function SchedulePage() {
                         : "Wähle eine Datei aus dem Bereich Materialien — das Thema wird automatisch übernommen und kann unten angepasst werden."}
                     </p>
                   </div>
+
 
                   {/* =================================================
                       LANGUAGE-SPECIFIC TOPIC

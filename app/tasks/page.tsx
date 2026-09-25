@@ -646,7 +646,7 @@ function TasksPageContent() {
           setLanguage={setLanguage}
         />
 
-        <div className="mx-auto w-full max-w-[1400px] px-4 pb-12 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[1400px] px-4 pb-32 sm:px-6 lg:px-8">
           {/* Header */}
           <section className="pb-7 pt-8 sm:pb-8 sm:pt-10">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">

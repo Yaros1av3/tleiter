@@ -23,6 +23,7 @@ import Link from "next/link";
 
 import { supabase } from "@/lib/supabase";
 import { type Language } from "@/lib/translations";
+import { useLanguage } from "@/components/LanguageProvider";
 
 type MaterialFolder = {
   id: number;
@@ -373,7 +374,7 @@ function materialTypeLabel(
 }
 
 export default function MaterialsPage() {
-  const language: Language = "de";
+  const { language } = useLanguage();
 
   const [folders, setFolders] = useState<MaterialFolder[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -450,85 +451,153 @@ export default function MaterialsPage() {
   const fileInputRef =
     useRef<HTMLInputElement | null>(null);
 
-  const ui = {
-    title: "Materialien",
-    subtitle:
-      "Materialien für den Teeniedienst",
+  const isRu = language === "ru";
 
-    search:
-      "Materialien und Ordner suchen...",
+  const ui = isRu
+    ? {
+        title: "Материалы",
+        subtitle:
+          "Материалы для служения подросткам",
 
-    root: "Teeniedienst",
+        search:
+          "Поиск материалов и папок...",
 
-    back: "Zurück",
-    newFolder: "Neuer Ordner",
-    upload: "Material hinzufügen",
+        root: "Служение подросткам",
 
-    folders: "Ordner",
-    files: "Materialien",
+        back: "Назад",
+        newFolder: "Новая папка",
+        upload: "Добавить материал",
 
-    empty:
-      "Dieser Ordner ist noch leer",
+        folders: "Папки",
+        files: "Материалы",
 
-    noResults:
-      "Keine Ergebnisse gefunden",
+        empty: "Эта папка пока пуста",
 
-    folder: "Ordner",
-    file: "Material",
+        noResults: "Ничего не найдено",
 
-    edit: "Bearbeiten",
-    delete: "Löschen",
+        folder: "Папка",
+        file: "Материал",
 
-    cancel: "Abbrechen",
-    save: "Speichern",
-    create: "Erstellen",
+        edit: "Редактировать",
+        delete: "Удалить",
 
-    nameGerman: "Deutscher Name",
-    nameRussian: "Russischer Name",
-    description: "Beschreibung",
+        cancel: "Отмена",
+        save: "Сохранить",
+        create: "Создать",
 
-    titleField: "Titel",
-    materialType: "Materialtyp",
+        nameGerman: "Название (DE)",
+        nameRussian: "Название (RU)",
+        description: "Описание",
 
-    externalLink: "Externer Link",
-    notes: "Notizen",
+        titleField: "Название",
+        materialType: "Тип материала",
 
-    chooseFile: "Datei auswählen",
-    noFile: "Keine Datei ausgewählt",
+        externalLink: "Внешняя ссылка",
+        notes: "Заметки",
 
-    deleteFolderTitle:
-      "Ordner löschen?",
+        chooseFile: "Выбрать файл",
+        noFile: "Файл не выбран",
 
-    deleteMaterialTitle:
-      "Material löschen?",
+        deleteFolderTitle: "Удалить папку?",
+        deleteMaterialTitle: "Удалить материал?",
 
-    deleteFolderText:
-      "Der Ordner und alle darin enthaltenen Elemente werden gelöscht.",
+        deleteFolderText:
+          "Папка и всё, что в ней находится, будет удалено.",
 
-    deleteMaterialText:
-      "Das Material wird dauerhaft gelöscht.",
+        deleteMaterialText:
+          "Материал будет удалён без возможности восстановления.",
 
-    deleteAllFolders:
-      "Alle Ordner löschen",
+        deleteAllFolders: "Удалить все папки",
+        deleteAllFoldersTitle: "Удалить все папки?",
 
-    deleteAllFoldersTitle:
-      "Alle Ordner löschen?",
+        deleteAllFoldersText:
+          "Все папки, вложенные подпапки и материалы внутри текущей папки будут удалены без возможности восстановления. Сама текущая папка останется.",
 
-    deleteAllFoldersText:
-      "Alle Ordner innerhalb des aktuellen Ordners, alle Unterordner und Materialien werden dauerhaft gelöscht. Der aktuelle Ordner bleibt erhalten.",
+        deleteAllFoldersConfirm: "Удалить всё",
 
-    deleteAllFoldersConfirm:
-      "Alles löschen",
+        saving: "Сохранение...",
+        deleting: "Удаление...",
+        deletingAll: "Удаление всех папок...",
+      }
+    : {
+        title: "Materialien",
+        subtitle:
+          "Materialien für den Teeniedienst",
 
-    saving:
-      "Wird gespeichert...",
+        search:
+          "Materialien und Ordner suchen...",
 
-    deleting:
-      "Wird gelöscht...",
+        root: "Teeniedienst",
 
-    deletingAll:
-      "Alle Ordner werden gelöscht...",
-  };
+        back: "Zurück",
+        newFolder: "Neuer Ordner",
+        upload: "Material hinzufügen",
+
+        folders: "Ordner",
+        files: "Materialien",
+
+        empty:
+          "Dieser Ordner ist noch leer",
+
+        noResults:
+          "Keine Ergebnisse gefunden",
+
+        folder: "Ordner",
+        file: "Material",
+
+        edit: "Bearbeiten",
+        delete: "Löschen",
+
+        cancel: "Abbrechen",
+        save: "Speichern",
+        create: "Erstellen",
+
+        nameGerman: "Deutscher Name",
+        nameRussian: "Russischer Name",
+        description: "Beschreibung",
+
+        titleField: "Titel",
+        materialType: "Materialtyp",
+
+        externalLink: "Externer Link",
+        notes: "Notizen",
+
+        chooseFile: "Datei auswählen",
+        noFile: "Keine Datei ausgewählt",
+
+        deleteFolderTitle:
+          "Ordner löschen?",
+
+        deleteMaterialTitle:
+          "Material löschen?",
+
+        deleteFolderText:
+          "Der Ordner und alle darin enthaltenen Elemente werden gelöscht.",
+
+        deleteMaterialText:
+          "Das Material wird dauerhaft gelöscht.",
+
+        deleteAllFolders:
+          "Alle Ordner löschen",
+
+        deleteAllFoldersTitle:
+          "Alle Ordner löschen?",
+
+        deleteAllFoldersText:
+          "Alle Ordner innerhalb des aktuellen Ordners, alle Unterordner und Materialien werden dauerhaft gelöscht. Der aktuelle Ordner bleibt erhalten.",
+
+        deleteAllFoldersConfirm:
+          "Alles löschen",
+
+        saving:
+          "Wird gespeichert...",
+
+        deleting:
+          "Wird gelöscht...",
+
+        deletingAll:
+          "Alle Ordner werden gelöscht...",
+      };
 
   /*
    * ============================================
@@ -1023,7 +1092,9 @@ export default function MaterialsPage() {
       console.error(error);
 
       alert(
-        "Der Ordner konnte nicht gespeichert werden.",
+        isRu
+          ? "Не удалось сохранить папку."
+          : "Der Ordner konnte nicht gespeichert werden.",
       );
     } finally {
       setSaving(false);
@@ -1077,7 +1148,9 @@ export default function MaterialsPage() {
       console.error(error);
 
       alert(
-        "Der Ordner konnte nicht gelöscht werden.",
+        isRu
+          ? "Не удалось удалить папку."
+          : "Der Ordner konnte nicht gelöscht werden.",
       );
     } finally {
       setDeleting(false);
@@ -1216,7 +1289,9 @@ export default function MaterialsPage() {
       console.error(error);
 
       alert(
-        "Die Ordner konnten nicht vollständig gelöscht werden.",
+        isRu
+          ? "Не удалось удалить все папки полностью."
+          : "Die Ordner konnten nicht vollständig gelöscht werden.",
       );
     } finally {
       setDeleting(false);
@@ -1630,7 +1705,9 @@ export default function MaterialsPage() {
       }
 
       alert(
-        "Das Material konnte nicht gespeichert werden.",
+        isRu
+          ? "Не удалось сохранить материал."
+          : "Das Material konnte nicht gespeichert werden.",
       );
     } finally {
       setSaving(false);
@@ -1689,7 +1766,9 @@ export default function MaterialsPage() {
       console.error(error);
 
       alert(
-        "Das Material konnte nicht gelöscht werden.",
+        isRu
+          ? "Не удалось удалить материал."
+          : "Das Material konnte nicht gelöscht werden.",
       );
     } finally {
       setDeleting(false);
@@ -1821,7 +1900,9 @@ export default function MaterialsPage() {
         {!adminChecking && (
           <div className="mb-3 flex items-center justify-between rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-xs">
             <span className="text-neutral-400">
-              TLeiter Materialien
+              {isRu
+                ? "Материалы TLeiter"
+                : "TLeiter Materialien"}
             </span>
 
             <span
@@ -1833,7 +1914,9 @@ export default function MaterialsPage() {
             >
               {canManage
                 ? "Admin"
-                : "Nur ansehen"}
+                : isRu
+                  ? "Только просмотр"
+                  : "Nur ansehen"}
             </span>
           </div>
         )}
@@ -1923,7 +2006,7 @@ export default function MaterialsPage() {
         <section className="overflow-hidden rounded-[26px] border border-neutral-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.05)]">
           {loading ? (
             <div className="flex min-h-[280px] items-center justify-center text-sm text-neutral-400">
-              Wird geladen...
+              {isRu ? "Загрузка..." : "Wird geladen..."}
             </div>
           ) : totalItems === 0 ? (
             <div className="flex min-h-[280px] flex-col items-center justify-center px-6 text-center">

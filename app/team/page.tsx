@@ -1031,7 +1031,7 @@ export default function TeamPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f5f4] text-neutral-900">
-      <main className="mx-auto min-h-screen w-full max-w-[760px] px-4 pb-8 sm:px-6">
+      <main className="mx-auto min-h-screen w-full max-w-[760px] px-4 pb-32 sm:px-6">
         {/* Top bar */}
         {/* Top bar */}
 {/* Top bar */}
