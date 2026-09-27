@@ -17,7 +17,6 @@ const geistMono = Geist_Mono({
 });
 
 const siteUrl = "https://tlight-workspace.vercel.app";
-const ogImage = `${siteUrl}/opengraph-image`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -75,23 +74,12 @@ export const metadata: Metadata = {
     title: "TLight — Team Workspace",
     description: "Dienst. Team. Ein Ort.",
     locale: "de_DE",
-
-    images: [
-      {
-        url: ogImage,
-        width: 1200,
-        height: 630,
-        type: "image/png",
-        alt: "TLight — Team Workspace",
-      },
-    ],
   },
 
   twitter: {
     card: "summary_large_image",
     title: "TLight — Team Workspace",
     description: "Dienst. Team. Ein Ort.",
-    images: [ogImage],
   },
 
   appleWebApp: {

@@ -20,7 +20,7 @@ export const contentType = "image/png";
 const LOGO_URL =
   "https://tlight-workspace.vercel.app/tlite-logo.png";
 
-export default function OpenGraphImage() {
+export default function TwitterImage() {
   return new ImageResponse(
     (
       <div

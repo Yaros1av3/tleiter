@@ -120,30 +120,30 @@ export default function WorkPage() {
 
   const text = {
     teamWork: isRu ? "Рабочее пространство" : "Team Work",
-    title: isRu ? "Работа" : "Arbeit",
+    title: isRu ? "Проекты" : "Projekte",
     description: isRu
-      ? "Здесь собраны все общие работы, проекты и подготовки команды."
-      : "Hier seht ihr alle gemeinsamen Arbeiten, Projekte und Vorbereitungen des Teams.",
+      ? "Здесь собраны все общие проекты и подготовки команды."
+      : "Hier seht ihr alle gemeinsamen Projekte und Vorbereitungen des Teams.",
 
-    newWork: isRu ? "Новая работа" : "Neue Arbeit",
+    newWork: isRu ? "Новый проект" : "Neues Projekt",
 
     current: isRu ? "Сейчас" : "Aktuell",
-    ongoing: isRu ? "Текущие работы" : "Laufende Arbeiten",
+    ongoing: isRu ? "Текущие проекты" : "Laufende Projekte",
 
     overview: isRu ? "Обзор" : "Übersicht",
-    allWork: isRu ? "Все работы" : "Alle Arbeiten",
+    allWork: isRu ? "Все проекты" : "Alle Projekte",
 
     noOtherWork: isRu
-      ? "Других работ пока нет."
-      : "Keine weiteren Arbeiten vorhanden.",
+      ? "Других проектов пока нет."
+      : "Keine weiteren Projekte vorhanden.",
 
     noWorkTitle: isRu
-      ? "Пока нет работ"
-      : "Noch keine Arbeiten",
+      ? "Пока нет проектов"
+      : "Noch keine Projekte",
 
     noWorkDescription: isRu
-      ? "Создайте первую общую работу, например для мероприятия, поездки или другого проекта."
-      : "Erstellt eure erste gemeinsame Arbeit, zum Beispiel für einen Event, eine Freizeit oder ein anderes Vorhaben.",
+      ? "Создайте первый общий проект, например для мероприятия, поездки или другой подготовки."
+      : "Erstellt euer erstes gemeinsames Projekt, zum Beispiel für einen Event, eine Freizeit oder ein anderes Vorhaben.",
 
     progress: isRu ? "Прогресс" : "Fortschritt",
     tasks: isRu ? "Задачи" : "Aufgaben",
@@ -159,20 +159,20 @@ export default function WorkPage() {
     close: isRu ? "Закрыть" : "Schließen",
 
     editWork: isRu
-      ? "Редактировать работу"
-      : "Arbeit bearbeiten",
+      ? "Редактировать проект"
+      : "Projekt bearbeiten",
 
     editWorkShort: isRu
-      ? "Редактирование работы"
-      : "Arbeit bearbeiten",
+      ? "Редактирование проекта"
+      : "Projekt bearbeiten",
 
     deleteWork: isRu
-      ? "Удалить работу"
-      : "Arbeit löschen",
+      ? "Удалить проект"
+      : "Projekt löschen",
 
     deleteWorkQuestion: isRu
-      ? "Удалить работу?"
-      : "Arbeit löschen?",
+      ? "Удалить проект?"
+      : "Projekt löschen?",
 
     deleteQuestion: isRu
       ? "Вы действительно хотите удалить"
@@ -187,8 +187,8 @@ export default function WorkPage() {
       : "Diese Aktion kann nicht rückgängig gemacht werden.",
 
     deleteDescription: isRu
-      ? "Все задачи, чек-листы и связанные данные этой работы также будут удалены."
-      : "Alle Aufgaben, Checklisten und zugehörigen Daten dieser Arbeit werden ebenfalls gelöscht.",
+      ? "Все задачи, чек-листы и связанные данные этого проекта также будут удалены."
+      : "Alle Aufgaben, Checklisten und zugehörigen Daten dieses Projekts werden ebenfalls gelöscht.",
 
     cancel: isRu ? "Отмена" : "Abbrechen",
 
@@ -198,7 +198,7 @@ export default function WorkPage() {
 
     deleting: isRu ? "Удаление..." : "Wird gelöscht...",
 
-    createTitle: isRu ? "Новая работа" : "Neue Arbeit",
+    createTitle: isRu ? "Новый проект" : "Neues Projekt",
 
     titleLabel: isRu ? "Название" : "Titel",
 
@@ -211,8 +211,8 @@ export default function WorkPage() {
       : "Beschreibung",
 
     descriptionPlaceholder: isRu
-      ? "О чём эта работа?"
-      : "Worum geht es bei dieser Arbeit?",
+      ? "О чём этот проект?"
+      : "Worum geht es bei diesem Projekt?",
 
     start: isRu ? "Начало" : "Start",
     end: isRu ? "Окончание" : "Ende",
@@ -224,8 +224,8 @@ export default function WorkPage() {
     archived: isRu ? "В архиве" : "Archiviert",
 
     createWork: isRu
-      ? "Создать работу"
-      : "Arbeit erstellen",
+      ? "Создать проект"
+      : "Projekt erstellen",
 
     creating: isRu
       ? "Создание..."
@@ -248,12 +248,12 @@ export default function WorkPage() {
       : "Kein eingeloggter Benutzer gefunden.",
 
     errorCreate: isRu
-      ? "Не удалось создать работу."
-      : "Die Arbeit konnte nicht erstellt werden.",
+      ? "Не удалось создать проект."
+      : "Das Projekt konnte nicht erstellt werden.",
 
     errorSave: isRu
-      ? "Не удалось сохранить работу."
-      : "Die Arbeit konnte nicht gespeichert werden.",
+      ? "Не удалось сохранить проект."
+      : "Das Projekt konnte nicht gespeichert werden.",
 
     loadingProjects: isRu
       ? "Загрузка..."
@@ -372,7 +372,7 @@ export default function WorkPage() {
 
     if (projectError) {
       console.error(
-        "Fehler beim Laden der Arbeiten:",
+        "Fehler beim Laden der Projekte:",
         projectError
       );
 

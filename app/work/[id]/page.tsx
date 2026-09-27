@@ -215,13 +215,13 @@ export default function WorkProjectPage() {
   const text =
     language === "ru"
       ? {
-          teamWork: "Командная работа",
-          work: "Работа",
+          teamWork: "Командные проекты",
+          work: "Проект",
 
-          notFound: "Работа не найдена",
-          allWorks: "Ко всем работам",
+          notFound: "Проект не найден",
+          allWorks: "Ко всем проектам",
 
-          deleteWork: "Удалить работу",
+          deleteWork: "Удалить проект",
           addTask: "Добавить задачу",
 
           planned: "Запланировано",
@@ -242,7 +242,7 @@ export default function WorkProjectPage() {
           noTasks: "Пока нет задач",
           addTaskButton: "Добавить задачу",
 
-          workStatus: "Состояние работы",
+          workStatus: "Статус проекта",
           noTasksColumn: "Нет задач",
 
           task: "Задача",
@@ -306,13 +306,13 @@ export default function WorkProjectPage() {
           deleting: "Удаление...",
 
           deleteProjectTitle:
-            "Удалить работу?",
+            "Удалить проект?",
           deleteProjectQuestion:
             "Ты действительно хочешь удалить",
           deleteProjectWarning:
             "Это действие нельзя отменить.",
           deleteProjectDescription:
-            "Все задачи и чек-листы этой работы также будут удалены.",
+            "Все задачи и чек-листы этого проекта также будут удалены.",
           deleteForever:
             "Удалить окончательно",
 
@@ -329,18 +329,18 @@ export default function WorkProjectPage() {
           taskDeleteError:
             "Не удалось удалить задачу.",
           projectDeleteError:
-            "Не удалось удалить работу.",
+            "Не удалось удалить проект.",
           checklistError:
             "Не удалось изменить чек-лист.",
         }
       : {
-          teamWork: "Team Work",
-          work: "Arbeit",
+          teamWork: "Team Projekte",
+          work: "Projekt",
 
-          notFound: "Arbeit nicht gefunden",
-          allWorks: "Zu allen Arbeiten",
+          notFound: "Projekt nicht gefunden",
+          allWorks: "Zu allen Projekten",
 
-          deleteWork: "Arbeit löschen",
+          deleteWork: "Projekt löschen",
           addTask: "Aufgabe hinzufügen",
 
           planned: "Geplant",
@@ -361,7 +361,7 @@ export default function WorkProjectPage() {
           noTasks: "Noch keine Aufgaben",
           addTaskButton: "Aufgabe hinzufügen",
 
-          workStatus: "Arbeitsstand",
+          workStatus: "Projektstatus",
           noTasksColumn: "Keine Aufgaben",
 
           task: "Aufgabe",
@@ -425,13 +425,13 @@ export default function WorkProjectPage() {
           deleting: "Wird gelöscht...",
 
           deleteProjectTitle:
-            "Arbeit löschen?",
+            "Projekt löschen?",
           deleteProjectQuestion:
             "Möchtest du",
           deleteProjectWarning:
             "Diese Aktion kann nicht rückgängig gemacht werden.",
           deleteProjectDescription:
-            "Alle Aufgaben und Checklisten dieser Arbeit werden ebenfalls gelöscht.",
+            "Alle Aufgaben und Checklisten dieses Projekts werden ebenfalls gelöscht.",
           deleteForever:
             "Endgültig löschen",
 
@@ -448,7 +448,7 @@ export default function WorkProjectPage() {
           taskDeleteError:
             "Die Aufgabe konnte nicht gelöscht werden.",
           projectDeleteError:
-            "Die Arbeit konnte nicht gelöscht werden.",
+            "Das Projekt konnte nicht gelöscht werden.",
           checklistError:
             "Die Checkliste konnte nicht geändert werden.",
         };
