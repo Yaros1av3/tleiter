@@ -350,92 +350,6 @@ export default function TeensPage() {
       }
     );
 
-  async function markBirthdayCelebrated(
-    teen: Teen
-  ) {
-    const celebrationDate = dateToISO(
-      birthdayWeek.nextSunday
-    );
-
-    const existing =
-      birthdayCelebrations.find(
-        (item) =>
-          item.teen_id === teen.id &&
-          item.birthday_year ===
-            currentYear
-      );
-
-    if (existing) {
-      const { data, error } =
-        await supabase
-          .from(
-            "teen_birthday_celebrations"
-          )
-          .update({
-            celebrated: true,
-            celebration_date:
-              celebrationDate,
-            updated_at:
-              new Date().toISOString(),
-          })
-          .eq("id", existing.id)
-          .select()
-          .single();
-
-      if (error) {
-        console.error(
-          "❌ Error updating birthday",
-          error
-        );
-        return;
-      }
-
-      setBirthdayCelebrations(
-        (current) =>
-          current.map((item) =>
-            item.id === existing.id
-              ? data
-              : item
-          )
-      );
-
-      return;
-    }
-
-    const { data, error } =
-      await supabase
-        .from(
-          "teen_birthday_celebrations"
-        )
-        .insert({
-          teen_id: teen.id,
-          birthday_year:
-            currentYear,
-          celebration_date:
-            celebrationDate,
-          celebrated: true,
-          updated_at:
-            new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-    if (error) {
-      console.error(
-        "❌ Error saving birthday",
-        error
-      );
-      return;
-    }
-
-    setBirthdayCelebrations(
-      (current) => [
-        ...current,
-        data,
-      ]
-    );
-  }
-
   function getGenderLabel(
     value: Gender | null
   ) {
@@ -1141,25 +1055,6 @@ export default function TeensPage() {
                           : "Jahre"}
                       </p>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        markBirthdayCelebrated(
-                          teen
-                        )
-                      }
-                      className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-bold text-neutral-900 transition active:scale-95"
-                    >
-                      <Check
-                        size={13}
-                        strokeWidth={2.3}
-                      />
-
-                      {isRu
-                        ? "Поздравили"
-                        : "Gratuliert"}
-                    </button>
                   </div>
                 )
               )}

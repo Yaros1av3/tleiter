@@ -467,83 +467,6 @@ export default function Home() {
       );
   }, [teens, birthdayCelebrations, today]);
 
-  async function markBirthdayCelebrated(teenId: number) {
-    const year = today.getFullYear();
-
-    const existing = birthdayCelebrations.find(
-      (item) =>
-        item.teen_id === teenId &&
-        item.birthday_year === year,
-    );
-
-    if (existing) {
-      const { error } = await supabase
-        .from("teen_birthday_celebrations")
-        .update({
-          celebrated: true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-
-      if (error) {
-        console.error(
-          "Dashboard birthday update:",
-          error,
-        );
-        return;
-      }
-
-      setBirthdayCelebrations((current) =>
-        current.map((item) =>
-          item.id === existing.id
-            ? { ...item, celebrated: true }
-            : item,
-        ),
-      );
-
-      return;
-    }
-
-    const teen = teens.find((item) => item.id === teenId);
-
-    if (!teen) return;
-
-    const candidate = getBirthdayCelebrationCandidate(
-      teen.birth_date,
-      today,
-    );
-
-    if (!candidate) return;
-
-    const { data, error } = await supabase
-      .from("teen_birthday_celebrations")
-      .insert({
-        teen_id: teenId,
-        birthday_year: year,
-        celebration_date: candidate,
-        celebrated: true,
-      })
-      .select(
-        "id, teen_id, birthday_year, celebration_date, celebrated",
-      )
-      .single();
-
-    if (error) {
-      console.error(
-        "Dashboard birthday insert:",
-        error,
-      );
-      return;
-    }
-
-    if (data) {
-      setBirthdayCelebrations((current) => [
-        ...current,
-        data,
-      ]);
-    }
-  }
-
   const currentWork = useMemo(() => {
     const active = workProjects.find(
       (project) => project.status === "active",
@@ -996,23 +919,6 @@ export default function Home() {
                                 )} gratulieren`}
                           </p>
                         </div>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            markBirthdayCelebrated(
-                              teen.id,
-                            )
-                          }
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-[15px] font-semibold text-neutral-600 transition active:scale-95"
-                          aria-label={
-                            isRu
-                              ? "Поздравление выполнено"
-                              : "Als gratuliert markieren"
-                          }
-                        >
-                          ✓
-                        </button>
                       </div>
                     ),
                   )}

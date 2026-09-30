@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   BriefcaseBusiness,
   CalendarDays,
+  CalendarRange,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -198,6 +199,27 @@ function getMonthDays(monthDate: Date) {
   return days;
 }
 
+function getWeekDays(anyDayInWeek: Date) {
+  let mondayIndex = anyDayInWeek.getDay();
+  mondayIndex = mondayIndex === 0 ? 6 : mondayIndex - 1;
+
+  const monday = new Date(
+    anyDayInWeek.getFullYear(),
+    anyDayInWeek.getMonth(),
+    anyDayInWeek.getDate() - mondayIndex,
+  );
+
+  const days: Date[] = [];
+
+  for (let i = 0; i < 7; i++) {
+    days.push(
+      new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i),
+    );
+  }
+
+  return days;
+}
+
 function nextOccurrence(date: Date, recurrence: Recurrence) {
   const next = new Date(date);
 
@@ -318,6 +340,8 @@ export default function CalendarPage() {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
+  const [view, setView] = useState<"month" | "week">("month");
+
   const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
   const [events, setEvents] = useState<Event[]>([]);
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
@@ -340,6 +364,11 @@ export default function CalendarPage() {
   const [form, setForm] = useState<EventForm>(emptyForm);
 
   const days = useMemo(() => getMonthDays(currentMonth), [currentMonth]);
+
+  const weekDays = useMemo(
+    () => getWeekDays(localDateFromKey(selectedDate)),
+    [selectedDate],
+  );
 
   const workCalendarEvents = useMemo<Event[]>(() => {
     return workItems
@@ -434,10 +463,55 @@ export default function CalendarPage() {
     });
   }, [calendarEvents, currentMonth]);
 
+  const weekEvents = useMemo(() => {
+    const weekStart = weekDays[0];
+    const weekEnd = new Date(
+      weekDays[6].getFullYear(),
+      weekDays[6].getMonth(),
+      weekDays[6].getDate() + 1,
+    );
+
+    return calendarEvents
+      .filter((event) => {
+        const start = new Date(event.start_at);
+        const end = new Date(event.end_at);
+        return start < weekEnd && end > weekStart;
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
+      );
+  }, [calendarEvents, weekDays]);
+
   const monthLabel = currentMonth.toLocaleDateString(
     language === "ru" ? "ru-RU" : "de-DE",
     { month: "long", year: "numeric" }
   );
+
+  const weekLabel = useMemo(() => {
+    const start = weekDays[0];
+    const end = weekDays[6];
+    const locale = language === "ru" ? "ru-RU" : "de-DE";
+
+    const sameMonth =
+      start.getMonth() === end.getMonth() &&
+      start.getFullYear() === end.getFullYear();
+
+    const startLabel = start.toLocaleDateString(
+      locale,
+      sameMonth
+        ? { day: "numeric" }
+        : { day: "numeric", month: "short" },
+    );
+
+    const endLabel = end.toLocaleDateString(locale, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+
+    return `${startLabel} – ${endLabel}`;
+  }, [weekDays, language]);
 
   const weekdays =
     language === "ru"
@@ -522,6 +596,26 @@ export default function CalendarPage() {
         1
       )
     );
+  };
+
+  const changeWeek = (offset: number) => {
+    const base = localDateFromKey(selectedDate);
+    const next = new Date(
+      base.getFullYear(),
+      base.getMonth(),
+      base.getDate() + offset * 7,
+    );
+
+    setSelectedDate(dateKey(next));
+
+    /* держим currentMonth в синхроне, чтобы диапазон загрузки
+       событий (±1 месяц) всегда покрывал показанную неделю */
+    if (
+      next.getMonth() !== currentMonth.getMonth() ||
+      next.getFullYear() !== currentMonth.getFullYear()
+    ) {
+      setCurrentMonth(new Date(next.getFullYear(), next.getMonth(), 1));
+    }
   };
 
   const selectDay = (date: Date) => {
@@ -987,7 +1081,7 @@ export default function CalendarPage() {
               {language === "ru" ? "Календарь" : "Kalender"}
             </div>
             <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">
-              {monthLabel}
+              {view === "month" ? monthLabel : weekLabel}
             </h1>
           </div>
 
@@ -1004,6 +1098,49 @@ export default function CalendarPage() {
           </button>
         </header>
 
+        {/* VIEW SWITCH + LEGEND */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex rounded-xl border border-neutral-200 bg-white p-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setView("month")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                view === "month"
+                  ? "bg-neutral-950 text-white"
+                  : "text-neutral-500 hover:text-neutral-900"
+              }`}
+            >
+              <CalendarDays size={14} />
+              {language === "ru" ? "Месяц" : "Monat"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setView("week")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                view === "week"
+                  ? "bg-neutral-950 text-white"
+                  : "text-neutral-500 hover:text-neutral-900"
+              }`}
+            >
+              <CalendarRange size={14} />
+              {language === "ru" ? "Неделя" : "Woche"}
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1">
+            {categories.map((category) => (
+              <div
+                key={category.id}
+                className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-500"
+              >
+                <span className={`h-2 w-2 rounded-full ${category.dot}`} />
+                {language === "ru" ? category.ru : category.de}
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* NAVIGATION */}
         <section className="mb-4 flex items-center justify-between rounded-2xl border border-neutral-200 bg-white p-2 shadow-sm">
           <button
@@ -1017,53 +1154,74 @@ export default function CalendarPage() {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => changeMonth(-1)}
+              onClick={() =>
+                view === "month" ? changeMonth(-1) : changeWeek(-1)
+              }
               className="flex h-10 w-10 items-center justify-center rounded-xl text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
-              aria-label={language === "ru" ? "Предыдущий месяц" : "Vorheriger Monat"}
+              aria-label={
+                language === "ru"
+                  ? view === "month"
+                    ? "Предыдущий месяц"
+                    : "Предыдущая неделя"
+                  : view === "month"
+                    ? "Vorheriger Monat"
+                    : "Vorherige Woche"
+              }
             >
               <ChevronLeft size={19} />
             </button>
 
             <button
               type="button"
-              onClick={() => changeMonth(1)}
+              onClick={() =>
+                view === "month" ? changeMonth(1) : changeWeek(1)
+              }
               className="flex h-10 w-10 items-center justify-center rounded-xl text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
-              aria-label={language === "ru" ? "Следующий месяц" : "Nächster Monat"}
+              aria-label={
+                language === "ru"
+                  ? view === "month"
+                    ? "Следующий месяц"
+                    : "Следующая неделя"
+                  : view === "month"
+                    ? "Nächster Monat"
+                    : "Nächste Woche"
+              }
             >
               <ChevronRight size={19} />
             </button>
           </div>
         </section>
 
-        {/* CALENDAR */}
-        <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
-          <div className="grid grid-cols-7 border-b border-neutral-200 bg-neutral-50">
-            {weekdays.map((day) => (
-              <div
-                key={day}
-                className="py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-neutral-400"
-              >
-                {day}
-              </div>
-            ))}
-          </div>
+        {/* CALENDAR: MONTH VIEW */}
+        {view === "month" && (
+          <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
+            <div className="grid grid-cols-7 border-b border-neutral-200 bg-neutral-50">
+              {weekdays.map((day) => (
+                <div
+                  key={day}
+                  className="py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-neutral-400"
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
 
-          <div className="grid grid-cols-7">
-            {days.map((day, index) => {
-              const key = dateKey(day);
-              const isCurrentMonth =
-                day.getMonth() === currentMonth.getMonth() &&
-                day.getFullYear() === currentMonth.getFullYear();
-              const isSelected = key === selectedDate;
-              const isTodayKey = key === dateKey(new Date());
+            <div className="grid grid-cols-7">
+              {days.map((day, index) => {
+                const key = dateKey(day);
+                const isCurrentMonth =
+                  day.getMonth() === currentMonth.getMonth() &&
+                  day.getFullYear() === currentMonth.getFullYear();
+                const isSelected = key === selectedDate;
+                const isTodayKey = key === dateKey(new Date());
 
-              const dayEvents = monthEvents.filter((event) =>
-                eventOverlapsDate(event, key)
-              );
+                const dayEvents = monthEvents.filter((event) =>
+                  eventOverlapsDate(event, key)
+                );
 
-              return (
-                <button
-                  type="button"
+                return (
+                  <button
+                    type="button"
                   key={`${key}-${index}`}
                   onClick={() => selectDay(day)}
                   className={`relative min-h-[68px] border-b border-r border-neutral-200 p-1.5 text-left transition sm:min-h-[104px] sm:p-2 ${
@@ -1119,6 +1277,89 @@ export default function CalendarPage() {
             })}
           </div>
         </section>
+        )}
+
+        {/* CALENDAR: WEEK VIEW */}
+        {view === "week" && (
+          <section className="space-y-2.5">
+            {weekDays.map((day) => {
+              const key = dateKey(day);
+              const isSelected = key === selectedDate;
+              const isTodayKey = key === dateKey(new Date());
+
+              const dayEvents = weekEvents.filter((event) =>
+                eventOverlapsDate(event, key)
+              );
+
+              return (
+                <button
+                  type="button"
+                  key={key}
+                  onClick={() => selectDay(day)}
+                  className={`flex w-full items-stretch gap-3 rounded-2xl border bg-white p-3 text-left shadow-sm transition ${
+                    isSelected
+                      ? "border-neutral-950 ring-2 ring-neutral-900"
+                      : "border-neutral-200 hover:border-neutral-300"
+                  }`}
+                >
+                  <div className="flex w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-neutral-50 py-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                      {day.toLocaleDateString(
+                        language === "ru" ? "ru-RU" : "de-DE",
+                        { weekday: "short" }
+                      )}
+                    </span>
+                    <span
+                      className={`mt-1 flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${
+                        isTodayKey
+                          ? "bg-neutral-950 text-white"
+                          : "text-neutral-800"
+                      }`}
+                    >
+                      {day.getDate()}
+                    </span>
+                  </div>
+
+                  <div className="min-w-0 flex-1 py-0.5">
+                    {dayEvents.length === 0 ? (
+                      <div className="flex h-full items-center text-[12px] text-neutral-300">
+                        {language === "ru" ? "Пусто" : "Keine Termine"}
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {dayEvents.map((event) => {
+                          const info = categoryInfo(
+                            event.category,
+                            language
+                          );
+
+                          return (
+                            <div
+                              key={event.id}
+                              className="flex min-w-0 items-center gap-2"
+                            >
+                              <span
+                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${info.dot}`}
+                              />
+                              <span className="shrink-0 text-[11px] font-semibold text-neutral-500">
+                                {event.category === "work"
+                                  ? "Deadline"
+                                  : formatTime(event.start_at)}
+                              </span>
+                              <span className="min-w-0 truncate text-[12px] font-medium text-neutral-800">
+                                {event.title}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </section>
+        )}
 
         {/* SELECTED DAY */}
         <section className="mt-5">
