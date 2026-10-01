@@ -16,6 +16,7 @@ import {
 
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
+import PushNotifications from "@/components/PushNotifications";
 
 type Profile = {
   full_name: string | null;
@@ -635,6 +636,8 @@ export default function SettingsPage() {
 
           </div>
         </section>
+
+        <PushNotifications isRu={isRu} />
 
         {/* Logout */}
         <section className="mt-4 overflow-hidden rounded-[24px] border border-red-100 bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]">

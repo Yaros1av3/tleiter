@@ -38,6 +38,7 @@ type TeamMember = {
   last_name: string;
   position: Position;
   phone: string | null;
+  email: string | null;
   birth_date: string | null;
   languages: string[];
   status: Status;
@@ -52,6 +53,7 @@ type MemberForm = {
   last_name: string;
   position: Position;
   phone: string;
+  email: string;
   birth_date: string;
   languages: string[];
   status: Status;
@@ -100,6 +102,7 @@ const emptyForm: MemberForm = {
   last_name: "",
   position: "co_leiter",
   phone: "",
+  email: "",
   birth_date: "",
   languages: [],
   status: "active",
@@ -723,6 +726,7 @@ export default function TeamPage() {
       last_name: member.last_name,
       position: member.position,
       phone: member.phone ?? "",
+      email: member.email ?? "",
       birth_date: member.birth_date ?? "",
       languages: member.languages ?? [],
       status: member.status,
@@ -859,6 +863,7 @@ export default function TeamPage() {
       last_name: form.last_name.trim(),
       position: form.position,
       phone: form.phone.trim() || null,
+      email: form.email.trim() || null,
       birth_date: form.birth_date || null,
       languages: form.languages,
       status: form.status,
@@ -2325,6 +2330,32 @@ export default function TeamPage() {
                     </option>
                   </select>
                 </div>
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="mb-2 block text-xs font-bold text-neutral-700">
+                  Email
+                </label>
+
+                <input
+                  value={form.email}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }))
+                  }
+                  placeholder="name@beispiel.de"
+                  type="email"
+                  className="h-12 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
+                />
+
+                <p className="mt-1.5 px-1 text-[11px] text-neutral-400">
+                  {language === "de"
+                    ? "Muss mit der E-Mail übereinstimmen, mit der sich die Person registriert — nötig für Dienst-Erinnerungen."
+                    : "Должен совпадать с email, на который человек регистрируется — нужен для напоминаний о служении."}
+                </p>
               </div>
 
               {/* Phone + Birthday */}
