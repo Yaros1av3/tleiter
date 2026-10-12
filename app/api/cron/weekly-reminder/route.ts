@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /*
- * Вызывается Vercel Cron (см. vercel.json) раз в неделю.
+ * Вызывается Vercel Cron (см. vercel.json) по вторникам в 16:00 (Берлин).
  * Находит ближайшее воскресенье, смотрит, кто стоит в плане
  * (schedule_entries + schedule_entry_members), и шлёт push
  * каждому служителю, у которого team_members.user_id привязан
@@ -41,24 +41,67 @@ type SubscriptionRow = {
   auth: string;
 };
 
-function nextSundayDateString(from: Date) {
-  const daysUntilSunday = (7 - from.getDay()) % 7;
-  const target = new Date(from);
-  target.setDate(target.getDate() + daysUntilSunday);
+const REMINDER_TIMEZONE = "Europe/Berlin";
+const REMINDER_HOUR = 16;
 
-  const year = target.getFullYear();
-  const month = String(target.getMonth() + 1).padStart(2, "0");
-  const day = String(target.getDate()).padStart(2, "0");
+function getBerlinNow(now: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: REMINDER_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
 
-  return `${year}-${month}-${day}`;
+  const get = (type: string) =>
+    Number(parts.find((part) => part.type === type)?.value);
+
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    hour: get("hour"),
+  };
+}
+
+function nextSundayFrom(year: number, month: number, day: number) {
+  const base = new Date(Date.UTC(year, month - 1, day));
+  const daysUntilSunday = (7 - base.getUTCDay()) % 7;
+  base.setUTCDate(base.getUTCDate() + daysUntilSunday);
+
+  const y = base.getUTCFullYear();
+  const m = String(base.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(base.getUTCDate()).padStart(2, "0");
+
+  return `${y}-${m}-${d}`;
 }
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = request.headers.get("authorization");
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret) {
+    return NextResponse.json(
+      { error: "CRON_SECRET is not configured" },
+      { status: 500 },
+    );
+  }
+
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // Два cron-запуска (14:00 и 15:00 UTC) — отправляем только когда в Берлине 16:xx.
+  // ?force=1 — для ручного теста (секрет всё равно нужен).
+  const berlin = getBerlinNow(new Date());
+  const force = request.nextUrl.searchParams.get("force") === "1";
+
+  if (!force && berlin.hour !== REMINDER_HOUR) {
+    return NextResponse.json({
+      skipped: true,
+      note: `Berlin hour is ${berlin.hour}, waiting for ${REMINDER_HOUR}`,
+    });
   }
 
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -75,7 +118,7 @@ export async function GET(request: NextRequest) {
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 
   const supabase = getSupabaseAdmin();
-  const sundayDate = nextSundayDateString(new Date());
+  const sundayDate = nextSundayFrom(berlin.year, berlin.month, berlin.day);
 
   const { data: entries, error: entriesError } = await supabase
     .from("schedule_entries")
