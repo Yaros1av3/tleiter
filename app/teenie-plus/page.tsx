@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft,
   Cake,
   Calendar,
   Check,
@@ -20,7 +19,6 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -424,7 +422,6 @@ function downloadBlob(blob: Blob, filename: string) {
 ===================================================== */
 
 export default function TeeniePlusPage() {
-  const router = useRouter();
   const { language } = useLanguage();
   const isRu = language === "ru";
   const locale = isRu ? "ru-RU" : "de-DE";
@@ -1059,15 +1056,6 @@ export default function TeeniePlusPage() {
     <main className="min-h-screen bg-[#f7f7f6] text-neutral-900">
       <header className="sticky top-0 z-30 border-b border-[#e6e7e8] bg-[#f7f7f6]/95 px-4 py-3 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-[760px] items-center gap-3">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#dfe2e5] bg-white text-[#374353]"
-            aria-label={isRu ? "Назад" : "Zurück"}
-          >
-            <ArrowLeft size={18} />
-          </button>
-
           <div className="min-w-0">
             <div className="text-[19px] font-bold leading-none tracking-[-0.03em] text-[#111820]">
               Teenie+
