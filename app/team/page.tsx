@@ -10,6 +10,8 @@ import {
   Filter,
   ImagePlus,
   ListTodo,
+  Mail,
+  MessageCircle,
   Phone,
   Plus,
   Search,
@@ -117,6 +119,50 @@ const positionOrder: Record<Position, number> = {
   co_leiter: 4,
   weitere: 5,
 };
+
+/* ---------- Языки: без дублей, всегда DE / RU ---------- */
+
+const LANGUAGE_META: Record<
+  string,
+  { flag: string; de: string; ru: string }
+> = {
+  DE: { flag: "🇩🇪", de: "Deutsch", ru: "Немецкий" },
+  RU: { flag: "🇷🇺", de: "Russisch", ru: "Русский" },
+};
+
+function normalizeLanguages(list: string[] | null | undefined) {
+  const set = new Set(
+    (list ?? [])
+      .map((item) => String(item).trim().toUpperCase())
+      .filter((item) => item in LANGUAGE_META),
+  );
+
+  return ["DE", "RU"].filter((item) => set.has(item));
+}
+
+/* ---------- Телефон → «позвонить» и WhatsApp ---------- */
+
+function toTelHref(phone: string) {
+  return `tel:${phone.replace(/[^\d+]/g, "")}`;
+}
+
+/* WhatsApp: номер в международном формате; 0176... считаем немецким (+49) */
+function toWhatsAppHref(phone: string) {
+  const trimmed = phone.trim();
+  const digits = trimmed.replace(/\D/g, "");
+
+  let international = digits;
+
+  if (trimmed.startsWith("+")) {
+    international = digits;
+  } else if (digits.startsWith("00")) {
+    international = digits.slice(2);
+  } else if (digits.startsWith("0")) {
+    international = `49${digits.slice(1)}`;
+  }
+
+  return `https://wa.me/${international}`;
+}
 
 function calculateAge(date: string | null) {
   if (!date) return null;
@@ -572,7 +618,7 @@ export default function TeamPage() {
 
       const matchesLanguage =
         languageFilter === "all" ||
-        member.languages.includes(languageFilter);
+        normalizeLanguages(member.languages).includes(languageFilter);
 
       const matchesStatus =
         statusFilter === "all" ||
@@ -729,7 +775,7 @@ export default function TeamPage() {
       phone: member.phone ?? "",
       email: member.email ?? "",
       birth_date: member.birth_date ?? "",
-      languages: member.languages ?? [],
+      languages: normalizeLanguages(member.languages),
       status: member.status,
       notes: member.notes ?? "",
     });
@@ -866,7 +912,7 @@ export default function TeamPage() {
       phone: form.phone.trim() || null,
       email: form.email.trim().toLowerCase() || null,
       birth_date: form.birth_date || null,
-      languages: form.languages,
+      languages: normalizeLanguages(form.languages),
       status: form.status,
       notes: form.notes.trim() || null,
       updated_at: new Date().toISOString(),
@@ -1474,6 +1520,35 @@ export default function TeamPage() {
                       </div>
                     </div>
 
+                    {/* Quick info */}
+                    {(normalizeLanguages(member.languages).length > 0 ||
+                      calculateAge(member.birth_date) !== null ||
+                      member.email) && (
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                        {normalizeLanguages(member.languages).map((item) => (
+                          <span
+                            key={item}
+                            className="rounded-lg bg-neutral-100 px-2 py-1 text-[10px] font-bold text-neutral-600"
+                          >
+                            {LANGUAGE_META[item].flag} {item}
+                          </span>
+                        ))}
+
+                        {calculateAge(member.birth_date) !== null && (
+                          <span className="rounded-lg bg-neutral-100 px-2 py-1 text-[10px] font-bold text-neutral-600">
+                            🎂 {calculateAge(member.birth_date)}{" "}
+                            {language === "de" ? "J." : "лет"}
+                          </span>
+                        )}
+
+                        {member.email && (
+                          <span className="min-w-0 max-w-full truncate rounded-lg bg-neutral-100 px-2 py-1 text-[10px] font-semibold text-neutral-500">
+                            ✉ {member.email}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     {/* Next service */}
                     <div className="mt-4">
                       {nextService ? (
@@ -1616,19 +1691,44 @@ export default function TeamPage() {
                     )}
                   </div>
 
-                  {/* Phone */}
-                  {member.phone && (
-                    <a
-                      href={`tel:${member.phone}`}
-                      onClick={(event) =>
-                        event.stopPropagation()
-                      }
-                      className="flex h-11 items-center justify-center gap-2 border-t border-neutral-100 bg-white text-xs font-bold text-neutral-600 transition active:bg-neutral-50"
+                  {/* Contact bar */}
+                  {(member.phone || member.email) && (
+                    <div
+                      className="flex border-t border-neutral-100 bg-white"
+                      onClick={(event) => event.stopPropagation()}
                     >
-                      <Phone size={14} />
+                      {member.phone && (
+                        <a
+                          href={toTelHref(member.phone)}
+                          className="flex h-11 flex-1 items-center justify-center gap-1.5 text-xs font-bold text-neutral-600 transition active:bg-neutral-50"
+                        >
+                          <Phone size={14} />
+                          {language === "de" ? "Anrufen" : "Позвонить"}
+                        </a>
+                      )}
 
-                      {member.phone}
-                    </a>
+                      {member.phone && (
+                        <a
+                          href={toWhatsAppHref(member.phone)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex h-11 flex-1 items-center justify-center gap-1.5 border-l border-neutral-100 text-xs font-bold text-emerald-600 transition active:bg-neutral-50"
+                        >
+                          <MessageCircle size={14} />
+                          WhatsApp
+                        </a>
+                      )}
+
+                      {member.email && (
+                        <a
+                          href={`mailto:${member.email}`}
+                          className="flex h-11 flex-1 items-center justify-center gap-1.5 border-l border-neutral-100 text-xs font-bold text-neutral-600 transition active:bg-neutral-50"
+                        >
+                          <Mail size={14} />
+                          E-Mail
+                        </a>
+                      )}
+                    </div>
                   )}
                 </article>
               );
@@ -1760,16 +1860,47 @@ export default function TeamPage() {
                 </div>
 
                 {selectedMember.phone && (
-                  <a
-                    href={`tel:${selectedMember.phone}`}
-                    className="mt-5 flex h-12 items-center justify-center gap-2 rounded-2xl bg-neutral-900 text-sm font-semibold text-white transition active:scale-[0.99]"
-                  >
-                    <Phone size={16} />
+                  <div className="mt-5 grid grid-cols-2 gap-2">
+                    <a
+                      href={toTelHref(selectedMember.phone)}
+                      className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-neutral-900 text-sm font-semibold text-white transition active:scale-[0.99]"
+                    >
+                      <Phone size={16} />
 
-                    {language === "de"
-                      ? `Anrufen · ${selectedMember.phone}`
-                      : `Позвонить · ${selectedMember.phone}`}
-                  </a>
+                      {language === "de" ? "Anrufen" : "Позвонить"}
+                    </a>
+
+                    <a
+                      href={toWhatsAppHref(selectedMember.phone)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#25d366] text-sm font-semibold text-white transition active:scale-[0.99]"
+                    >
+                      <MessageCircle size={16} />
+                      WhatsApp
+                    </a>
+                  </div>
+                )}
+
+                {(selectedMember.phone || selectedMember.email) && (
+                  <div className="mt-3 space-y-1.5 text-[13px] text-neutral-600">
+                    {selectedMember.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone size={14} className="shrink-0 text-neutral-400" />
+                        <span className="min-w-0 break-all">{selectedMember.phone}</span>
+                      </div>
+                    )}
+
+                    {selectedMember.email && (
+                      <a
+                        href={`mailto:${selectedMember.email}`}
+                        className="flex items-center gap-2"
+                      >
+                        <Mail size={14} className="shrink-0 text-neutral-400" />
+                        <span className="min-w-0 break-all">{selectedMember.email}</span>
+                      </a>
+                    )}
+                  </div>
                 )}
               </section>
 
@@ -1885,15 +2016,18 @@ export default function TeamPage() {
                     </div>
 
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {selectedMember.languages
-                        ?.length ? (
-                        selectedMember.languages.map(
+                      {normalizeLanguages(selectedMember.languages)
+                        .length ? (
+                        normalizeLanguages(selectedMember.languages).map(
                           (item) => (
                             <span
                               key={item}
-                              className="rounded-md bg-white px-1.5 py-1 text-[9px] font-bold text-neutral-500"
+                              className="rounded-md bg-white px-1.5 py-1 text-[11px] font-bold text-neutral-600"
                             >
-                              {item}
+                              {LANGUAGE_META[item].flag}{" "}
+                              {language === "de"
+                                ? LANGUAGE_META[item].de
+                                : LANGUAGE_META[item].ru}
                             </span>
                           ),
                         )

@@ -6,7 +6,9 @@ import {
   Check,
   ChevronDown,
   GraduationCap,
+  MessageCircle,
   Pencil,
+  Phone,
   Plus,
   RotateCcw,
   Search,
@@ -28,6 +30,11 @@ type Teen = {
   last_name: string;
   birth_date: string;
   phone: string | null;
+  parent1_name: string | null;
+  parent1_phone: string | null;
+  parent2_name: string | null;
+  parent2_phone: string | null;
+  notes: string | null;
   gender: Gender | null;
   languages: TeenLanguage[];
   is_active: boolean;
@@ -50,6 +57,89 @@ type LanguageFilter = "all" | TeenLanguage;
 type StatusFilter = "active" | "all" | "inactive";
 
 type Tab = "teens" | "graduates";
+
+/* ---------- Телефон → ссылки «позвонить» и WhatsApp ---------- */
+
+function toTelHref(phone: string) {
+  const cleaned = phone.replace(/[^\d+]/g, "");
+
+  return `tel:${cleaned}`;
+}
+
+/*
+ * Для WhatsApp нужен номер в международном формате без «+».
+ * Если номер начинается с 0 (например 0176...), считаем, что это Германия (+49).
+ */
+function toWhatsAppHref(phone: string) {
+  const trimmed = phone.trim();
+  const digits = trimmed.replace(/\D/g, "");
+
+  let international = digits;
+
+  if (trimmed.startsWith("+")) {
+    international = digits;
+  } else if (digits.startsWith("00")) {
+    international = digits.slice(2);
+  } else if (digits.startsWith("0")) {
+    international = `49${digits.slice(1)}`;
+  }
+
+  return `https://wa.me/${international}`;
+}
+
+function ContactRow({
+  label,
+  name,
+  phone,
+  callLabel,
+}: {
+  label: string;
+  name?: string | null;
+  phone: string | null;
+  callLabel: string;
+}) {
+  if (!name && !phone) return null;
+
+  return (
+    <div className="mt-2 rounded-2xl bg-neutral-50 p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+        {label}
+      </p>
+
+      {name && (
+        <p className="mt-1 text-sm font-semibold">{name}</p>
+      )}
+
+      {phone ? (
+        <>
+          <p className="mt-0.5 text-sm text-neutral-600">{phone}</p>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <a
+              href={toTelHref(phone)}
+              className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-neutral-950 text-[13px] font-bold text-white active:scale-[0.98]"
+            >
+              <Phone size={15} />
+              {callLabel}
+            </a>
+
+            <a
+              href={toWhatsAppHref(phone)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#25d366] text-[13px] font-bold text-white active:scale-[0.98]"
+            >
+              <MessageCircle size={15} />
+              WhatsApp
+            </a>
+          </div>
+        </>
+      ) : (
+        <p className="mt-0.5 text-sm text-neutral-400">—</p>
+      )}
+    </div>
+  );
+}
 
 export default function TeensPage() {
   const { language } = useLanguage();
@@ -97,6 +187,11 @@ export default function TeensPage() {
   const [lastName, setLastName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [phone, setPhone] = useState("");
+  const [parent1Name, setParent1Name] = useState("");
+  const [parent1Phone, setParent1Phone] = useState("");
+  const [parent2Name, setParent2Name] = useState("");
+  const [parent2Phone, setParent2Phone] = useState("");
+  const [notes, setNotes] = useState("");
 
   const [gender, setGender] =
     useState<Gender | "">("");
@@ -715,6 +810,11 @@ export default function TeensPage() {
     setLastName("");
     setBirthDate("");
     setPhone("");
+    setParent1Name("");
+    setParent1Phone("");
+    setParent2Name("");
+    setParent2Phone("");
+    setNotes("");
     setGender("");
     setSelectedLanguages([]);
     setIsActive(true);
@@ -744,6 +844,11 @@ export default function TeensPage() {
     setPhone(
       teen.phone ?? ""
     );
+    setParent1Name(teen.parent1_name ?? "");
+    setParent1Phone(teen.parent1_phone ?? "");
+    setParent2Name(teen.parent2_name ?? "");
+    setParent2Phone(teen.parent2_phone ?? "");
+    setNotes(teen.notes ?? "");
     setGender(
       teen.gender ?? ""
     );
@@ -802,6 +907,11 @@ export default function TeensPage() {
         birthDate,
       phone:
         cleanPhone || null,
+      parent1_name: parent1Name.trim() || null,
+      parent1_phone: parent1Phone.trim() || null,
+      parent2_name: parent2Name.trim() || null,
+      parent2_phone: parent2Phone.trim() || null,
+      notes: notes.trim() || null,
       gender:
         gender || null,
       languages:
@@ -1941,18 +2051,37 @@ export default function TeensPage() {
               </p>
             </div>
 
-            <div className="mt-2 rounded-2xl bg-neutral-50 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
-                {isRu
-                  ? "Телефон"
-                  : "Telefon"}
-              </p>
+            <ContactRow
+              label={isRu ? "Телефон подростка" : "Telefon Teenager"}
+              phone={selectedTeen.phone}
+              callLabel={isRu ? "Позвонить" : "Anrufen"}
+            />
 
-              <p className="mt-1 text-sm font-semibold">
-                {selectedTeen.phone ||
-                  "—"}
-              </p>
-            </div>
+            <ContactRow
+              label={isRu ? "Родитель 1" : "Elternteil 1"}
+              name={selectedTeen.parent1_name}
+              phone={selectedTeen.parent1_phone}
+              callLabel={isRu ? "Позвонить" : "Anrufen"}
+            />
+
+            <ContactRow
+              label={isRu ? "Родитель 2" : "Elternteil 2"}
+              name={selectedTeen.parent2_name}
+              phone={selectedTeen.parent2_phone}
+              callLabel={isRu ? "Позвонить" : "Anrufen"}
+            />
+
+            {selectedTeen.notes && (
+              <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                  {isRu ? "Заметки" : "Notizen"}
+                </p>
+
+                <p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-neutral-800">
+                  {selectedTeen.notes}
+                </p>
+              </div>
+            )}
 
             <div className="mt-2 flex items-center justify-between rounded-2xl bg-neutral-50 p-4">
               <span className="text-sm font-semibold">
@@ -2274,6 +2403,66 @@ export default function TeensPage() {
                   }
                   placeholder="+49 ..."
                   className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
+                />
+              </div>
+
+              <div className="rounded-2xl border border-neutral-200 p-3">
+                <p className="mb-2 text-xs font-bold text-neutral-700">
+                  {isRu ? "Родители" : "Eltern"}
+                </p>
+
+                <div className="space-y-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <input
+                      value={parent1Name}
+                      onChange={(event) => setParent1Name(event.target.value)}
+                      placeholder={isRu ? "Родитель 1: имя" : "Elternteil 1: Name"}
+                      className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
+                    />
+
+                    <input
+                      type="tel"
+                      value={parent1Phone}
+                      onChange={(event) => setParent1Phone(event.target.value)}
+                      placeholder={isRu ? "Телефон" : "Telefon"}
+                      className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <input
+                      value={parent2Name}
+                      onChange={(event) => setParent2Name(event.target.value)}
+                      placeholder={isRu ? "Родитель 2: имя" : "Elternteil 2: Name"}
+                      className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
+                    />
+
+                    <input
+                      type="tel"
+                      value={parent2Phone}
+                      onChange={(event) => setParent2Phone(event.target.value)}
+                      placeholder={isRu ? "Телефон" : "Telefon"}
+                      className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-neutral-700">
+                  {isRu ? "Заметки" : "Notizen"}
+                </label>
+
+                <textarea
+                  rows={4}
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder={
+                    isRu
+                      ? "Аллергии, особенности, что важно помнить..."
+                      : "Allergien, Besonderheiten, wichtige Hinweise..."
+                  }
+                  className="w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm outline-none focus:border-neutral-400 focus:bg-white"
                 />
               </div>
 

@@ -316,7 +316,9 @@ export default function AvailabilityPage() {
       .maybeSingle();
 
     if (member) {
-      return `${member.first_name} ${member.last_name}`.trim();
+      return `${member.first_name} ${
+        member.last_name.trim() === "-" ? "" : member.last_name
+      }`.trim();
     }
 
     const { data: profile } = await supabase
@@ -446,7 +448,9 @@ export default function AvailabilityPage() {
     const notResponded = teamMembers
       .filter((member) => !member.user_id || !respondedIds.has(member.user_id))
       .map((member) => ({
-        name: `${member.first_name} ${member.last_name}`.trim(),
+        name: `${member.first_name} ${
+          member.last_name.trim() === "-" ? "" : member.last_name
+        }`.trim(),
         noAccount: !member.user_id,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, locale));
