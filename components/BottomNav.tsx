@@ -11,6 +11,8 @@ import {
 
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/translations";
+import { useAvailabilityReminder } from "@/lib/useAvailabilityReminder";
+import ReminderDot from "@/components/ReminderDot";
 
 const publicRoutes = [
   "/login",
@@ -22,6 +24,7 @@ const publicRoutes = [
 export default function BottomNav() {
   const pathname = usePathname();
   const { language } = useLanguage();
+  const reminder = useAvailabilityReminder();
 
   if (publicRoutes.includes(pathname)) {
     return null;
@@ -83,10 +86,16 @@ export default function BottomNav() {
                     : "text-[#7a8490]"
                 }`}
               >
-                <Icon
-                  size={21}
-                  strokeWidth={active ? 2.3 : 2}
-                />
+                <span className="relative">
+                  <Icon
+                    size={21}
+                    strokeWidth={active ? 2.3 : 2}
+                  />
+
+                  {item.href === "/schedule" && reminder.needed && (
+                    <ReminderDot className="-right-1.5 -top-1" />
+                  )}
+                </span>
 
                 <span className="text-[10px] font-semibold leading-none">
                   {item.label}

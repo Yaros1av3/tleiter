@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   AlertCircle,
   ArrowLeft,
+  CalendarCheck,
   FileText,
   Search,
   Link2,
@@ -25,6 +26,8 @@ import { supabase } from "@/lib/supabase";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useAvailabilityReminder } from "@/lib/useAvailabilityReminder";
+import ReminderDot from "@/components/ReminderDot";
 
 type TeamMember = {
   id: number;
@@ -104,6 +107,7 @@ const emptyForm: EntryForm = {
 
 export default function SchedulePage() {
   const router = useRouter();
+  const reminder = useAvailabilityReminder();
   const { language, t } = useLanguage();
 
   const isRu = language === "ru";
@@ -1241,6 +1245,81 @@ export default function SchedulePage() {
                 </div>
               )}
           </section>
+
+          {/* =================================================
+              AVAILABILITY LINKS
+          ================================================= */}
+          {!roleLoading && (
+            <section
+              className={`mb-5 grid gap-2 ${
+                isAdmin ? "sm:grid-cols-2" : ""
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => router.push("/availability")}
+                className="flex items-center gap-3 rounded-[18px] border border-[#e1e3e6] bg-white px-4 py-3 text-left shadow-[0_2px_10px_rgba(17,24,32,0.025)] transition active:scale-[0.99]"
+              >
+                <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[#111820] text-white">
+                  <CalendarCheck size={18} />
+
+                  {reminder.needed && (
+                    <ReminderDot className="-right-0.5 -top-0.5" />
+                  )}
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14px] font-bold text-[#111820]">
+                    {isRu ? "Когда могу служить" : "Wann ich dienen kann"}
+                  </span>
+
+                  <span
+                    className={`block text-[11px] ${
+                      reminder.needed
+                        ? "font-semibold text-red-500"
+                        : "text-[#818994]"
+                    }`}
+                  >
+                    {reminder.needed
+                      ? isRu
+                        ? `Заполни на ${reminder.nextMonth.toLocaleDateString("ru-RU", { month: "long" })}`
+                        : `Bitte für ${reminder.nextMonth.toLocaleDateString("de-DE", { month: "long" })} ausfüllen`
+                      : isRu
+                        ? "Отметь свои воскресенья и служения"
+                        : "Trage deine Sonntage und Gottesdienste ein"}
+                  </span>
+                </span>
+
+                <ChevronRight size={18} className="shrink-0 text-[#b1b7bf]" />
+              </button>
+
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/availability?tab=overview")}
+                  className="flex items-center gap-3 rounded-[18px] border border-[#e1e3e6] bg-white px-4 py-3 text-left shadow-[0_2px_10px_rgba(17,24,32,0.025)] transition active:scale-[0.99]"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-emerald-600 text-white">
+                    <Users size={18} />
+                  </span>
+
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-bold text-[#111820]">
+                      {isRu ? "Сводка доступности" : "Verfügbarkeit im Team"}
+                    </span>
+
+                    <span className="block text-[11px] text-[#818994]">
+                      {isRu
+                        ? "Кто когда может служить"
+                        : "Wer wann dienen kann"}
+                    </span>
+                  </span>
+
+                  <ChevronRight size={18} className="shrink-0 text-[#b1b7bf]" />
+                </button>
+              )}
+            </section>
+          )}
 
           {/* =================================================
               MONTH NAVIGATION

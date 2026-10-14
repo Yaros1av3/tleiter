@@ -6,6 +6,7 @@ import {
   ArrowRight,
   BriefcaseBusiness,
   Cake,
+  CalendarCheck,
   CalendarDays,
   CalendarRange,
   Clock3,
@@ -18,6 +19,8 @@ import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
 import { translations } from "@/lib/translations";
+import { useAvailabilityReminder } from "@/lib/useAvailabilityReminder";
+import ReminderDot from "@/components/ReminderDot";
 import { useLanguage } from "@/components/LanguageProvider";
 
 type WorkProject = {
@@ -210,6 +213,7 @@ function formatProjectPeriod(
 export default function Home() {
   const router = useRouter();
   const { language } = useLanguage();
+  const reminder = useAvailabilityReminder();
 
   const t = translations[language];
 
@@ -590,6 +594,14 @@ export default function Home() {
       icon: ListChecks,
     },
     {
+      href: "/availability",
+      label: isRu ? "Когда могу служить" : "Wann ich dienen kann",
+      description: isRu
+        ? "Мои воскресенья и служения"
+        : "Meine Sonntage und Gottesdienste",
+      icon: CalendarCheck,
+    },
+    {
       href: "/settings",
       label: isRu ? "Настройки" : "Einstellungen",
       description: isRu
@@ -637,7 +649,7 @@ export default function Home() {
               aria-label={
                 isRu ? "Ещё" : "Mehr"
               }
-              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border shadow-[0_2px_8px_rgba(17,24,32,0.05)] transition active:scale-95 ${
+              className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border shadow-[0_2px_8px_rgba(17,24,32,0.05)] transition active:scale-95 ${
                 moreOpen
                   ? "border-[#111820] bg-[#111820] text-white"
                   : "border-[#dfe2e5] bg-white text-[#374353]"
@@ -651,11 +663,47 @@ export default function Home() {
               ) : (
                 <MoreIcon size={22} />
               )}
+
+              {reminder.needed && !moreOpen && (
+                <ReminderDot className="right-0 top-0" />
+              )}
             </button>
           </div>
         </header>
 
         <div className="mx-auto w-full max-w-[760px] px-4 pb-28 sm:px-6">
+          {/* =====================================================
+              AVAILABILITY REMINDER
+          ====================================================== */}
+          {reminder.needed && (
+            <button
+              type="button"
+              onClick={() => router.push("/availability")}
+              className="mt-5 flex w-full items-center gap-3 rounded-[20px] border border-red-200 bg-red-50 px-4 py-3.5 text-left transition active:scale-[0.99]"
+            >
+              <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-red-500 text-white">
+                <CalendarCheck size={19} />
+                <ReminderDot className="-right-0.5 -top-0.5" />
+              </span>
+
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-bold text-red-700">
+                  {isRu
+                    ? "Запиши, когда сможешь служить"
+                    : "Trage ein, wann du dienen kannst"}
+                </span>
+
+                <span className="block text-[12px] text-red-600/80">
+                  {isRu
+                    ? `Нужно заполнить на ${reminder.nextMonth.toLocaleDateString("ru-RU", { month: "long" })}`
+                    : `Bitte für ${reminder.nextMonth.toLocaleDateString("de-DE", { month: "long" })} ausfüllen`}
+                </span>
+              </span>
+
+              <ArrowRight size={18} className="shrink-0 text-red-400" />
+            </button>
+          )}
+
           {/* =====================================================
               NEXT SERVICE
           ====================================================== */}
@@ -1357,7 +1405,7 @@ export default function Home() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 p-3">
+              <div className="grid max-h-[70vh] grid-cols-1 gap-2 overflow-y-auto p-3">
                 {moreItems.map((item) => {
                   const Icon = item.icon;
 
@@ -1369,18 +1417,22 @@ export default function Home() {
                         setMoreOpen(false);
                         router.push(item.href);
                       }}
-                      className="flex min-h-[72px] items-center gap-3 rounded-[18px] bg-[#f6f7f7] px-4 text-left transition active:scale-[0.98]"
+                      className="flex min-h-[68px] items-center gap-3 rounded-[18px] bg-[#f6f7f7] px-4 py-3 text-left transition active:scale-[0.98]"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-white text-[#303b48] shadow-sm">
+                      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-white text-[#303b48] shadow-sm">
                         <Icon size={19} />
+
+                        {item.href === "/availability" && reminder.needed && (
+                          <ReminderDot className="-right-0.5 -top-0.5" />
+                        )}
                       </div>
 
-                      <div className="min-w-0">
-                        <p className="truncate text-[14px] font-semibold text-[#202a35]">
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words text-[15px] font-semibold leading-tight text-[#202a35]">
                           {item.label}
                         </p>
 
-                        <p className="mt-0.5 truncate text-[10px] text-[#8a939d]">
+                        <p className="mt-0.5 break-words text-[11px] leading-snug text-[#8a939d]">
                           {item.description}
                         </p>
                       </div>

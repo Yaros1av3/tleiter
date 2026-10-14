@@ -21,6 +21,7 @@ import {
 import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
+import { useLanguage } from "@/components/LanguageProvider";
 import { translations, type Language } from "@/lib/translations";
 
 type Position =
@@ -348,7 +349,7 @@ function getEntryTypeLabel(
 export default function TeamPage() {
   const router = useRouter();
 
-  const [language, setLanguage] = useState<Language>("de");
+  const { language } = useLanguage();
   const t = translations[language];
 
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -863,7 +864,7 @@ export default function TeamPage() {
       last_name: form.last_name.trim(),
       position: form.position,
       phone: form.phone.trim() || null,
-      email: form.email.trim() || null,
+      email: form.email.trim().toLowerCase() || null,
       birth_date: form.birth_date || null,
       languages: form.languages,
       status: form.status,

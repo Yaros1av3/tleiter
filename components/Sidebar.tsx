@@ -16,6 +16,8 @@ import {
 
 import { useRouter } from "next/navigation";
 import { translations, type Language } from "@/lib/translations";
+import { useAvailabilityReminder } from "@/lib/useAvailabilityReminder";
+import ReminderDot from "@/components/ReminderDot";
 
 type SidebarProps = {
   language: Language;
@@ -24,6 +26,7 @@ type SidebarProps = {
 export default function Sidebar({ language }: SidebarProps) {
   const router = useRouter();
   const t = translations[language];
+  const reminder = useAvailabilityReminder();
 
   const scheduleLabel = language === "ru" ? "Расписание" : "Dienstplan";
   const materialsLabel = language === "ru" ? "Материалы" : "Materialien";
@@ -110,8 +113,12 @@ export default function Sidebar({ language }: SidebarProps) {
               title={item.label}
               className="flex h-11 w-full shrink-0 items-center rounded-xl text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
             >
-              <span className="flex min-w-[48px] items-center justify-center">
+              <span className="relative flex min-w-[48px] items-center justify-center">
                 <Icon size={19} strokeWidth={1.8} />
+
+                {item.key === "schedule" && reminder.needed && (
+                  <ReminderDot className="right-2.5 top-0" />
+                )}
               </span>
 
               <span className="overflow-hidden whitespace-nowrap text-sm font-medium text-neutral-600 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
