@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
 
@@ -59,6 +60,7 @@ export function getNextMonth(now: Date = new Date()) {
 
 export function useAvailabilityReminder() {
   const [needed, setNeeded] = useState(false);
+  const pathname = usePathname();
 
   const check = useCallback(async () => {
     const now = new Date();
@@ -106,13 +108,22 @@ export function useAvailabilityReminder() {
     }
   }, []);
 
+  /* проверяем при открытии и при каждом переходе на другую страницу */
   useEffect(() => {
     check();
+  }, [check, pathname]);
 
+  /* и когда человек вошёл / вышел, или ответил в форме */
+  useEffect(() => {
     window.addEventListener(AVAILABILITY_UPDATED_EVENT, check);
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+      check();
+    });
 
     return () => {
       window.removeEventListener(AVAILABILITY_UPDATED_EVENT, check);
+      authListener.subscription.unsubscribe();
     };
   }, [check]);
 

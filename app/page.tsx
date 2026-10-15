@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   BriefcaseBusiness,
+  Bus,
   Cake,
   CalendarCheck,
   CalendarDays,
@@ -20,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { translations } from "@/lib/translations";
 import { useAvailabilityReminder } from "@/lib/useAvailabilityReminder";
+import { useTripsReminder } from "@/lib/useTripsReminder";
 import ReminderDot from "@/components/ReminderDot";
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -214,6 +216,7 @@ export default function Home() {
   const router = useRouter();
   const { language } = useLanguage();
   const reminder = useAvailabilityReminder();
+  const tripsReminder = useTripsReminder();
 
   const t = translations[language];
 
@@ -594,6 +597,14 @@ export default function Home() {
       icon: ListChecks,
     },
     {
+      href: "/trips",
+      label: isRu ? "Поездки" : "Fahrten & Freizeiten",
+      description: isRu
+        ? "Голосования и планирование поездок"
+        : "Abstimmungen und Planung",
+      icon: Bus,
+    },
+    {
       href: "/availability",
       label: isRu ? "Когда могу служить" : "Wann ich dienen kann",
       description: isRu
@@ -664,7 +675,7 @@ export default function Home() {
                 <MoreIcon size={22} />
               )}
 
-              {reminder.needed && !moreOpen && (
+              {(reminder.needed || tripsReminder.needed) && !moreOpen && (
                 <ReminderDot className="right-0 top-0" />
               )}
             </button>
@@ -1423,6 +1434,10 @@ export default function Home() {
                         <Icon size={19} />
 
                         {item.href === "/availability" && reminder.needed && (
+                          <ReminderDot className="-right-0.5 -top-0.5" />
+                        )}
+
+                        {item.href === "/trips" && tripsReminder.needed && (
                           <ReminderDot className="-right-0.5 -top-0.5" />
                         )}
                       </div>

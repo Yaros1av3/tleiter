@@ -31,6 +31,7 @@ type Position =
   | "leiter"
   | "co_leiter"
   | "sekretariat"
+  | "freizeiten"
   | "weitere";
 
 type Status = "active" | "inactive";
@@ -112,12 +113,17 @@ const emptyForm: MemberForm = {
   notes: "",
 };
 
+/* email не запрашивается напрямую — его получают только админы через функцию */
+const MEMBER_COLUMNS =
+  "id,first_name,last_name,position,phone,birth_date,languages,status,notes,avatar_url,created_at,updated_at";
+
 const positionOrder: Record<Position, number> = {
   hauptleiter: 1,
   sekretariat: 2,
   leiter: 3,
   co_leiter: 4,
-  weitere: 5,
+  freizeiten: 5,
+  weitere: 6,
 };
 
 /* ---------- Языки: без дублей, всегда DE / RU ---------- */
@@ -263,6 +269,10 @@ function getPositionLabel(position: Position, language: Language) {
       ru: "Помощник лидера",
       de: "Co-Leiter",
     },
+    freizeiten: {
+      ru: "Ответственный за поездки",
+      de: "Fahrten & Freizeiten",
+    },
     weitere: {
       ru: "Другое",
       de: "Weitere",
@@ -295,6 +305,9 @@ function getPositionStyle(position: Position) {
 
     case "co_leiter":
       return "bg-emerald-50 text-emerald-700";
+
+    case "freizeiten":
+      return "bg-amber-50 text-amber-700";
 
     default:
       return "bg-neutral-100 text-neutral-600";
@@ -410,6 +423,9 @@ export default function TeamPage() {
 
   const [loading, setLoading] = useState(true);
 
+  /* Только админы могут добавлять / менять / удалять и видеть email */
+  const [isAdmin, setIsAdmin] = useState(false);
+
   const [search, setSearch] = useState("");
 
   const [positionFilter, setPositionFilter] = useState<
@@ -473,6 +489,11 @@ export default function TeamPage() {
   async function loadData() {
     setLoading(true);
 
+    const { data: adminData } = await supabase.rpc("is_admin");
+    const adminNow = adminData === true;
+
+    setIsAdmin(adminNow);
+
     const [
       membersResponse,
       workItemsResponse,
@@ -482,7 +503,7 @@ export default function TeamPage() {
     ] = await Promise.all([
       supabase
         .from("team_members")
-        .select("*")
+        .select(MEMBER_COLUMNS)
         .order("first_name", { ascending: true }),
 
       supabase
@@ -518,8 +539,24 @@ export default function TeamPage() {
       );
       setMembers([]);
     } else {
+      const emailById = new Map<number, string | null>();
+
+      if (adminNow) {
+        const { data: emailRows } = await supabase.rpc("get_team_emails");
+
+        for (const row of (emailRows ?? []) as {
+          id: number;
+          email: string | null;
+        }[]) {
+          emailById.set(row.id, row.email);
+        }
+      }
+
       const sorted = [
-        ...(membersResponse.data ?? []),
+        ...(membersResponse.data ?? []).map((row) => ({
+          ...row,
+          email: emailById.get(row.id as number) ?? null,
+        })),
       ].sort((a, b) => {
         const positionDifference =
           positionOrder[a.position as Position] -
@@ -948,7 +985,7 @@ export default function TeamPage() {
         const { data, error } = await supabase
           .from("team_members")
           .insert(basePayload)
-          .select()
+          .select("id")
           .single();
 
         if (error) {
@@ -1098,18 +1135,20 @@ export default function TeamPage() {
       {language === "de" ? "Unser Team" : "Наша команда"}
     </h1>
 
-    <button
-      type="button"
-      onClick={openCreateModal}
-      aria-label={
-        language === "de"
-          ? "Teammitglied hinzufügen"
-          : "Добавить участника"
-      }
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white shadow-sm transition active:scale-95"
-    >
-      <Plus size={18} strokeWidth={2.2} />
-    </button>
+    {isAdmin && (
+      <button
+        type="button"
+        onClick={openCreateModal}
+        aria-label={
+          language === "de"
+            ? "Teammitglied hinzufügen"
+            : "Добавить участника"
+        }
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white shadow-sm transition active:scale-95"
+      >
+        <Plus size={18} strokeWidth={2.2} />
+      </button>
+    )}
   </div>
 </header>
 
@@ -1279,6 +1318,13 @@ export default function TeamPage() {
                   <option value="sekretariat">
                     {getPositionLabel(
                       "sekretariat",
+                      language,
+                    )}
+                  </option>
+
+                  <option value="freizeiten">
+                    {getPositionLabel(
+                      "freizeiten",
                       language,
                     )}
                   </option>
@@ -1764,6 +1810,7 @@ export default function TeamPage() {
                   <X size={18} />
                 </button>
 
+                {isAdmin && (
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -1793,6 +1840,7 @@ export default function TeamPage() {
                     <Trash2 size={15} />
                   </button>
                 </div>
+                )}
               </div>
             </div>
 
@@ -2425,7 +2473,14 @@ export default function TeamPage() {
                       )}
                     </option>
 
-                    <option value="weitere">
+                    <option value="freizeiten">
+                    {getPositionLabel(
+                      "freizeiten",
+                      language,
+                    )}
+                  </option>
+
+                  <option value="weitere">
                       {getPositionLabel(
                         "weitere",
                         language,

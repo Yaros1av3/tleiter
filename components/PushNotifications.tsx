@@ -67,14 +67,6 @@ export default function PushNotifications({ isRu }: { isRu: boolean }) {
       });
   }, []);
 
-  async function linkTeamMemberByEmail(userId: string, email: string) {
-    await supabase
-      .from("team_members")
-      .update({ user_id: userId })
-      .eq("email", email)
-      .is("user_id", null);
-  }
-
   async function subscribe() {
     if (!VAPID_PUBLIC_KEY) {
       setMessage(
@@ -124,21 +116,54 @@ export default function PushNotifications({ isRu }: { isRu: boolean }) {
 
       if (error) throw error;
 
-      if (user.email) {
-        await linkTeamMemberByEmail(user.id, user.email);
-      }
-
       setSubscribed(true);
     } catch (error) {
       console.error("Push subscribe:", error);
 
+      const details =
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : typeof error === "object" && error !== null
+            ? JSON.stringify(error)
+            : String(error);
+
       setMessage(
-        isRu
+        (isRu
           ? "Не удалось включить уведомления."
-          : "Benachrichtigungen konnten nicht aktiviert werden.",
+          : "Benachrichtigungen konnten nicht aktiviert werden.") +
+          ` (${details})`,
       );
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function sendTest() {
+    setMessage("");
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch("/api/push/test", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+      });
+
+      const result = await response.json();
+
+      setMessage(
+        response.ok && result.sent > 0
+          ? isRu
+            ? "Тест отправлен — проверь уведомление."
+            : "Test gesendet — prüfe die Benachrichtigung."
+          : isRu
+            ? "Не удалось отправить тест."
+            : "Test konnte nicht gesendet werden.",
+      );
+    } catch {
+      setMessage(isRu ? "Не удалось отправить тест." : "Test konnte nicht gesendet werden.");
     }
   }
 
@@ -239,6 +264,16 @@ export default function PushNotifications({ isRu }: { isRu: boolean }) {
                   : isRu
                     ? "Включить уведомления"
                     : "Benachrichtigungen aktivieren"}
+            </button>
+          )}
+
+          {supported && subscribed && (
+            <button
+              type="button"
+              onClick={sendTest}
+              className="ml-2 mt-3.5 rounded-[13px] border border-[#e2e5e8] px-4 py-2.5 text-[13px] font-bold text-[#374353] transition active:scale-[0.98]"
+            >
+              {isRu ? "Отправить тест" : "Test senden"}
             </button>
           )}
 
