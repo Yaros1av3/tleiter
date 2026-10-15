@@ -23,6 +23,7 @@ import { translations } from "@/lib/translations";
 import { useAvailabilityReminder } from "@/lib/useAvailabilityReminder";
 import { useTripsReminder } from "@/lib/useTripsReminder";
 import ReminderDot from "@/components/ReminderDot";
+import InstallBanner from "@/components/InstallBanner";
 import { useLanguage } from "@/components/LanguageProvider";
 
 type WorkProject = {
@@ -683,6 +684,8 @@ export default function Home() {
         </header>
 
         <div className="mx-auto w-full max-w-[760px] px-4 pb-28 sm:px-6">
+          <InstallBanner isRu={isRu} />
+
           {/* =====================================================
               AVAILABILITY REMINDER
           ====================================================== */}

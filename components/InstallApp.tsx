@@ -52,6 +52,17 @@ export default function InstallApp({ isRu }: { isRu: boolean }) {
     sync();
     setReady(true);
 
+    if (new URLSearchParams(window.location.search).get("install") === "1") {
+      setShowSteps(true);
+      setTimeout(
+        () =>
+          document
+            .getElementById("install-app")
+            ?.scrollIntoView({ behavior: "smooth", block: "center" }),
+        250,
+      );
+    }
+
     window.addEventListener(INSTALL_EVENT, sync);
     return () => window.removeEventListener(INSTALL_EVENT, sync);
   }, []);
@@ -83,7 +94,7 @@ export default function InstallApp({ isRu }: { isRu: boolean }) {
     "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f1f2f3] text-[12px] font-bold";
 
   return (
-    <section className="mt-4 overflow-hidden rounded-[24px] border border-[#e6e7e8] bg-white p-5 shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
+    <section id="install-app" className="mt-4 overflow-hidden rounded-[24px] border border-[#e6e7e8] bg-white p-5 shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
       <div className="flex items-start gap-3.5">
         <div
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] ${
