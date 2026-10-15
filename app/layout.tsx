@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthGuard from "@/components/AuthGuard";
 import BottomNav from "@/components/BottomNav";
+import InstallPromptCapture from "@/components/InstallPromptCapture";
 import { LanguageProvider } from "@/components/LanguageProvider";
 
 const geistSans = Geist({
@@ -17,6 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 const siteUrl = "https://tlight-workspace.vercel.app";
+const ogImage = `${siteUrl}/opengraph-image`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -60,9 +62,9 @@ export const metadata: Metadata = {
 
     apple: [
       {
-        url: "/apple-icon.png",
+        url: "/icons/apple-touch-icon.png",
         type: "image/png",
-        sizes: "512x512",
+        sizes: "180x180",
       },
     ],
   },
@@ -74,12 +76,23 @@ export const metadata: Metadata = {
     title: "TLight — Team Workspace",
     description: "Dienst. Team. Ein Ort.",
     locale: "de_DE",
+
+    images: [
+      {
+        url: ogImage,
+        width: 1200,
+        height: 630,
+        type: "image/png",
+        alt: "TLight — Team Workspace",
+      },
+    ],
   },
 
   twitter: {
     card: "summary_large_image",
     title: "TLight — Team Workspace",
     description: "Dienst. Team. Ein Ort.",
+    images: [ogImage],
   },
 
   appleWebApp: {
@@ -121,6 +134,7 @@ export default function RootLayout({
           <AuthGuard>
             {children}
             <BottomNav />
+            <InstallPromptCapture />
           </AuthGuard>
         </LanguageProvider>
       </body>

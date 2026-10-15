@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BriefcaseBusiness,
   CalendarDays,
-  CalendarRange,
+  Clock3,
   ChevronLeft,
   ChevronRight,
-  Clock3,
   MapPin,
   MoreHorizontal,
   Pencil,
@@ -88,9 +87,19 @@ const categories = [
   { id: "church", ru: "Церковь", de: "Gemeinde", dot: "bg-emerald-500" },
   { id: "lesson", ru: "Урок", de: "Unterricht", dot: "bg-amber-500" },
   { id: "important", ru: "Важное", de: "Wichtig", dot: "bg-red-500" },
-  { id: "work", ru: "Проекты", de: "Projekte", dot: "bg-slate-700" },
+  { id: "work", ru: "Работа", de: "Arbeit", dot: "bg-slate-700" },
   { id: "other", ru: "Другое", de: "Sonstiges", dot: "bg-neutral-400" },
 ] as const;
+
+const categoryChip: Record<string, string> = {
+  youth: "bg-violet-50 text-violet-800",
+  team: "bg-blue-50 text-blue-800",
+  church: "bg-emerald-50 text-emerald-800",
+  lesson: "bg-amber-50 text-amber-800",
+  important: "bg-red-50 text-red-700",
+  work: "bg-slate-100 text-slate-700",
+  other: "bg-neutral-100 text-neutral-600",
+};
 
 const emptyForm: EventForm = {
   title: "",
@@ -194,27 +203,6 @@ function getMonthDays(monthDate: Date) {
   let next = 1;
   while (days.length < 42) {
     days.push(new Date(year, month + 1, next++));
-  }
-
-  return days;
-}
-
-function getWeekDays(anyDayInWeek: Date) {
-  let mondayIndex = anyDayInWeek.getDay();
-  mondayIndex = mondayIndex === 0 ? 6 : mondayIndex - 1;
-
-  const monday = new Date(
-    anyDayInWeek.getFullYear(),
-    anyDayInWeek.getMonth(),
-    anyDayInWeek.getDate() - mondayIndex,
-  );
-
-  const days: Date[] = [];
-
-  for (let i = 0; i < 7; i++) {
-    days.push(
-      new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i),
-    );
   }
 
   return days;
@@ -340,8 +328,6 @@ export default function CalendarPage() {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
-  const [view, setView] = useState<"month" | "week">("month");
-
   const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
   const [events, setEvents] = useState<Event[]>([]);
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
@@ -362,13 +348,11 @@ export default function CalendarPage() {
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState<EventForm>(emptyForm);
+  const [view, setView] = useState<"month" | "list">("month");
+  const [hiddenCategories, setHiddenCategories] = useState<string[]>([]);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const days = useMemo(() => getMonthDays(currentMonth), [currentMonth]);
-
-  const weekDays = useMemo(
-    () => getWeekDays(localDateFromKey(selectedDate)),
-    [selectedDate],
-  );
 
   const workCalendarEvents = useMemo<Event[]>(() => {
     return workItems
@@ -429,8 +413,11 @@ export default function CalendarPage() {
   }, [language, scheduleEntries]);
 
   const calendarEvents = useMemo(
-    () => [...events, ...workCalendarEvents, ...scheduleCalendarEvents],
-    [events, workCalendarEvents, scheduleCalendarEvents]
+    () =>
+      [...events, ...workCalendarEvents, ...scheduleCalendarEvents].filter(
+        (event) => !hiddenCategories.includes(event.category)
+      ),
+    [events, workCalendarEvents, scheduleCalendarEvents, hiddenCategories]
   );
 
   const selectedDayEvents = useMemo(
@@ -463,55 +450,10 @@ export default function CalendarPage() {
     });
   }, [calendarEvents, currentMonth]);
 
-  const weekEvents = useMemo(() => {
-    const weekStart = weekDays[0];
-    const weekEnd = new Date(
-      weekDays[6].getFullYear(),
-      weekDays[6].getMonth(),
-      weekDays[6].getDate() + 1,
-    );
-
-    return calendarEvents
-      .filter((event) => {
-        const start = new Date(event.start_at);
-        const end = new Date(event.end_at);
-        return start < weekEnd && end > weekStart;
-      })
-      .sort(
-        (a, b) =>
-          new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
-      );
-  }, [calendarEvents, weekDays]);
-
   const monthLabel = currentMonth.toLocaleDateString(
     language === "ru" ? "ru-RU" : "de-DE",
     { month: "long", year: "numeric" }
   );
-
-  const weekLabel = useMemo(() => {
-    const start = weekDays[0];
-    const end = weekDays[6];
-    const locale = language === "ru" ? "ru-RU" : "de-DE";
-
-    const sameMonth =
-      start.getMonth() === end.getMonth() &&
-      start.getFullYear() === end.getFullYear();
-
-    const startLabel = start.toLocaleDateString(
-      locale,
-      sameMonth
-        ? { day: "numeric" }
-        : { day: "numeric", month: "short" },
-    );
-
-    const endLabel = end.toLocaleDateString(locale, {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-
-    return `${startLabel} – ${endLabel}`;
-  }, [weekDays, language]);
 
   const weekdays =
     language === "ru"
@@ -596,26 +538,6 @@ export default function CalendarPage() {
         1
       )
     );
-  };
-
-  const changeWeek = (offset: number) => {
-    const base = localDateFromKey(selectedDate);
-    const next = new Date(
-      base.getFullYear(),
-      base.getMonth(),
-      base.getDate() + offset * 7,
-    );
-
-    setSelectedDate(dateKey(next));
-
-    /* держим currentMonth в синхроне, чтобы диапазон загрузки
-       событий (±1 месяц) всегда покрывал показанную неделю */
-    if (
-      next.getMonth() !== currentMonth.getMonth() ||
-      next.getFullYear() !== currentMonth.getFullYear()
-    ) {
-      setCurrentMonth(new Date(next.getFullYear(), next.getMonth(), 1));
-    }
   };
 
   const selectDay = (date: Date) => {
@@ -1071,533 +993,515 @@ export default function CalendarPage() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  const todayKey = dateKey(new Date());
+
+  const relativeDayLabel = (key: string) => {
+    const diff = Math.round(
+      (localDateFromKey(key).getTime() - localDateFromKey(todayKey).getTime()) /
+        86400000
+    );
+    if (diff === 0) return language === "ru" ? "Сегодня" : "Heute";
+    if (diff === 1) return language === "ru" ? "Завтра" : "Morgen";
+    if (diff === -1) return language === "ru" ? "Вчера" : "Gestern";
+    return null;
+  };
+
+  const toggleCategory = (id: string) => {
+    setHiddenCategories((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id]
+    );
+  };
+
+  const agendaGroups = useMemo(() => {
+    const monthStartKey = dateKey(
+      new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
+    );
+    const groups = new Map<string, Event[]>();
+
+    const sorted = [...monthEvents].sort(
+      (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+    );
+
+    for (const event of sorted) {
+      let key = eventDateKey(event.start_at);
+      if (key < monthStartKey) key = monthStartKey;
+      groups.set(key, [...(groups.get(key) ?? []), event]);
+    }
+
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, events]) => ({ key, events }));
+  }, [monthEvents, currentMonth]);
+
+  const openEventDetails = (event: Event) => {
+    if (event.source === "schedule" && event.source_id) {
+      const entry = scheduleEntries.find((item) => item.id === event.source_id);
+      if (entry) openScheduleEntry(entry);
+      return;
+    }
+
+    if (event.category === "work") {
+      const item = workItems.find((entry) => entry.id === Math.abs(event.id));
+      if (item) {
+        setSelectedWorkItem(item);
+        setSelectedEvent(null);
+        setSelectedScheduleEntry(null);
+      }
+      return;
+    }
+
+    setSelectedEvent(event);
+    setSelectedWorkItem(null);
+    setSelectedScheduleEntry(null);
+  };
+
+  const renderEventCard = (event: Event) => {
+    const info = categoryInfo(event.category, language);
+    const isWork = event.category === "work";
+    const multiDay = eventDateKey(event.start_at) !== eventDateKey(event.end_at);
+
+    return (
+      <article
+        key={event.id}
+        role="button"
+        tabIndex={0}
+        onClick={() => openEventDetails(event)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") openEventDetails(event);
+        }}
+        className="flex cursor-pointer gap-3 overflow-hidden rounded-2xl border border-neutral-200 bg-white p-3.5 shadow-sm transition active:scale-[0.99]"
+      >
+        <span className={`w-1 shrink-0 self-stretch rounded-full ${info.dot}`} />
+
+        <div className="flex w-[52px] shrink-0 flex-col justify-center text-center">
+          {isWork ? (
+            <>
+              <BriefcaseBusiness size={16} className="mx-auto text-neutral-500" />
+              <span className="mt-1 text-[9px] font-bold uppercase tracking-wide text-neutral-500">
+                Deadline
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-[15px] font-bold leading-none">
+                {formatTime(event.start_at)}
+              </span>
+              <span className="mt-1 text-[11px] leading-none text-neutral-400">
+                {formatTime(event.end_at)}
+              </span>
+            </>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h3 className="break-words text-[15px] font-semibold leading-snug">
+            {event.title}
+          </h3>
+
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-neutral-500">
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                categoryChip[event.category] ?? categoryChip.other
+              }`}
+            >
+              {language === "ru" ? info.ru : info.de}
+            </span>
+
+            {multiDay && !isWork && (
+              <span>
+                {formatShortDate(event.start_at, language)} –{" "}
+                {formatShortDate(event.end_at, language)}
+              </span>
+            )}
+
+            {event.source === "schedule" && (
+              <span className="inline-flex items-center gap-1 text-violet-600">
+                <CalendarDays size={11} />
+                {language === "ru" ? "Из расписания" : "Aus Dienstplan"}
+              </span>
+            )}
+
+            {event.recurrence !== "none" && !event.source && (
+              <span className="inline-flex items-center gap-1">
+                <Repeat2 size={11} />
+                {language === "ru" ? "Повторяется" : "Wiederkehrend"}
+              </span>
+            )}
+          </div>
+
+          {event.location && (
+            <div className="mt-1.5 flex items-center gap-1.5 text-xs text-neutral-500">
+              <MapPin size={12} />
+              <span className="truncate">{event.location}</span>
+            </div>
+          )}
+        </div>
+
+        <MoreHorizontal size={17} className="mt-0.5 shrink-0 text-neutral-300" />
+      </article>
+    );
+  };
+
   return (
     <main className="min-h-screen bg-[#f7f7f5] pb-32 text-neutral-950 sm:pb-10">
       <div className="mx-auto w-full max-w-6xl px-3 pb-10 pt-4 sm:px-6 sm:pt-8">
         {/* TOP */}
-        <header className="mb-5 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400">
-              {language === "ru" ? "Календарь" : "Kalender"}
-            </div>
-            <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">
-              {view === "month" ? monthLabel : weekLabel}
+        <header className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => changeMonth(-1)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-neutral-500 transition hover:bg-white hover:text-neutral-950 active:scale-95"
+              aria-label={language === "ru" ? "Предыдущий месяц" : "Vorheriger Monat"}
+            >
+              <ChevronLeft size={21} />
+            </button>
+
+            <h1 className="min-w-0 truncate px-1 text-center text-[22px] font-semibold capitalize tracking-tight sm:min-w-[210px] sm:text-[26px]">
+              {monthLabel}
             </h1>
-          </div>
-
-          <button
-            type="button"
-            onClick={openCreate}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-neutral-950 text-white shadow-sm transition hover:bg-neutral-800 sm:h-auto sm:w-auto sm:gap-2 sm:px-4"
-            aria-label={language === "ru" ? "Новое событие" : "Neues Ereignis"}
-          >
-            <Plus size={19} />
-            <span className="hidden text-sm font-semibold sm:inline">
-              {language === "ru" ? "Новое" : "Neu"}
-            </span>
-          </button>
-        </header>
-
-        {/* VIEW SWITCH + LEGEND */}
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
-          <div className="flex rounded-xl border border-neutral-200 bg-white p-1 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setView("month")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                view === "month"
-                  ? "bg-neutral-950 text-white"
-                  : "text-neutral-500 hover:text-neutral-900"
-              }`}
-            >
-              <CalendarDays size={14} />
-              {language === "ru" ? "Месяц" : "Monat"}
-            </button>
 
             <button
               type="button"
-              onClick={() => setView("week")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                view === "week"
-                  ? "bg-neutral-950 text-white"
-                  : "text-neutral-500 hover:text-neutral-900"
-              }`}
+              onClick={() => changeMonth(1)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-neutral-500 transition hover:bg-white hover:text-neutral-950 active:scale-95"
+              aria-label={language === "ru" ? "Следующий месяц" : "Nächster Monat"}
             >
-              <CalendarRange size={14} />
-              {language === "ru" ? "Неделя" : "Woche"}
+              <ChevronRight size={21} />
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1">
-            {categories.map((category) => (
-              <div
-                key={category.id}
-                className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-500"
-              >
-                <span className={`h-2 w-2 rounded-full ${category.dot}`} />
-                {language === "ru" ? category.ru : category.de}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* NAVIGATION */}
-        <section className="mb-4 flex items-center justify-between rounded-2xl border border-neutral-200 bg-white p-2 shadow-sm">
-          <button
-            type="button"
-            onClick={goToday}
-            className="rounded-xl px-3 py-2 text-xs font-semibold text-neutral-700 transition hover:bg-neutral-100"
-          >
-            {language === "ru" ? "Сегодня" : "Heute"}
-          </button>
-
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              onClick={() =>
-                view === "month" ? changeMonth(-1) : changeWeek(-1)
-              }
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
-              aria-label={
-                language === "ru"
-                  ? view === "month"
-                    ? "Предыдущий месяц"
-                    : "Предыдущая неделя"
-                  : view === "month"
-                    ? "Vorheriger Monat"
-                    : "Vorherige Woche"
-              }
+              onClick={goToday}
+              className="rounded-full border border-neutral-200 bg-white px-3.5 py-2 text-xs font-semibold text-neutral-800 shadow-sm transition active:scale-95"
             >
-              <ChevronLeft size={19} />
+              {language === "ru" ? "Сегодня" : "Heute"}
             </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                view === "month" ? changeMonth(1) : changeWeek(1)
-              }
-              className="flex h-10 w-10 items-center justify-center rounded-xl text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-950"
-              aria-label={
-                language === "ru"
-                  ? view === "month"
-                    ? "Следующий месяц"
-                    : "Следующая неделя"
-                  : view === "month"
-                    ? "Nächster Monat"
-                    : "Nächste Woche"
-              }
-            >
-              <ChevronRight size={19} />
-            </button>
-          </div>
-        </section>
-
-        {/* CALENDAR: MONTH VIEW */}
-        {view === "month" && (
-          <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
-            <div className="grid grid-cols-7 border-b border-neutral-200 bg-neutral-50">
-              {weekdays.map((day) => (
-                <div
-                  key={day}
-                  className="py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-neutral-400"
-                >
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-7">
-              {days.map((day, index) => {
-                const key = dateKey(day);
-                const isCurrentMonth =
-                  day.getMonth() === currentMonth.getMonth() &&
-                  day.getFullYear() === currentMonth.getFullYear();
-                const isSelected = key === selectedDate;
-                const isTodayKey = key === dateKey(new Date());
-
-                const dayEvents = monthEvents.filter((event) =>
-                  eventOverlapsDate(event, key)
-                );
-
-                return (
-                  <button
-                    type="button"
-                  key={`${key}-${index}`}
-                  onClick={() => selectDay(day)}
-                  className={`relative min-h-[68px] border-b border-r border-neutral-200 p-1.5 text-left transition sm:min-h-[104px] sm:p-2 ${
-                    isCurrentMonth ? "bg-white" : "bg-neutral-50/70"
-                  } ${
-                    isSelected
-                      ? "z-10 bg-neutral-50 ring-2 ring-inset ring-neutral-900"
-                      : "hover:bg-neutral-50"
-                  }`}
-                >
-                  <div
-                    className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
-                      isTodayKey
-                        ? "bg-neutral-950 text-white"
-                        : isCurrentMonth
-                        ? "text-neutral-800"
-                        : "text-neutral-300"
-                    }`}
-                  >
-                    {day.getDate()}
-                  </div>
-
-                  <div className="mt-1.5 space-y-1">
-                    {dayEvents.slice(0, 3).map((event) => {
-                      const info = categoryInfo(event.category, language);
-
-                      return (
-                        <div
-                          key={event.id}
-                          className="flex min-w-0 items-center gap-1"
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 shrink-0 rounded-full ${info.dot}`}
-                          />
-                          <span className="hidden min-w-0 truncate text-[10px] font-medium text-neutral-600 sm:block">
-                            {event.category === "work" ? "Deadline · " : `${formatTime(event.start_at)} `}{event.title}
-                          </span>
-                          <span className="block truncate text-[9px] font-medium text-neutral-600 sm:hidden">
-                            {event.category === "work" ? "Deadline" : formatTime(event.start_at)}
-                          </span>
-                        </div>
-                      );
-                    })}
-
-                    {dayEvents.length > 3 && (
-                      <div className="text-[9px] font-semibold text-neutral-400">
-                        +{dayEvents.length - 3}
-                      </div>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-        )}
-
-        {/* CALENDAR: WEEK VIEW */}
-        {view === "week" && (
-          <section className="space-y-2.5">
-            {weekDays.map((day) => {
-              const key = dateKey(day);
-              const isSelected = key === selectedDate;
-              const isTodayKey = key === dateKey(new Date());
-
-              const dayEvents = weekEvents.filter((event) =>
-                eventOverlapsDate(event, key)
-              );
-
-              return (
-                <button
-                  type="button"
-                  key={key}
-                  onClick={() => selectDay(day)}
-                  className={`flex w-full items-stretch gap-3 rounded-2xl border bg-white p-3 text-left shadow-sm transition ${
-                    isSelected
-                      ? "border-neutral-950 ring-2 ring-neutral-900"
-                      : "border-neutral-200 hover:border-neutral-300"
-                  }`}
-                >
-                  <div className="flex w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-neutral-50 py-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                      {day.toLocaleDateString(
-                        language === "ru" ? "ru-RU" : "de-DE",
-                        { weekday: "short" }
-                      )}
-                    </span>
-                    <span
-                      className={`mt-1 flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${
-                        isTodayKey
-                          ? "bg-neutral-950 text-white"
-                          : "text-neutral-800"
-                      }`}
-                    >
-                      {day.getDate()}
-                    </span>
-                  </div>
-
-                  <div className="min-w-0 flex-1 py-0.5">
-                    {dayEvents.length === 0 ? (
-                      <div className="flex h-full items-center text-[12px] text-neutral-300">
-                        {language === "ru" ? "Пусто" : "Keine Termine"}
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {dayEvents.map((event) => {
-                          const info = categoryInfo(
-                            event.category,
-                            language
-                          );
-
-                          return (
-                            <div
-                              key={event.id}
-                              className="flex min-w-0 items-center gap-2"
-                            >
-                              <span
-                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${info.dot}`}
-                              />
-                              <span className="shrink-0 text-[11px] font-semibold text-neutral-500">
-                                {event.category === "work"
-                                  ? "Deadline"
-                                  : formatTime(event.start_at)}
-                              </span>
-                              <span className="min-w-0 truncate text-[12px] font-medium text-neutral-800">
-                                {event.title}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </section>
-        )}
-
-        {/* SELECTED DAY */}
-        <section className="mt-5">
-          <div className="mb-3 flex items-end justify-between gap-3">
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
-                {language === "ru" ? "Выбранный день" : "Ausgewählter Tag"}
-              </div>
-              <h2 className="mt-1 text-lg font-semibold capitalize">
-                {localDateFromKey(selectedDate).toLocaleDateString(
-                  language === "ru" ? "ru-RU" : "de-DE",
-                  {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                  }
-                )}
-              </h2>
-            </div>
-
-            <span className="text-xs text-neutral-400">
-              {selectedDayEvents.length}{" "}
-              {language === "ru" ? "событий" : "Termine"}
-            </span>
-          </div>
-
-          {loading ? (
-            <div className="rounded-2xl border border-neutral-200 bg-white p-5 text-sm text-neutral-400">
-              {language === "ru" ? "Загрузка..." : "Laden..."}
-            </div>
-          ) : selectedDayEvents.length === 0 ? (
             <button
               type="button"
               onClick={openCreate}
-              className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-neutral-300 bg-white p-5 text-left transition hover:border-neutral-400 hover:bg-neutral-50"
+              className="hidden items-center gap-2 rounded-full bg-neutral-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-800 md:flex"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-neutral-500">
-                <Plus size={18} />
-              </div>
-              <div>
-                <div className="text-sm font-semibold">
-                  {language === "ru" ? "Свободный день" : "Noch kein Termin"}
-                </div>
-                <div className="mt-0.5 text-xs text-neutral-400">
-                  {language === "ru"
-                    ? "Добавить событие"
-                    : "Termin hinzufügen"}
-                </div>
-              </div>
+              <Plus size={17} />
+              {language === "ru" ? "Новое" : "Neu"}
             </button>
-          ) : (
-            <div className="space-y-2.5">
-              {selectedDayEvents.map((event) => {
-                const info = categoryInfo(event.category, language);
+          </div>
+        </header>
 
-                return (
-                  <article
-                    key={event.id}
-                    className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm"
+        {/* VIEW SWITCH + FILTERS */}
+        <div className="mb-3 space-y-2.5">
+          <div className="flex w-full rounded-full bg-neutral-200/60 p-1 sm:w-fit">
+            {(
+              [
+                ["month", language === "ru" ? "Месяц" : "Monat"],
+                ["list", language === "ru" ? "Список" : "Liste"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setView(key)}
+                className={`flex-1 rounded-full px-5 py-1.5 text-[13px] font-semibold transition sm:flex-none ${
+                  view === key
+                    ? "bg-white text-neutral-950 shadow-sm"
+                    : "text-neutral-500"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
+            {categories.map((category) => {
+              const hidden = hiddenCategories.includes(category.id);
+
+              return (
+                <button
+                  key={category.id}
+                  type="button"
+                  onClick={() => toggleCategory(category.id)}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition ${
+                    hidden
+                      ? "border-neutral-200 bg-transparent text-neutral-400"
+                      : "border-neutral-200 bg-white text-neutral-700 shadow-sm"
+                  }`}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${category.dot} ${hidden ? "opacity-30" : ""}`}
+                  />
+                  <span className={hidden ? "line-through" : ""}>
+                    {language === "ru" ? category.ru : category.de}
+                  </span>
+                </button>
+              );
+            })}
+
+            {hiddenCategories.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setHiddenCategories([])}
+                className="shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold text-neutral-500 underline"
+              >
+                {language === "ru" ? "Показать все" : "Alle zeigen"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {view === "month" && (
+          <>
+            {/* CALENDAR */}
+            <section
+              className="overflow-hidden rounded-[22px] border border-neutral-200 bg-white shadow-sm"
+              onTouchStart={(e) => {
+                touchStart.current = {
+                  x: e.touches[0].clientX,
+                  y: e.touches[0].clientY,
+                };
+              }}
+              onTouchEnd={(e) => {
+                const start = touchStart.current;
+                touchStart.current = null;
+                if (!start) return;
+
+                const dx = e.changedTouches[0].clientX - start.x;
+                const dy = e.changedTouches[0].clientY - start.y;
+
+                if (Math.abs(dx) > 60 && Math.abs(dy) < 45) {
+                  changeMonth(dx < 0 ? 1 : -1);
+                }
+              }}
+            >
+              <div className="grid grid-cols-7 border-b border-neutral-100">
+                {weekdays.map((day, index) => (
+                  <div
+                    key={day}
+                    className={`py-2.5 text-center text-[10px] font-bold uppercase tracking-wider ${
+                      index >= 5 ? "text-rose-400" : "text-neutral-400"
+                    }`}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="flex w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-neutral-950 py-2 text-white">
-                        {event.category === "work" ? (
-                          <BriefcaseBusiness size={14} className="mb-1 opacity-70" />
-                        ) : event.source === "schedule" ? (
-                          <CalendarDays size={14} className="mb-1 opacity-70" />
-                        ) : (
-                          <Clock3 size={14} className="mb-1 opacity-70" />
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7">
+                {days.map((day, index) => {
+                  const key = dateKey(day);
+                  const isCurrentMonth =
+                    day.getMonth() === currentMonth.getMonth() &&
+                    day.getFullYear() === currentMonth.getFullYear();
+                  const isSelected = key === selectedDate;
+                  const isTodayKey = key === todayKey;
+                  const isWeekend = index % 7 >= 5;
+
+                  const dayEvents = monthEvents.filter((event) =>
+                    eventOverlapsDate(event, key)
+                  );
+
+                  return (
+                    <button
+                      type="button"
+                      key={`${key}-${index}`}
+                      onClick={() => selectDay(day)}
+                      className={`relative flex min-h-[62px] flex-col items-center border-b border-r border-neutral-100 px-1 pb-1.5 pt-1.5 text-left transition sm:min-h-[112px] sm:items-stretch sm:px-2 sm:pt-2 ${
+                        isCurrentMonth
+                          ? isWeekend
+                            ? "bg-neutral-50/60"
+                            : "bg-white"
+                          : "bg-neutral-50/80"
+                      } ${isSelected ? "bg-neutral-50" : "hover:bg-neutral-50"}`}
+                    >
+                      <span
+                        className={`flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-semibold transition sm:self-start ${
+                          isSelected
+                            ? "bg-neutral-950 text-white"
+                            : isTodayKey
+                            ? "bg-rose-100 text-rose-700"
+                            : isCurrentMonth
+                            ? "text-neutral-800"
+                            : "text-neutral-300"
+                        }`}
+                      >
+                        {day.getDate()}
+                      </span>
+
+                      {/* mobile: цветные точки */}
+                      <div className="mt-1.5 flex flex-wrap justify-center gap-[3px] sm:hidden">
+                        {dayEvents.slice(0, 4).map((event) => (
+                          <span
+                            key={event.id}
+                            className={`h-1.5 w-1.5 rounded-full ${categoryInfo(event.category, language).dot}`}
+                          />
+                        ))}
+                        {dayEvents.length > 4 && (
+                          <span className="text-[8px] font-bold leading-[6px] text-neutral-400">
+                            +
+                          </span>
                         )}
-                        <span className="text-[10px] font-bold text-center">
-                          {event.category === "work" ? "DEADLINE" : formatTime(event.start_at)}
-                        </span>
                       </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <h3 className="truncate text-sm font-semibold">
-                              {event.title}
-                            </h3>
-
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-neutral-400">
-                              <span className="inline-flex items-center gap-1">
-                                <span className={`h-1.5 w-1.5 rounded-full ${info.dot}`} />
-                                {language === "ru" ? info.ru : info.de}
-                              </span>
-
-                              {event.category === "work" ? (
-                                <span className="inline-flex items-center gap-1">
-                                  · {language === "ru" ? "Дедлайн задачи" : "Aufgaben-Deadline"}
-                                </span>
-                              ) : (
-                                <>
-                                  <span>
-                                    {formatTime(event.start_at)}–{formatTime(event.end_at)}
-                                  </span>
-                                  {eventDateKey(event.start_at) !== eventDateKey(event.end_at) && (
-                                    <span className="inline-flex items-center gap-1">
-                                      · {formatShortDate(event.start_at, language)} – {formatShortDate(event.end_at, language)}
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (event.source === "schedule" && event.source_id) {
-                                const entry = scheduleEntries.find((item) => item.id === event.source_id);
-                                if (entry) openScheduleEntry(entry);
-                                return;
-                              }
-
-                              if (event.category === "work") {
-                                const item = workItems.find((entry) => entry.id === Math.abs(event.id));
-                                if (item) {
-                                  setSelectedWorkItem(item);
-                                  setSelectedEvent(null);
-                                  setSelectedScheduleEntry(null);
-                                }
-                              } else {
-                                setSelectedEvent(event);
-                                setSelectedWorkItem(null);
-                                setSelectedScheduleEntry(null);
-                              }
-                            }}
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-900"
-                            aria-label={language === "ru" ? "Открыть" : "Öffnen"}
+                      {/* desktop: цветные плашки */}
+                      <div className="mt-1.5 hidden w-full space-y-1 sm:block">
+                        {dayEvents.slice(0, 3).map((event) => (
+                          <div
+                            key={event.id}
+                            className={`truncate rounded-md px-1.5 py-[3px] text-[10.5px] font-semibold ${
+                              categoryChip[event.category] ?? categoryChip.other
+                            }`}
                           >
-                            <MoreHorizontal size={17} />
-                          </button>
-                        </div>
+                            {event.category === "work"
+                              ? ""
+                              : `${formatTime(event.start_at)} `}
+                            {event.title}
+                          </div>
+                        ))}
 
-                        {event.location && (
-                          <div className="mt-2 flex items-center gap-1.5 text-xs text-neutral-500">
-                            <MapPin size={13} />
-                            <span className="truncate">{event.location}</span>
+                        {dayEvents.length > 3 && (
+                          <div className="px-1 text-[10px] font-semibold text-neutral-400">
+                            +{dayEvents.length - 3}{" "}
+                            {language === "ru" ? "ещё" : "weitere"}
                           </div>
                         )}
-
-                        {event.category === "work" ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const item = workItems.find((entry) => entry.id === Math.abs(event.id));
-                              if (item) openWorkItem(item);
-                            }}
-                            className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-200"
-                          >
-                            <BriefcaseBusiness size={11} />
-                            {language === "ru" ? "Открыть работу" : "Arbeit öffnen"}
-                          </button>
-                        ) : event.source === "schedule" ? (
-                          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-medium text-violet-700">
-                            <CalendarDays size={11} />
-                            {language === "ru" ? "Из расписания" : "Aus Dienstplan"}
-                          </div>
-                        ) : event.recurrence !== "none" ? (
-                          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] font-medium text-neutral-500">
-                            <Repeat2 size={11} />
-                            {language === "ru" ? "Повторяющееся" : "Wiederkehrend"}
-                          </div>
-                        ) : null}
                       </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* SELECTED DAY */}
+            <section className="mt-5">
+              <div className="mb-3 flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
+                    {relativeDayLabel(selectedDate) ??
+                      (language === "ru" ? "Выбранный день" : "Ausgewählter Tag")}
+                  </div>
+                  <h2 className="mt-1 text-lg font-semibold capitalize">
+                    {localDateFromKey(selectedDate).toLocaleDateString(
+                      language === "ru" ? "ru-RU" : "de-DE",
+                      { weekday: "long", day: "numeric", month: "long" }
+                    )}
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={openCreate}
+                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-700 shadow-sm active:scale-95"
+                >
+                  <Plus size={14} />
+                  {language === "ru" ? "Добавить" : "Hinzufügen"}
+                </button>
+              </div>
+
+              {loading ? (
+                <div className="rounded-2xl border border-neutral-200 bg-white p-5 text-sm text-neutral-400">
+                  {language === "ru" ? "Загрузка..." : "Laden..."}
+                </div>
+              ) : selectedDayEvents.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={openCreate}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-neutral-300 bg-white p-5 text-left transition hover:border-neutral-400 hover:bg-neutral-50"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-neutral-500">
+                    <Plus size={18} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">
+                      {language === "ru" ? "Свободный день" : "Noch kein Termin"}
                     </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        {/* AUTOMATIC SOURCES */}
-        <section className="mt-5 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
-            {language === "ru" ? "Автоматическая синхронизация" : "Automatische Synchronisierung"}
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
-                <BriefcaseBusiness size={15} />
-              </div>
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-slate-900">
-                  {language === "ru" ? "Проекты" : "Projekte"}
+                    <div className="mt-0.5 text-xs text-neutral-400">
+                      {language === "ru" ? "Добавить событие" : "Termin hinzufügen"}
+                    </div>
+                  </div>
+                </button>
+              ) : (
+                <div className="space-y-2.5">
+                  {selectedDayEvents.map((event) => renderEventCard(event))}
                 </div>
-                <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
-                  {language === "ru" ? "Дедлайны задач появляются автоматически." : "Aufgaben-Deadlines erscheinen automatisch."}
-                </p>
+              )}
+            </section>
+          </>
+        )}
+
+        {/* LIST VIEW */}
+        {view === "list" && (
+          <section className="space-y-5">
+            {loading ? (
+              <div className="rounded-2xl border border-neutral-200 bg-white p-5 text-sm text-neutral-400">
+                {language === "ru" ? "Загрузка..." : "Laden..."}
               </div>
-            </div>
-            <div className="flex items-start gap-3 rounded-xl bg-violet-50 p-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-white">
-                <CalendarDays size={15} />
+            ) : agendaGroups.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-8 text-center text-sm text-neutral-400">
+                {language === "ru"
+                  ? "В этом месяце нет событий."
+                  : "In diesem Monat gibt es keine Termine."}
               </div>
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-violet-950">
-                  {language === "ru" ? "Расписание" : "Dienstplan"}
+            ) : (
+              agendaGroups.map((group) => (
+                <div key={group.key}>
+                  <div className="mb-2 flex items-center gap-2">
+                    <span
+                      className={`flex h-9 min-w-9 items-center justify-center rounded-full px-2 text-[14px] font-bold ${
+                        group.key === todayKey
+                          ? "bg-rose-100 text-rose-700"
+                          : "bg-neutral-950 text-white"
+                      }`}
+                    >
+                      {localDateFromKey(group.key).getDate()}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold capitalize">
+                        {localDateFromKey(group.key).toLocaleDateString(
+                          language === "ru" ? "ru-RU" : "de-DE",
+                          { weekday: "long", month: "long" }
+                        )}
+                      </div>
+                      {relativeDayLabel(group.key) && (
+                        <div className="text-[11px] font-semibold text-rose-600">
+                          {relativeDayLabel(group.key)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {group.events.map((event) => renderEventCard(event))}
+                  </div>
                 </div>
-                <p className="mt-0.5 text-[11px] leading-4 text-violet-700/70">
-                  {language === "ru" ? "Все служения из расписания появляются автоматически." : "Alle Dienste aus dem Dienstplan erscheinen automatisch."}
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
+              ))
+            )}
+          </section>
+        )}
 
-        {/* MONTH SUMMARY */}
-        <section className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-              {language === "ru" ? "События" : "Termine"}
-            </div>
-            <div className="mt-1 text-xl font-semibold">{monthEvents.length}</div>
-          </div>
-
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-              {language === "ru" ? "Повторения" : "Wiederholungen"}
-            </div>
-            <div className="mt-1 text-xl font-semibold">
-              {monthEvents.filter((event) => event.recurrence !== "none").length}
-            </div>
-          </div>
-
-          <div className="col-span-2 rounded-2xl border border-neutral-200 bg-white p-4 sm:col-span-1">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-              {language === "ru" ? "Этот месяц" : "Dieser Monat"}
-            </div>
-            <div className="mt-1 flex items-center gap-2 text-sm font-semibold capitalize">
-              <CalendarDays size={16} className="text-neutral-400" />
-              {monthLabel}
-            </div>
-          </div>
-        </section>
+        {/* FOOTNOTE */}
+        <p className="mt-6 text-center text-[11px] leading-5 text-neutral-400">
+          {language === "ru"
+            ? "Дедлайны задач и служения из расписания добавляются в календарь автоматически."
+            : "Aufgaben-Deadlines und Dienste aus dem Dienstplan erscheinen automatisch im Kalender."}
+          {" · "}
+          {monthEvents.length} {language === "ru" ? "событий в месяце" : "Termine im Monat"}
+        </p>
       </div>
+
+      {/* FAB (mobile) */}
+      <button
+        type="button"
+        onClick={openCreate}
+        className="fixed bottom-[96px] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-neutral-950 text-white shadow-[0_10px_30px_rgba(17,24,32,0.35)] transition active:scale-95 md:hidden"
+        aria-label={language === "ru" ? "Новое событие" : "Neues Ereignis"}
+      >
+        <Plus size={24} />
+      </button>
 
       {/* SCHEDULE ENTRY ACTION SHEET */}
       {selectedScheduleEntry && !selectedEvent && !selectedWorkItem && !editorOpen && !deleteOpen && !seriesOpen && (
@@ -1828,7 +1732,7 @@ export default function CalendarPage() {
               <div className="min-w-0">
                 <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
                   <BriefcaseBusiness size={13} />
-                  {language === "ru" ? "Проект" : "Projekt"}
+                  {language === "ru" ? "Работа" : "Arbeit"}
                 </div>
                 <h2 className="text-xl font-semibold tracking-tight">{selectedWorkItem.title}</h2>
                 <p className="mt-1 text-sm text-neutral-500">

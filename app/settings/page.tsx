@@ -17,6 +17,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import PushNotifications from "@/components/PushNotifications";
+import InstallApp from "@/components/InstallApp";
 
 type Profile = {
   full_name: string | null;
@@ -636,6 +637,8 @@ export default function SettingsPage() {
 
           </div>
         </section>
+
+        <InstallApp isRu={isRu} />
 
         <PushNotifications isRu={isRu} />
 
