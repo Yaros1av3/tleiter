@@ -433,14 +433,7 @@ export default function TripsPage() {
     <main className="min-h-screen bg-[#f7f7f6] pb-24 text-[#111820]">
       <div className="sticky top-0 z-20 border-b border-[#e6e8ea] bg-[#f7f7f6]/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
-          <button
-            type="button"
-            onClick={() => router.push("/")}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"
-            aria-label="back"
-          >
-            <ChevronLeft size={20} />
-          </button>
+          
           <div className="min-w-0 flex-1">
             <h1 className="text-[18px] font-bold">{t("Поездки и выезды", "Fahrten & Freizeiten")}</h1>
             <p className="text-[12px] text-[#8a939d]">
