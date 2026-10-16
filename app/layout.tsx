@@ -6,6 +6,7 @@ import AuthGuard from "@/components/AuthGuard";
 import BottomNav from "@/components/BottomNav";
 import InstallPromptCapture from "@/components/InstallPromptCapture";
 import { LanguageProvider } from "@/components/LanguageProvider";
+import { ToastProvider } from "@/components/ToastProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -131,11 +132,13 @@ export default function RootLayout({
     >
       <body className="min-h-full">
         <LanguageProvider>
-          <AuthGuard>
-            {children}
-            <BottomNav />
-            <InstallPromptCapture />
-          </AuthGuard>
+          <ToastProvider>
+            <AuthGuard>
+              {children}
+              <BottomNav />
+              <InstallPromptCapture />
+            </AuthGuard>
+          </ToastProvider>
         </LanguageProvider>
       </body>
     </html>

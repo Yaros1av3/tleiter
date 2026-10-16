@@ -19,6 +19,7 @@ import {
 
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useToast } from "@/components/ToastProvider";
 
 type Recurrence = "none" | "weekly" | "biweekly" | "monthly" | "yearly";
 type SeriesScope = "single" | "following" | "all";
@@ -321,6 +322,7 @@ function categoryInfo(category: string, language: "ru" | "de") {
 
 export default function CalendarPage() {
   const { language } = useLanguage();
+  const toast = useToast();
   const router = useRouter();
 
   const [currentMonth, setCurrentMonth] = useState(() => {
@@ -601,7 +603,7 @@ export default function CalendarPage() {
 
   const validateForm = () => {
     if (!form.title.trim()) {
-      alert(language === "ru" ? "Введите название." : "Bitte einen Titel eingeben.");
+      toast.error(language === "ru" ? "Введите название." : "Bitte einen Titel eingeben.");
       return null;
     }
 
@@ -611,7 +613,7 @@ export default function CalendarPage() {
       !isValidTime(form.startTime) ||
       !isValidTime(form.endTime)
     ) {
-      alert(
+      toast.error(
         language === "ru"
           ? "Проверьте даты и время."
           : "Bitte Start-/Enddatum und Uhrzeit prüfen."
@@ -623,7 +625,7 @@ export default function CalendarPage() {
     const end = toDateTime(form.endDate, form.endTime);
 
     if (end <= start) {
-      alert(
+      toast.error(
         language === "ru"
           ? "Дата и время окончания должны быть позже начала."
           : "Enddatum und Endzeit müssen nach dem Beginn liegen."
@@ -635,7 +637,7 @@ export default function CalendarPage() {
 
     if (form.recurrence !== "none") {
       if (!form.recurrenceUntil) {
-        alert(
+        toast.error(
           language === "ru"
             ? "Выберите дату окончания повторения."
             : "Bitte ein Enddatum für die Wiederholung wählen."
@@ -646,7 +648,7 @@ export default function CalendarPage() {
       until = new Date(`${form.recurrenceUntil}T23:59:59`);
 
       if (until < start) {
-        alert(
+        toast.error(
           language === "ru"
             ? "Дата окончания повторения должна быть позже начала."
             : "Das Ende der Wiederholung muss nach dem Start liegen."
@@ -689,7 +691,7 @@ export default function CalendarPage() {
 
     if (error) {
       console.error("Create event error:", error);
-      alert(
+      toast.error(
         language === "ru"
           ? "Не удалось создать событие."
           : "Das Ereignis konnte nicht erstellt werden."
@@ -703,6 +705,7 @@ export default function CalendarPage() {
     setSelectedDate(form.date);
     setCurrentMonth(localDateFromKey(form.date));
     await loadEvents();
+    toast.success(language === "ru" ? "Сохранено" : "Gespeichert");
   };
 
   const saveSingleEvent = async () => {
@@ -730,7 +733,7 @@ export default function CalendarPage() {
 
     if (error) {
       console.error("Update event error:", error);
-      alert(
+      toast.error(
         language === "ru"
           ? "Не удалось сохранить событие."
           : "Das Ereignis konnte nicht gespeichert werden."
@@ -745,6 +748,7 @@ export default function CalendarPage() {
     setSelectedDate(form.date);
     setCurrentMonth(localDateFromKey(form.date));
     await loadEvents();
+    toast.success(language === "ru" ? "Сохранено" : "Gespeichert");
 
     // Keep the database as source of truth.
     void data;
@@ -807,9 +811,10 @@ export default function CalendarPage() {
       setEditorOpen(false);
       setSelectedEvent(null);
       await loadEvents();
+      toast.success(language === "ru" ? "Серия обновлена" : "Serie aktualisiert");
     } catch (error) {
       console.error("Series update error:", error);
-      alert(
+      toast.error(
         language === "ru"
           ? "Не удалось полностью обновить серию."
           : "Die Serie konnte nicht vollständig aktualisiert werden."
@@ -915,9 +920,10 @@ export default function CalendarPage() {
       setSaving(false);
       closeOverlays();
       await loadEvents();
+      toast.success(language === "ru" ? "Событие удалено" : "Ereignis gelöscht");
     } catch (error) {
       console.error("Delete event error:", error);
-      alert(
+      toast.error(
         language === "ru"
           ? "Не удалось удалить событие."
           : "Das Ereignis konnte nicht gelöscht werden."

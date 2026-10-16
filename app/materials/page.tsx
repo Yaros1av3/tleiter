@@ -24,6 +24,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { type Language } from "@/lib/translations";
 import { useLanguage } from "@/components/LanguageProvider";
+import { useToast } from "@/components/ToastProvider";
 
 type MaterialFolder = {
   id: number;
@@ -375,6 +376,7 @@ function materialTypeLabel(
 
 export default function MaterialsPage() {
   const { language } = useLanguage();
+  const toast = useToast();
 
   const [folders, setFolders] = useState<MaterialFolder[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -1091,7 +1093,7 @@ export default function MaterialsPage() {
     } catch (error) {
       console.error(error);
 
-      alert(
+      toast.error(
         isRu
           ? "Не удалось сохранить папку."
           : "Der Ordner konnte nicht gespeichert werden.",
@@ -1147,7 +1149,7 @@ export default function MaterialsPage() {
     } catch (error) {
       console.error(error);
 
-      alert(
+      toast.error(
         isRu
           ? "Не удалось удалить папку."
           : "Der Ordner konnte nicht gelöscht werden.",
@@ -1288,7 +1290,7 @@ export default function MaterialsPage() {
     } catch (error) {
       console.error(error);
 
-      alert(
+      toast.error(
         isRu
           ? "Не удалось удалить все папки полностью."
           : "Die Ordner konnten nicht vollständig gelöscht werden.",
@@ -1704,7 +1706,7 @@ export default function MaterialsPage() {
           ]);
       }
 
-      alert(
+      toast.error(
         isRu
           ? "Не удалось сохранить материал."
           : "Das Material konnte nicht gespeichert werden.",
@@ -1765,7 +1767,7 @@ export default function MaterialsPage() {
     } catch (error) {
       console.error(error);
 
-      alert(
+      toast.error(
         isRu
           ? "Не удалось удалить материал."
           : "Das Material konnte nicht gelöscht werden.",
