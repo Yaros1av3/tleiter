@@ -2,10 +2,6 @@
 
 import {
   House,
-  Target,
-  Lightbulb,
-  ListTodo,
-  CalendarClock,
   CalendarDays,
   ClipboardList,
   BookOpen,
@@ -32,30 +28,6 @@ export default function Sidebar({ language }: SidebarProps) {
   const materialsLabel = language === "ru" ? "Материалы" : "Materialien";
 
   const items = [
-    {
-      key: "goals",
-      label: t.navigation.goals,
-      icon: Target,
-      path: "/goals",
-    },
-    {
-      key: "ideas",
-      label: t.navigation.ideas,
-      icon: Lightbulb,
-      path: "/ideas",
-    },
-    {
-      key: "tasks",
-      label: t.navigation.tasks,
-      icon: ListTodo,
-      path: "/tasks",
-    },
-    {
-      key: "deadlines",
-      label: t.navigation.deadlines,
-      icon: CalendarClock,
-      path: "/deadlines",
-    },
     {
       key: "calendar",
       label: t.navigation.calendar,
