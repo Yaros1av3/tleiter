@@ -676,12 +676,22 @@ export default function Home() {
       icon: Bus,
     },
     {
-      href: "/availability",
-      label: isRu ? "Когда могу служить" : "Wann ich dienen kann",
-      description: isRu
-        ? "Мои воскресенья и служения"
-        : "Meine Sonntage und Gottesdienste",
-      icon: CalendarCheck,
+      href: reminder.exempt ? "/availability?tab=overview" : "/availability",
+      label: reminder.exempt
+        ? isRu
+          ? "Сводка: кто когда может"
+          : "Übersicht: wer wann kann"
+        : isRu
+          ? "Когда могу служить"
+          : "Wann ich dienen kann",
+      description: reminder.exempt
+        ? isRu
+          ? "Доступность команды по воскресеньям"
+          : "Verfügbarkeit des Teams an Sonntagen"
+        : isRu
+          ? "Мои воскресенья и служения"
+          : "Meine Sonntage und Gottesdienste",
+      icon: reminder.exempt ? Users : CalendarCheck,
     },
     {
       href: "/settings",
@@ -1535,7 +1545,7 @@ export default function Home() {
                       <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-white text-[#303b48] shadow-sm">
                         <Icon size={19} />
 
-                        {item.href === "/availability" && reminder.needed && (
+                        {item.href.startsWith("/availability") && reminder.needed && (
                           <ReminderDot className="-right-0.5 -top-0.5" />
                         )}
 

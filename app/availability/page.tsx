@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Send,
+  ShieldCheck,
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
@@ -79,6 +80,60 @@ function getSundays(month: Date) {
   return result;
 }
 
+function shortName(name: string) {
+  const parts = name.trim().split(/\s+/);
+
+  if (parts.length < 2) return name;
+
+  return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
+}
+
+type NameRowProps = {
+  label: string;
+  tone: "dark" | "green" | "red";
+  names: string[];
+  emptyText?: string;
+};
+
+function NameRow({ label, tone, names, emptyText }: NameRowProps) {
+  const labelClass =
+    tone === "dark"
+      ? "bg-[#111820] text-white"
+      : tone === "green"
+        ? "bg-emerald-600 text-white"
+        : "bg-red-50 text-red-500";
+
+  return (
+    <div className="flex items-start gap-3 px-4 py-2.5">
+      <span
+        className={`mt-0.5 inline-flex min-w-[58px] shrink-0 items-center justify-center rounded-full px-2 py-1 text-[11px] font-bold ${labelClass}`}
+      >
+        {label}
+        {names.length > 0 && (
+          <span className="ml-1 opacity-70">{names.length}</span>
+        )}
+      </span>
+
+      <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+        {names.length === 0 ? (
+          <span className="py-1 text-[12px] text-[#b1b7bf]">
+            {emptyText ?? "—"}
+          </span>
+        ) : (
+          names.map((name) => (
+            <span
+              key={name}
+              className="rounded-full bg-[#f1f2f3] px-2.5 py-1 text-[13px] font-semibold leading-none text-[#111820]"
+            >
+              {shortName(name)}
+            </span>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 function emptyDraft(): Draft {
   return { status: null, s10: false, s13: false, note: "" };
 }
@@ -96,6 +151,13 @@ export default function AvailabilityPage() {
   const [userEmail, setUserEmail] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState<"mine" | "overview">("mine");
+
+  /* «не служит, только администрирует» — форма «Когда могу служить» ему не нужна */
+  const [exempt, setExempt] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [overviewView, setOverviewView] = useState<"days" | "people">("days");
+  const [openSilent, setOpenSilent] = useState<Record<string, boolean>>({});
+  const [exemptIds, setExemptIds] = useState<string[]>([]);
 
   /* в конце месяца форма сразу открывается на следующий месяц */
   const [viewMonth, setViewMonth] = useState(() => {
@@ -140,21 +202,36 @@ export default function AvailabilityPage() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (!user) return;
+      if (!user) {
+        setReady(true);
+        return;
+      }
 
       setUserId(user.id);
       setUserEmail(user.email ?? "");
 
-      const { data } = await supabase.rpc("is_admin");
+      const [{ data }, { data: exemptRow }] = await Promise.all([
+        supabase.rpc("is_admin"),
+        supabase
+          .from("availability_exempt")
+          .select("user_id")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+      ]);
 
       setIsAdmin(data === true);
+      setExempt(Boolean(exemptRow));
 
       if (
         data === true &&
-        new URLSearchParams(window.location.search).get("tab") === "overview"
+        (Boolean(exemptRow) ||
+          new URLSearchParams(window.location.search).get("tab") ===
+            "overview")
       ) {
         setTab("overview");
       }
+
+      setReady(true);
     }
 
     init();
@@ -163,7 +240,7 @@ export default function AvailabilityPage() {
   /* ---------- загрузка моих ответов за месяц ---------- */
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || exempt) return;
 
     const currentUserId: string = userId;
     let cancelled = false;
@@ -215,7 +292,7 @@ export default function AvailabilityPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, viewMonth]);
+  }, [userId, viewMonth, exempt]);
 
   /* ---------- загрузка сводки (только админ) ---------- */
 
@@ -230,7 +307,7 @@ export default function AvailabilityPage() {
       const first = sundays[0] ?? toDateString(viewMonth);
       const last = sundays[sundays.length - 1] ?? first;
 
-      const [availabilityResult, teamResult, accountsResult] = await Promise.all([
+      const [availabilityResult, teamResult, accountsResult, exemptResult] = await Promise.all([
         supabase
           .from("service_availability")
           .select(
@@ -243,6 +320,7 @@ export default function AvailabilityPage() {
           .select("first_name, last_name, user_id")
           .eq("status", "active"),
         supabase.rpc("get_account_names"),
+        supabase.from("availability_exempt").select("user_id"),
       ]);
 
       if (cancelled) return;
@@ -257,6 +335,11 @@ export default function AvailabilityPage() {
       setOverviewRows((availabilityResult.data ?? []) as AvailabilityRow[]);
       setTeamMembers((teamResult.data ?? []) as TeamMemberRow[]);
       setAccounts((accountsResult.data ?? []) as AccountRow[]);
+      setExemptIds(
+        ((exemptResult.data ?? []) as { user_id: string }[]).map(
+          (row) => row.user_id,
+        ),
+      );
       setLoadingOverview(false);
     }
 
@@ -449,12 +532,28 @@ export default function AvailabilityPage() {
     });
 
     const respondedIds = new Set(byUser.keys());
+    const exemptSet = new Set(exemptIds);
 
     const cleanName = (first: string, last: string | null) =>
       `${first} ${(last ?? "").trim() === "-" ? "" : (last ?? "")}`.trim();
 
+    /* имена тех, кто не служит — чтобы не показывать и их карточку в команде */
+    const exemptNames = new Set(
+      accounts
+        .filter((account) => exemptSet.has(account.id))
+        .map((account) => (account.full_name ?? "").trim().toLowerCase())
+        .filter(Boolean),
+    );
+
     const notResponded = teamMembers
-      .filter((member) => !member.user_id || !respondedIds.has(member.user_id))
+      .filter(
+        (member) =>
+          !(member.user_id && exemptSet.has(member.user_id)) &&
+          !exemptNames.has(
+            cleanName(member.first_name, member.last_name).toLowerCase(),
+          ) &&
+          (!member.user_id || !respondedIds.has(member.user_id)),
+      )
       .map((member) => ({
         name: cleanName(member.first_name, member.last_name),
         noAccount: !member.user_id,
@@ -471,7 +570,11 @@ export default function AvailabilityPage() {
     );
 
     for (const account of accounts) {
-      if (linkedUserIds.has(account.id) || respondedIds.has(account.id)) {
+      if (
+        linkedUserIds.has(account.id) ||
+        respondedIds.has(account.id) ||
+        exemptSet.has(account.id)
+      ) {
         continue;
       }
 
@@ -492,8 +595,56 @@ export default function AvailabilityPage() {
           a.member_name.localeCompare(b.member_name, locale),
       );
 
-    return { people, counts, notResponded, notes };
-  }, [overviewRows, teamMembers, accounts, sundays, locale, isRu]);
+    /* данные по каждому воскресенью для карточек */
+    const days: Record<
+      string,
+      {
+        s10: string[];
+        s13: string[];
+        no: string[];
+        silent: string[];
+        notes: AvailabilityRow[];
+      }
+    > = {};
+
+    for (const date of sundays) {
+      const day = {
+        s10: [] as string[],
+        s13: [] as string[],
+        no: [] as string[],
+        silent: [] as string[],
+        notes: [] as AvailabilityRow[],
+      };
+
+      for (const person of people) {
+        if (exemptSet.has(person.id)) continue;
+
+        const cell = person.cells.get(date);
+
+        if (!cell) {
+          day.silent.push(person.name);
+          continue;
+        }
+
+        if (cell.status === "unavailable") {
+          day.no.push(person.name);
+        } else {
+          if (cell.service_10) day.s10.push(person.name);
+          if (cell.service_13) day.s13.push(person.name);
+        }
+
+        if (cell.note) day.notes.push(cell);
+      }
+
+      for (const person of notResponded) {
+        day.silent.push(person.name);
+      }
+
+      days[date] = day;
+    }
+
+    return { people, counts, notResponded, notes, days };
+  }, [overviewRows, teamMembers, accounts, exemptIds, sundays, locale, isRu]);
 
   function formatSunday(date: string) {
     return new Date(`${date}T00:00:00`).toLocaleDateString(locale, {
@@ -523,7 +674,13 @@ export default function AvailabilityPage() {
 
           <div className="min-w-0">
             <div className="text-[19px] font-bold leading-none tracking-[-0.03em] text-[#111820]">
-              {isRu ? "Когда могу служить" : "Wann ich dienen kann"}
+              {exempt
+                ? isRu
+                  ? "Сводка команды"
+                  : "Team-Übersicht"
+                : isRu
+                  ? "Когда могу служить"
+                  : "Wann ich dienen kann"}
             </div>
 
             <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8a939d]">
@@ -537,7 +694,7 @@ export default function AvailabilityPage() {
 
       <div className="mx-auto w-full max-w-[760px] px-4 pb-32 pt-5 sm:px-6">
         {/* TABS (только для админов) */}
-        {isAdmin && (
+        {isAdmin && !exempt && (
           <div className="mb-4 flex gap-2 rounded-[16px] border border-[#e2e5e8] bg-white p-1.5">
             <button
               type="button"
@@ -603,7 +760,22 @@ export default function AvailabilityPage() {
         </div>
 
         {/* ================= МОИ ОТВЕТЫ ================= */}
-        {tab === "mine" && (
+        {!ready && (
+          <div className="h-[180px] animate-pulse rounded-[20px] bg-white" />
+        )}
+
+        {ready && exempt && !isAdmin && (
+          <div className="flex items-start gap-3 rounded-[20px] border border-[#e6e8ea] bg-white p-4 text-[13px] leading-5 text-[#65707d]">
+            <ShieldCheck size={18} className="mt-0.5 shrink-0 text-[#8b949f]" />
+            <span>
+              {isRu
+                ? "Тебе не нужно отмечать, когда ты можешь служить."
+                : "Du musst nicht angeben, wann du dienen kannst."}
+            </span>
+          </div>
+        )}
+
+        {ready && !exempt && tab === "mine" && (
           <div>
             <p className="mb-4 px-1 text-[13px] leading-5 text-[#65707d]">
               {isRu
@@ -756,179 +928,228 @@ export default function AvailabilityPage() {
         )}
 
         {/* ================= СВОДКА (АДМИН) ================= */}
-        {tab === "overview" && isAdmin && (
+        {ready && tab === "overview" && isAdmin && (
           <div>
+            {/* переключатель вида */}
+            <div className="mb-3 flex gap-1.5 rounded-[14px] border border-[#e2e5e8] bg-white p-1">
+              {(
+                [
+                  ["days", isRu ? "По дням" : "Nach Tagen"],
+                  ["people", isRu ? "По людям" : "Nach Personen"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setOverviewView(key)}
+                  className={`flex-1 rounded-[10px] py-2 text-[12.5px] font-semibold transition ${
+                    overviewView === key
+                      ? "bg-[#111820] text-white"
+                      : "text-[#65707d]"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             {loadingOverview ? (
               <div className="h-[220px] animate-pulse rounded-[20px] bg-white" />
-            ) : (
-              <>
-                <div className="overflow-hidden rounded-[20px] border border-[#e6e8ea] bg-white">
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-[13px]">
-                      <thead>
-                        <tr className="bg-[#fafafa] text-[10px] font-bold uppercase tracking-[0.06em] text-[#9aa2ad]">
-                          <th className="sticky left-0 z-10 min-w-[130px] bg-[#fafafa] px-3 py-2.5 text-left">
-                            {isRu ? "Служитель" : "Person"}
-                          </th>
+            ) : overviewView === "days" ? (
+              <div className="space-y-3">
+                {sundays.map((date) => {
+                  const day = overview.days[date];
+                  const past = date < todayString;
+                  const silentOpen = Boolean(openSilent[date]);
 
-                          {sundays.map((date) => (
-                            <th
-                              key={date}
-                              className="min-w-[84px] px-2 py-2.5 text-center"
-                            >
-                              {formatShort(date)}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
+                  return (
+                    <section
+                      key={date}
+                      className={`overflow-hidden rounded-[20px] border border-[#e6e8ea] bg-white ${
+                        past ? "opacity-60" : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 border-b border-[#eceef0] bg-[#fafafa] px-4 py-3">
+                        <div className="min-w-0 truncate text-[15px] font-bold capitalize text-[#111820]">
+                          {formatSunday(date)}
+                        </div>
 
-                      <tbody>
-                        {overview.people.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={sundays.length + 1}
-                              className="px-4 py-10 text-center text-[12px] text-[#9aa2ad]"
-                            >
-                              {isRu
-                                ? "Пока никто не ответил на этот месяц."
-                                : "Für diesen Monat hat noch niemand geantwortet."}
-                            </td>
-                          </tr>
-                        ) : (
-                          overview.people.map((person) => (
-                            <tr
-                              key={person.id}
-                              className="border-t border-[#f0f1f2]"
-                            >
-                              <td className="sticky left-0 z-10 bg-white px-3 py-2.5 font-semibold text-[#111820]">
-                                {person.name}
-                              </td>
+                        <div className="flex shrink-0 gap-1.5 text-[11px] font-bold">
+                          <span className="rounded-full bg-[#111820] px-2 py-0.5 text-white">
+                            10:00 · {day.s10.length}
+                          </span>
 
-                              {sundays.map((date) => {
-                                const cell = person.cells.get(date);
+                          <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-white">
+                            12:30 · {day.s13.length}
+                          </span>
+                        </div>
+                      </div>
 
-                                if (!cell) {
-                                  return (
-                                    <td
-                                      key={date}
-                                      className="px-2 py-2.5 text-center text-[#d0d4d9]"
-                                    >
-                                      –
-                                    </td>
-                                  );
-                                }
+                      <div className="divide-y divide-[#f3f4f5]">
+                        <NameRow
+                          label="10:00"
+                          tone="dark"
+                          names={day.s10}
+                          emptyText={isRu ? "никого" : "niemand"}
+                        />
 
-                                if (cell.status === "unavailable") {
-                                  return (
-                                    <td
-                                      key={date}
-                                      className="px-2 py-2.5 text-center"
-                                    >
-                                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-500">
-                                        {isRu ? "нет" : "nein"}
-                                      </span>
-                                    </td>
-                                  );
-                                }
+                        <NameRow
+                          label="12:30"
+                          tone="green"
+                          names={day.s13}
+                          emptyText={isRu ? "никого" : "niemand"}
+                        />
 
-                                return (
-                                  <td
-                                    key={date}
-                                    className="px-2 py-2.5 text-center"
-                                  >
-                                    <div className="flex justify-center gap-1">
-                                      {cell.service_10 && (
-                                        <span className="rounded-full bg-[#111820] px-2 py-0.5 text-[11px] font-bold text-white">
-                                          10
-                                        </span>
-                                      )}
-
-                                      {cell.service_13 && (
-                                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">
-                                          12:30
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))
+                        {day.no.length > 0 && (
+                          <NameRow
+                            label={isRu ? "Не могут" : "Nein"}
+                            tone="red"
+                            names={day.no}
+                          />
                         )}
-                      </tbody>
 
-                      {overview.people.length > 0 && (
-                        <tfoot>
-                          <tr className="border-t border-[#eceef0] bg-[#fafafa] text-[11px] font-semibold text-[#65707d]">
-                            <td className="sticky left-0 z-10 bg-[#fafafa] px-3 py-2.5">
-                              {isRu ? "Могут" : "Verfügbar"}
-                            </td>
+                        {day.silent.length > 0 && (
+                          <div className="px-4 py-2.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenSilent((current) => ({
+                                  ...current,
+                                  [date]: !current[date],
+                                }))
+                              }
+                              className="flex w-full items-center justify-between text-[12px] font-semibold text-[#8a939d]"
+                            >
+                              <span>
+                                {isRu ? "Нет ответа" : "Keine Antwort"} ·{" "}
+                                {day.silent.length}
+                              </span>
 
-                            {overview.counts.map((count) => (
-                              <td
-                                key={count.date}
-                                className="px-2 py-2.5 text-center"
+                              <ChevronRight
+                                size={15}
+                                className={`transition ${
+                                  silentOpen ? "rotate-90" : ""
+                                }`}
+                              />
+                            </button>
+
+                            {silentOpen && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {day.silent.map((name) => (
+                                  <span
+                                    key={name}
+                                    className="rounded-full border border-[#e2e5e8] px-2.5 py-1 text-[12px] font-medium leading-none text-[#8a939d]"
+                                  >
+                                    {shortName(name)}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {day.notes.length > 0 && (
+                          <div className="space-y-1 bg-[#fffbf0] px-4 py-2.5">
+                            {day.notes.map((row) => (
+                              <p
+                                key={`${row.user_id}-${row.sunday_date}`}
+                                className="text-[12.5px] leading-snug text-[#6b5a2a]"
                               >
-                                10: {count.s10} · 12:30: {count.s13}
-                              </td>
+                                <span className="font-bold">
+                                  {shortName(row.member_name)}:
+                                </span>{" "}
+                                {row.note}
+                              </p>
                             ))}
-                          </tr>
-                        </tfoot>
-                      )}
-                    </table>
-                  </div>
-                </div>
+                          </div>
+                        )}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            ) : overview.people.length === 0 ? (
+              <div className="rounded-[20px] border border-[#e6e8ea] bg-white px-4 py-10 text-center text-[12px] text-[#9aa2ad]">
+                {isRu
+                  ? "Пока никто не ответил на этот месяц."
+                  : "Für diesen Monat hat noch niemand geantwortet."}
+              </div>
+            ) : (
+              <div className="divide-y divide-[#f0f1f2] overflow-hidden rounded-[20px] border border-[#e6e8ea] bg-white">
+                {overview.people
+                  .filter((person) => !exemptIds.includes(person.id))
+                  .map((person) => (
+                    <div key={person.id} className="px-4 py-3">
+                      <div className="text-[14px] font-bold text-[#111820]">
+                        {person.name}
+                      </div>
 
-                <p className="mt-2 px-1 text-[11px] text-[#9aa2ad]">
-                  {isRu
-                    ? "10 / 12:30 — время служения, «нет» — не может в этот день, «–» — ещё не ответил."
-                    : "10 / 12:30 — Gottesdienst, „nein“ — kann nicht, „–“ — noch keine Antwort."}
+                      <div className="mt-2 grid grid-cols-5 gap-1.5">
+                        {sundays.map((date) => {
+                          const cell = person.cells.get(date);
+
+                          return (
+                            <div
+                              key={date}
+                              className="rounded-[10px] bg-[#f6f7f7] px-1 py-1.5 text-center"
+                            >
+                              <div className="text-[10px] font-medium text-[#9aa2ad]">
+                                {formatShort(date)}
+                              </div>
+
+                              <div className="mt-0.5 flex min-h-[18px] flex-col items-center justify-center gap-0.5 text-[11px] font-bold leading-none">
+                                {!cell ? (
+                                  <span className="text-[#c5cad0]">–</span>
+                                ) : cell.status === "unavailable" ? (
+                                  <span className="text-red-500">
+                                    {isRu ? "нет" : "nein"}
+                                  </span>
+                                ) : (
+                                  <>
+                                    {cell.service_10 && (
+                                      <span className="text-[#111820]">
+                                        10:00
+                                      </span>
+                                    )}
+
+                                    {cell.service_13 && (
+                                      <span className="text-emerald-600">
+                                        12:30
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {/* ещё не ответили вообще */}
+            {!loadingOverview && overview.notResponded.length > 0 && (
+              <div className="mt-3 rounded-[20px] border border-[#e6e8ea] bg-white p-4">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#9aa2ad]">
+                  {isRu ? "Совсем не ответили" : "Noch gar nicht geantwortet"} ·{" "}
+                  {overview.notResponded.length}
                 </p>
 
-                {overview.notes.length > 0 && (
-                  <div className="mt-4 rounded-[20px] border border-[#e6e8ea] bg-white p-4">
-                    <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#9aa2ad]">
-                      {isRu ? "Комментарии" : "Kommentare"}
-                    </p>
-
-                    <div className="space-y-1.5">
-                      {overview.notes.map((row) => (
-                        <p
-                          key={`${row.user_id}-${row.sunday_date}`}
-                          className="text-[13px] text-[#374353]"
-                        >
-                          <span className="font-semibold">
-                            {row.member_name}
-                          </span>{" "}
-                          · {formatShort(row.sunday_date)}: {row.note}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {overview.notResponded.length > 0 && (
-                  <div className="mt-4 rounded-[20px] border border-[#e6e8ea] bg-white p-4">
-                    <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#9aa2ad]">
-                      {isRu ? "Ещё не ответили" : "Noch nicht geantwortet"} ·{" "}
-                      {overview.notResponded.length}
-                    </p>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      {overview.notResponded.map((person) => (
-                        <span
-                          key={person.name}
-                          className="rounded-full border border-[#e2e5e8] bg-[#fafafa] px-2.5 py-1 text-[12px] font-medium text-[#374353]"
-                        >
-                          {person.name}
-                          {person.noAccount &&
-                            (isRu ? " (нет аккаунта)" : " (kein Konto)")}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
+                <div className="flex flex-wrap gap-1.5">
+                  {overview.notResponded.map((person) => (
+                    <span
+                      key={person.name}
+                      className="rounded-full border border-[#e2e5e8] bg-[#fafafa] px-2.5 py-1 text-[12px] font-medium text-[#374353]"
+                    >
+                      {person.name}
+                      {person.noAccount &&
+                        (isRu ? " (нет аккаунта)" : " (kein Konto)")}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         )}

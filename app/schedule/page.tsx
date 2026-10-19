@@ -1444,6 +1444,7 @@ export default function SchedulePage() {
             {/* QUICK LINKS */}
             {!roleLoading && (
               <div className="flex flex-wrap items-center gap-2">
+                {!reminder.exempt && (
                 <button
                   type="button"
                   onClick={() =>
@@ -1479,6 +1480,7 @@ export default function SchedulePage() {
                     </span>
                   )}
                 </button>
+                )}
 
                 {isAdmin ? (
                   <button

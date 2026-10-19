@@ -14,7 +14,7 @@ import { supabase } from "@/lib/supabase";
  *
  * Чтобы изменить момент появления — поменяй REMINDER_DAYS.
  */
-export const REMINDER_DAYS = 31;
+export const REMINDER_DAYS = 10;
 
 export const AVAILABILITY_UPDATED_EVENT = "availability-updated";
 
@@ -60,6 +60,13 @@ export function getNextMonth(now: Date = new Date()) {
 
 export function useAvailabilityReminder() {
   const [needed, setNeeded] = useState(false);
+
+  /*
+   * «Не служит» — например, человек только администрирует.
+   * Для него не показываем напоминания и форму «Когда могу служить».
+   * Список таких людей — таблица availability_exempt (см. availability-exempt.sql).
+   */
+  const [exempt, setExempt] = useState(false);
   const pathname = usePathname();
 
   const check = useCallback(async () => {
@@ -77,8 +84,23 @@ export function useAvailabilityReminder() {
 
       if (!user) {
         setNeeded(false);
+        setExempt(false);
         return;
       }
+
+      const { data: exemptRow } = await supabase
+        .from("availability_exempt")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (exemptRow) {
+        setExempt(true);
+        setNeeded(false);
+        return;
+      }
+
+      setExempt(false);
 
       const sundays = getSundaysOfMonth(getNextMonth(now));
 
@@ -127,5 +149,5 @@ export function useAvailabilityReminder() {
     };
   }, [check]);
 
-  return { needed, nextMonth: getNextMonth() };
+  return { needed, exempt, nextMonth: getNextMonth() };
 }
