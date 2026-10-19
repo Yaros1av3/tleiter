@@ -145,6 +145,9 @@ export default function SchedulePage() {
     string | null
   >(null);
 
+  // Прошедшие даты месяца свёрнуты, чтобы не листать до актуального
+  const [showPast, setShowPast] = useState(false);
+
   const [currentMonth, setCurrentMonth] = useState(() => {
     const fromUrl = dateFromUrl.current;
 
@@ -1182,13 +1185,26 @@ export default function SchedulePage() {
     autoFocusDone.current = true;
     setFocusedDate(target);
 
+    if (target < today) {
+      setShowPast(true);
+    }
+
     const scrollTimer = window.setTimeout(() => {
-      document
-        .getElementById(`day-${target}`)
-        ?.scrollIntoView({
+      const element = document.getElementById(
+        `day-${target}`,
+      );
+
+      // Если нужный день и так виден вверху страницы — не прокручиваем,
+      // чтобы не прятать переключатель месяца
+      if (
+        element &&
+        element.getBoundingClientRect().top > 260
+      ) {
+        element.scrollIntoView({
           behavior: "smooth",
           block: "start",
         });
+      }
     }, 150);
 
     const clearTimer = window.setTimeout(() => {
@@ -1206,6 +1222,32 @@ export default function SchedulePage() {
    * RENDER
    * =====================================================
    */
+
+  const todayStr = (() => {
+    const now = new Date();
+
+    return `${now.getFullYear()}-${String(
+      now.getMonth() + 1,
+    ).padStart(2, "0")}-${String(
+      now.getDate(),
+    ).padStart(2, "0")}`;
+  })();
+
+  const firstUpcomingDate =
+    scheduleDays.find((date) => date >= todayStr) ?? null;
+
+  const pastDays = scheduleDays.filter(
+    (date) => date < todayStr,
+  );
+
+  const upcomingDays = scheduleDays.filter(
+    (date) => date >= todayStr,
+  );
+
+  // если весь месяц в прошлом — показываем всё, иначе прошедшие под спойлером
+  const pastOpen = showPast || upcomingDays.length === 0;
+
+  const visibleDays = pastOpen ? scheduleDays : upcomingDays;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#f5f5f3] text-[#111820]">
@@ -1268,11 +1310,11 @@ export default function SchedulePage() {
           </div>
         </div>
 
-        <div className="mx-auto w-full max-w-[1180px] px-4 pb-32 pt-5 sm:px-6 md:pt-8 lg:px-8">
+        <div className="mx-auto w-full max-w-[880px] px-4 pb-32 pt-3 sm:px-6 md:pt-8 lg:px-8">
           {/* =================================================
               DESKTOP HEADING
           ================================================= */}
-          <section className="mb-5 md:mb-7">
+          <section className="md:mb-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex min-w-0 items-start gap-3">
                 <button
@@ -1339,168 +1381,131 @@ export default function SchedulePage() {
                 )}
             </div>
 
-            {!roleLoading &&
-              !isAdmin && (
-                <div className="mt-4 flex items-center gap-2 rounded-[15px] border border-[#e3e5e8] bg-white px-4 py-3 text-[12px] leading-4 text-[#687585]">
-                  <ShieldCheck
-                    size={16}
-                    className="shrink-0 text-[#8b949f]"
-                  />
-
-                  <span>
-                    {isRu
-                      ? "Ты просматриваешь расписание. Изменять его могут только администраторы."
-                      : "Du kannst den Dienstplan ansehen. Änderungen sind nur für Administratoren möglich."}
-                  </span>
-                </div>
-              )}
           </section>
 
           {/* =================================================
-              AVAILABILITY LINKS
+              TOOLBAR: месяц + быстрые ссылки
           ================================================= */}
-          {!roleLoading && (
-            <section
-              className={`mb-5 grid gap-2 ${
-                isAdmin ? "sm:grid-cols-2" : ""
-              }`}
-            >
+          <section className="mb-3 space-y-2">
+            {/* MONTH NAVIGATION */}
+            <div className="flex items-center gap-1 rounded-[16px] border border-[#e1e3e6] bg-white p-1">
               <button
                 type="button"
-                onClick={() => router.push("/availability")}
-                className="flex items-center gap-3 rounded-[18px] border border-[#e1e3e6] bg-white px-4 py-3 text-left shadow-[0_2px_10px_rgba(17,24,32,0.025)] transition active:scale-[0.99]"
+                onClick={previousMonth}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] text-[#687585] active:bg-[#f3f4f5]"
+                aria-label={
+                  isRu
+                    ? "Предыдущий месяц"
+                    : "Vorheriger Monat"
+                }
               >
-                <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[#111820] text-white">
-                  <CalendarCheck size={18} />
-
-                  {reminder.needed && (
-                    <ReminderDot className="-right-0.5 -top-0.5" />
-                  )}
-                </span>
-
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-bold text-[#111820]">
-                    {isRu ? "Когда могу служить" : "Wann ich dienen kann"}
-                  </span>
-
-                  <span
-                    className={`block text-[11px] ${
-                      reminder.needed
-                        ? "font-semibold text-red-500"
-                        : "text-[#818994]"
-                    }`}
-                  >
-                    {reminder.needed
-                      ? isRu
-                        ? `Заполни на ${reminder.nextMonth.toLocaleDateString("ru-RU", { month: "long" })}`
-                        : `Bitte für ${reminder.nextMonth.toLocaleDateString("de-DE", { month: "long" })} ausfüllen`
-                      : isRu
-                        ? "Отметь свои воскресенья и служения"
-                        : "Trage deine Sonntage und Gottesdienste ein"}
-                  </span>
-                </span>
-
-                <ChevronRight size={18} className="shrink-0 text-[#b1b7bf]" />
+                <ChevronLeft size={20} />
               </button>
 
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => router.push("/availability?tab=overview")}
-                  className="flex items-center gap-3 rounded-[18px] border border-[#e1e3e6] bg-white px-4 py-3 text-left shadow-[0_2px_10px_rgba(17,24,32,0.025)] transition active:scale-[0.99]"
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-emerald-600 text-white">
-                    <Users size={18} />
-                  </span>
-
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[14px] font-bold text-[#111820]">
-                      {isRu ? "Сводка доступности" : "Verfügbarkeit im Team"}
-                    </span>
-
-                    <span className="block text-[11px] text-[#818994]">
-                      {isRu
-                        ? "Кто когда может служить"
-                        : "Wer wann dienen kann"}
-                    </span>
-                  </span>
-
-                  <ChevronRight size={18} className="shrink-0 text-[#b1b7bf]" />
-                </button>
-              )}
-            </section>
-          )}
-
-          {/* =================================================
-              MONTH NAVIGATION
-          ================================================= */}
-          <section className="mb-5 rounded-[20px] border border-[#e1e3e6] bg-white p-2 shadow-[0_2px_10px_rgba(17,24,32,0.025)]">
-            <div className="flex items-center justify-between">
-              <div className="flex min-w-0 items-center">
-                <button
-                  type="button"
-                  onClick={
-                    previousMonth
-                  }
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-[#687585] active:bg-[#f3f4f5] md:h-9 md:w-9"
-                  aria-label={
-                    isRu
-                      ? "Предыдущий месяц"
-                      : "Vorheriger Monat"
-                  }
-                >
-                  <ChevronLeft
-                    size={20}
-                  />
-                </button>
-
-                <div className="min-w-0 px-2 md:px-3">
-                  <div className="truncate text-[15px] font-bold capitalize tracking-[-0.02em]">
-                    {monthLabel}
-                  </div>
-
-                  <div className="mt-0.5 text-[11px] text-[#98a0aa]">
-                    {entries.length}{" "}
-                    {isRu
-                      ? entries.length ===
-                        1
-                        ? "служение"
-                        : "служений"
-                      : entries.length ===
-                          1
-                        ? "Dienst"
-                        : "Dienste"}
-                  </div>
+              <div className="min-w-0 flex-1 text-center">
+                <div className="truncate text-[15px] font-bold capitalize leading-tight tracking-[-0.02em]">
+                  {monthLabel}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={nextMonth}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] text-[#687585] active:bg-[#f3f4f5] md:h-9 md:w-9"
-                  aria-label={
-                    isRu
-                      ? "Следующий месяц"
-                      : "Nächster Monat"
-                  }
-                >
-                  <ChevronRight
-                    size={20}
-                  />
-                </button>
+                <div className="text-[11px] leading-tight text-[#98a0aa]">
+                  {entries.length}{" "}
+                  {isRu
+                    ? entries.length === 1
+                      ? "служение"
+                      : "служений"
+                    : entries.length === 1
+                      ? "Dienst"
+                      : "Dienste"}
+                </div>
               </div>
 
               <button
                 type="button"
-                onClick={
-                  goToToday
+                onClick={nextMonth}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] text-[#687585] active:bg-[#f3f4f5]"
+                aria-label={
+                  isRu
+                    ? "Следующий месяц"
+                    : "Nächster Monat"
                 }
-                className="h-10 shrink-0 rounded-[13px] border border-[#e2e4e7] px-3 text-[11px] font-bold text-[#596371] active:bg-[#f5f5f5]"
               >
-                {isRu
-                  ? "Сегодня"
-                  : "Heute"}
+                <ChevronRight size={20} />
+              </button>
+
+              <button
+                type="button"
+                onClick={goToToday}
+                className="ml-0.5 mr-0.5 h-9 shrink-0 rounded-[11px] bg-[#111820] px-3.5 text-[11px] font-bold text-white active:opacity-80"
+              >
+                {isRu ? "Сегодня" : "Heute"}
               </button>
             </div>
+
+            {/* QUICK LINKS */}
+            {!roleLoading && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push("/availability")
+                  }
+                  className={`inline-flex h-10 items-center gap-2 rounded-full border pl-1.5 pr-4 text-[12.5px] font-bold transition active:scale-[0.98] ${
+                    reminder.needed
+                      ? "border-red-200 bg-red-50 text-red-700"
+                      : "border-[#e1e3e6] bg-white text-[#111820]"
+                  }`}
+                >
+                  <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-[#111820] text-white">
+                    <CalendarCheck size={14} />
+
+                    {reminder.needed && (
+                      <ReminderDot className="-right-0.5 -top-0.5" />
+                    )}
+                  </span>
+
+                  <span>
+                    {isRu
+                      ? "Когда могу служить"
+                      : "Wann ich dienen kann"}
+                  </span>
+
+                  {reminder.needed && (
+                    <span className="font-semibold text-red-500">
+                      ·{" "}
+                      {reminder.nextMonth.toLocaleDateString(
+                        isRu ? "ru-RU" : "de-DE",
+                        { month: "long" },
+                      )}
+                    </span>
+                  )}
+                </button>
+
+                {isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(
+                        "/availability?tab=overview",
+                      )
+                    }
+                    className="inline-flex h-10 items-center gap-2 rounded-full border border-[#e1e3e6] bg-white pl-1.5 pr-4 text-[12.5px] font-bold text-[#111820] transition active:scale-[0.98]"
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white">
+                      <Users size={14} />
+                    </span>
+
+                    {isRu ? "Сводка" : "Übersicht"}
+                  </button>
+                ) : (
+                  <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-[#8b949f]">
+                    <ShieldCheck size={13} />
+                    {isRu
+                      ? "Только просмотр"
+                      : "Nur ansehen"}
+                  </span>
+                )}
+              </div>
+            )}
           </section>
 
           {/* ERROR */}
@@ -1591,118 +1596,144 @@ export default function SchedulePage() {
                 )}
             </div>
           ) : (
-            <div className="space-y-4">
-              {scheduleDays.map(
+            <div className="space-y-3">
+              {pastDays.length > 0 &&
+                upcomingDays.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowPast((value) => !value)
+                    }
+                    className="flex w-full items-center justify-between rounded-[14px] border border-dashed border-[#d5d8dc] px-3.5 py-2.5 text-[12px] font-semibold text-[#707987] active:bg-white"
+                  >
+                    <span>
+                      {isRu
+                        ? `Прошедшие: ${pastDays.length}`
+                        : `Vergangene: ${pastDays.length}`}
+                    </span>
+
+                    <span className="flex items-center gap-1 text-[#98a0aa]">
+                      {pastOpen
+                        ? isRu
+                          ? "Скрыть"
+                          : "Ausblenden"
+                        : isRu
+                          ? "Показать"
+                          : "Anzeigen"}
+                      <ChevronRight
+                        size={15}
+                        className={`transition ${
+                          pastOpen ? "rotate-90" : ""
+                        }`}
+                      />
+                    </span>
+                  </button>
+                )}
+
+              {visibleDays.map(
                 (date) => {
                   const dayEntries =
                     groupedEntries[
                       date
                     ] ?? [];
 
+                  const isPast = date < todayStr;
+                  const isToday = date === todayStr;
+
                   return (
                     <section
                       key={date}
                       id={`day-${date}`}
-                      className={`scroll-mt-20 overflow-hidden rounded-[22px] border bg-white shadow-[0_3px_14px_rgba(17,24,32,0.035)] transition-shadow duration-500 ${
+                      className={`scroll-mt-20 overflow-hidden rounded-[20px] border bg-white transition-shadow duration-500 ${
                         focusedDate === date
                           ? "border-[#111820] shadow-[0_0_0_3px_rgba(17,24,32,0.12)]"
-                          : "border-[#e0e2e5]"
-                      }`}
+                          : "border-[#e0e2e5] shadow-[0_2px_10px_rgba(17,24,32,0.03)]"
+                      } ${isPast ? "opacity-70" : ""}`}
                     >
                       {/* DAY HEADER */}
-                      <div className="border-b border-[#e8e9eb] bg-[#fafafa] px-3.5 py-3.5 md:px-5">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-[54px] w-[54px] shrink-0 flex-col items-center justify-center rounded-[16px] bg-[#111820] text-white shadow-sm">
-                            <span className="text-[19px] font-bold leading-none">
-                              {date.slice(
-                                8,
-                                10,
-                              )}
-                            </span>
+                      <div className="flex items-center gap-3 border-b border-[#eceef0] bg-[#fafafa] px-3 py-2.5 md:px-4">
+                        <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-[13px] bg-[#111820] text-white">
+                          <span className="text-[17px] font-bold leading-none">
+                            {date.slice(8, 10)}
+                          </span>
 
-                            <span className="mt-1 text-[8px] font-bold uppercase tracking-[0.1em] text-[#aeb6bf]">
-                              {getWeekday(
-                                date,
-                              )}
-                            </span>
+                          <span className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.1em] text-[#aeb6bf]">
+                            {getWeekday(date)}
+                          </span>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[14px] font-bold capitalize leading-tight tracking-[-0.015em]">
+                            {getFullDate(date)}
                           </div>
 
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-[14px] font-bold capitalize tracking-[-0.015em]">
-                              {getFullDate(
-                                date,
-                              )}
-                            </div>
+                          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[#969ea8]">
+                            {isToday ? (
+                              <span className="rounded-full bg-[#111820] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                                {isRu ? "Сегодня" : "Heute"}
+                              </span>
+                            ) : (
+                              date === firstUpcomingDate && (
+                                <span className="rounded-full bg-[#111820] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                                  {isRu ? "Ближайшее" : "Nächster"}
+                                </span>
+                              )
+                            )}
 
-                            <div className="mt-1 text-[11px] text-[#969ea8]">
+                            <span>
                               {dayEntries.length}{" "}
                               {isRu
-                                ? dayEntries.length ===
-                                  1
+                                ? dayEntries.length === 1
                                   ? "служение"
                                   : "служений"
-                                : dayEntries.length ===
-                                    1
+                                : dayEntries.length === 1
                                   ? "Dienst"
                                   : "Dienste"}
-                            </div>
+                            </span>
                           </div>
                         </div>
 
                         {isAdmin && (
-                          <div className="mt-3 grid grid-cols-2 gap-2">
+                          <div className="flex shrink-0 gap-1.5">
                             <button
                               type="button"
                               onClick={() =>
-                                openCreateModal(
-                                  date,
-                                  "10:00",
-                                )
+                                openCreateModal(date, "10:00")
                               }
-                              className="flex h-10 items-center justify-center gap-1.5 rounded-[12px] border border-[#dedfe2] bg-white text-[11px] font-bold text-[#68717d] active:bg-[#f4f5f5]"
+                              title="DE"
+                              className="flex h-9 items-center gap-1 rounded-[10px] border border-[#dedfe2] bg-white px-2 text-[11px] font-bold text-[#68717d] active:bg-[#f4f5f5]"
                             >
-                              <Plus
-                                size={14}
-                              />
-                              10:00 · DE
+                              <Plus size={13} />
+                              10:00
                             </button>
 
                             <button
                               type="button"
                               onClick={() =>
-                                openCreateModal(
-                                  date,
-                                  "12:30",
-                                )
+                                openCreateModal(date, "12:30")
                               }
-                              className="flex h-10 items-center justify-center gap-1.5 rounded-[12px] border border-[#dedfe2] bg-white text-[11px] font-bold text-[#68717d] active:bg-[#f4f5f5]"
+                              title="RU"
+                              className="flex h-9 items-center gap-1 rounded-[10px] border border-[#dedfe2] bg-white px-2 text-[11px] font-bold text-[#68717d] active:bg-[#f4f5f5]"
                             >
-                              <Plus
-                                size={14}
-                              />
-                              12:30 · RU
+                              <Plus size={13} />
+                              12:30
                             </button>
                           </div>
                         )}
                       </div>
 
                       {/* ENTRIES */}
-                      <div className="space-y-3 p-2.5 md:p-3">
+                      <div className="divide-y divide-[#eef0f1]">
                         {dayEntries.map(
                           (entry) => {
                             const serviceMembers =
-                              getEntryMembers(
-                                entry.id,
-                              );
+                              getEntryMembers(entry.id);
 
                             const isEvent =
-                              entry.entry_type ===
-                              "event";
+                              entry.entry_type === "event";
 
                             const linkedMaterial =
-                              getLinkedMaterial(
-                                entry,
-                              );
+                              getLinkedMaterial(entry);
 
                             const materialPath =
                               linkedMaterial
@@ -1713,237 +1744,89 @@ export default function SchedulePage() {
 
                             return (
                               <article
-                                key={
-                                  entry.id
-                                }
-                                className="overflow-hidden rounded-[19px] border border-[#e4e6e8] bg-[#fbfbfb]"
+                                key={entry.id}
+                                className="flex gap-3 px-3 py-3 md:px-4"
                               >
-                                <div className="p-4">
+                                {/* TIME */}
+                                <div
+                                  className={`flex h-fit w-[52px] shrink-0 flex-col items-center rounded-[12px] py-2 ${
+                                    isEvent
+                                      ? "bg-[#fff3d9] text-[#a8731b]"
+                                      : "bg-[#eef0f2] text-[#4e5966]"
+                                  }`}
+                                >
+                                  <span className="text-[14px] font-bold leading-none">
+                                    {entry.service_time}
+                                  </span>
+
+                                  <span className="mt-1 text-[9px] font-bold uppercase tracking-[0.08em] opacity-70">
+                                    {isEvent
+                                      ? isRu
+                                        ? "Событие"
+                                        : "Event"
+                                      : entry.service_time === "10:00"
+                                        ? "DE"
+                                        : "RU"}
+                                  </span>
+                                </div>
+
+                                <div className="min-w-0 flex-1">
                                   {/* TITLE */}
-                                  <div className="flex items-start gap-3">
-                                    <div
-                                      className={`flex h-[54px] w-[54px] shrink-0 flex-col items-center justify-center rounded-[15px] ${
-                                        isEvent
-                                          ? "bg-[#fff3d9] text-[#a8731b]"
-                                          : "bg-[#eef0f2] text-[#4e5966]"
-                                      }`}
-                                    >
-                                      {isEvent ? (
-                                        <Sparkles
-                                          size={
-                                            17
-                                          }
-                                          strokeWidth={
-                                            1.8
-                                          }
-                                        />
-                                      ) : (
-                                        <Clock3
-                                          size={
-                                            17
-                                          }
-                                          strokeWidth={
-                                            1.8
-                                          }
-                                        />
-                                      )}
-
-                                      <span className="mt-1 text-[11px] font-bold">
-                                        {
-                                          entry.service_time
+                                  <div className="flex items-start justify-between gap-2">
+                                    {linkedMaterial ? (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          goToMaterial(entry)
                                         }
-                                      </span>
-                                    </div>
+                                        className="group inline-flex min-w-0 items-start gap-1.5 text-left"
+                                      >
+                                        <h3 className="break-words text-[16px] font-bold leading-[1.25] tracking-[-0.02em] text-[#111820] underline decoration-[#c7cbd1] decoration-2 underline-offset-2 group-active:text-[#4e5966]">
+                                          {getEntryTitle(entry)}
+                                        </h3>
 
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                          <div className="mb-1 flex flex-wrap items-center gap-1.5">
-                                            <span className="inline-flex rounded-full bg-[#eef0f2] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.08em] text-[#707987]">
-                                              {entry.service_time ===
-                                              "10:00"
-                                                ? "DE"
-                                                : "RU"}
-                                            </span>
-
-                                            {isEvent && (
-                                              <span className="inline-flex rounded-full bg-[#fff1d4] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.08em] text-[#a56d16]">
-                                                {isRu
-                                                  ? "Событие"
-                                                  : "Event"}
-                                              </span>
-                                            )}
-                                          </div>
-
-                                          {getLinkedMaterial(
-                                            entry,
-                                          ) ? (
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                goToMaterial(
-                                                  entry,
-                                                )
-                                              }
-                                              className="group inline-flex items-start gap-1.5 text-left"
-                                            >
-                                              <h3 className="break-words text-[16px] font-bold leading-[1.25] tracking-[-0.025em] text-[#111820] underline decoration-[#c7cbd1] decoration-2 underline-offset-2 group-active:text-[#4e5966]">
-                                                {getEntryTitle(
-                                                  entry,
-                                                )}
-                                              </h3>
-
-                                              <FileText
-                                                size={
-                                                  13
-                                                }
-                                                className="mt-1 shrink-0 text-[#9aa2ad]"
-                                              />
-                                            </button>
-                                          ) : (
-                                            <h3 className="break-words text-[16px] font-bold leading-[1.25] tracking-[-0.025em] text-[#111820]">
-                                              {getEntryTitle(
-                                                entry,
-                                              )}
-                                            </h3>
-                                          )}
-                                        </div>
-
-                                        {isAdmin && (
-                                          <div className="flex shrink-0 items-center gap-1">
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                openEditModal(
-                                                  entry,
-                                                )
-                                              }
-                                              className="flex h-9 w-9 items-center justify-center rounded-[11px] text-[#8a929c] active:bg-[#eef0f1] active:text-[#111820]"
-                                              aria-label={
-                                                isRu
-                                                  ? "Редактировать"
-                                                  : "Bearbeiten"
-                                              }
-                                            >
-                                              <Pencil
-                                                size={
-                                                  15
-                                                }
-                                              />
-                                            </button>
-
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                setDeleteTarget(
-                                                  entry,
-                                                )
-                                              }
-                                              className="flex h-9 w-9 items-center justify-center rounded-[11px] text-[#9b8a8a] active:bg-red-50 active:text-red-600"
-                                              aria-label={
-                                                isRu
-                                                  ? "Удалить"
-                                                  : "Löschen"
-                                              }
-                                            >
-                                              <Trash2
-                                                size={
-                                                  15
-                                                }
-                                              />
-                                            </button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* =================================================
-                                      SERVING TEAM
-                                  ================================================= */}
-                                  <div className="mt-4 rounded-[16px] border border-[#e2e4e6] bg-white p-3.5">
-                                    <div className="mb-3 flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-2">
-                                        <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[#111820] text-white">
-                                          <Users
-                                            size={
-                                              15
-                                            }
-                                            strokeWidth={
-                                              1.8
-                                            }
-                                          />
-                                        </div>
-
-                                        <div>
-                                          <div className="text-[12px] font-bold text-[#111820]">
-                                            {isRu
-                                              ? "Служат"
-                                              : "Mitarbeiter"}
-                                          </div>
-
-                                          <div className="text-[9px] text-[#9aa2ad]">
-                                            {serviceMembers.length}{" "}
-                                            {isRu
-                                              ? serviceMembers.length ===
-                                                1
-                                                ? "человек"
-                                                : "человека"
-                                              : serviceMembers.length ===
-                                                  1
-                                                ? "Person"
-                                                : "Personen"}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {serviceMembers.length >
-                                    0 ? (
-                                      <div className="space-y-2">
-                                        {serviceMembers.map(
-                                          (
-                                            member,
-                                          ) => (
-                                            <div
-                                              key={
-                                                member.id
-                                              }
-                                              className="flex min-h-[58px] items-center gap-3 rounded-[14px] bg-[#f5f6f6] px-3"
-                                            >
-                                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[#111820] text-[10px] font-bold text-white">
-                                                {getInitials(
-                                                  member,
-                                                )}
-                                              </div>
-
-                                              <div className="min-w-0 flex-1">
-                                                <div className="text-[13px] font-bold leading-5 text-[#1a222b]">
-                                                  {
-                                                    member.first_name
-                                                  }{" "}
-                                                  {
-                                                    member.last_name
-                                                  }
-                                                </div>
-
-                                                {member.position && (
-                                                  <div className="mt-0.5 text-[10px] text-[#8a939d]">
-                                                    {
-                                                      member.position
-                                                    }
-                                                  </div>
-                                                )}
-                                              </div>
-                                            </div>
-                                          ),
-                                        )}
-                                      </div>
+                                        <FileText
+                                          size={14}
+                                          className="mt-1 shrink-0 text-[#9aa2ad]"
+                                        />
+                                      </button>
                                     ) : (
-                                      <div className="rounded-[12px] bg-[#f5f6f6] px-3 py-3 text-[11px] text-[#929aa5]">
-                                        {isRu
-                                          ? "Служители ещё не назначены."
-                                          : "Noch keine Mitarbeiter zugewiesen."}
+                                      <h3 className="min-w-0 break-words text-[16px] font-bold leading-[1.25] tracking-[-0.02em] text-[#111820]">
+                                        {getEntryTitle(entry)}
+                                      </h3>
+                                    )}
+
+                                    {isAdmin && (
+                                      <div className="-mr-1 flex shrink-0 items-center">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            openEditModal(entry)
+                                          }
+                                          className="flex h-8 w-8 items-center justify-center rounded-[10px] text-[#8a929c] active:bg-[#eef0f1] active:text-[#111820]"
+                                          aria-label={
+                                            isRu
+                                              ? "Редактировать"
+                                              : "Bearbeiten"
+                                          }
+                                        >
+                                          <Pencil size={15} />
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setDeleteTarget(entry)
+                                          }
+                                          className="flex h-8 w-8 items-center justify-center rounded-[10px] text-[#9b8a8a] active:bg-red-50 active:text-red-600"
+                                          aria-label={
+                                            isRu
+                                              ? "Удалить"
+                                              : "Löschen"
+                                          }
+                                        >
+                                          <Trash2 size={15} />
+                                        </button>
                                       </div>
                                     )}
                                   </div>
@@ -1951,65 +1834,73 @@ export default function SchedulePage() {
                                   {/* META */}
                                   {(entry.bible_text ||
                                     materialPath) && (
-                                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                    <div className="mt-1 space-y-0.5 text-[12px] leading-snug text-[#707987]">
                                       {entry.bible_text && (
-                                        <div className="flex min-w-0 gap-2 rounded-[13px] bg-[#f1f2f3] px-3 py-2.5">
+                                        <p className="flex items-start gap-1.5 break-words">
                                           <BookOpen
-                                            size={
-                                              15
-                                            }
-                                            className="mt-0.5 shrink-0 text-[#7f8893]"
+                                            size={13}
+                                            className="mt-[3px] shrink-0 text-[#9aa2ad]"
                                           />
-
-                                          <div className="min-w-0">
-                                            <div className="text-[8px] font-bold uppercase tracking-[0.08em] text-[#9aa2ad]">
-                                              {isRu
-                                                ? "Библия"
-                                                : "Bibelstelle"}
-                                            </div>
-
-                                            <div className="mt-0.5 break-words text-[11px] font-semibold leading-4 text-[#5f6975]">
-                                              {
-                                                entry.bible_text
-                                              }
-                                            </div>
-                                          </div>
-                                        </div>
+                                          <span className="font-medium">
+                                            {entry.bible_text}
+                                          </span>
+                                        </p>
                                       )}
 
                                       {materialPath && (
-                                        <div className="flex min-w-0 gap-2 rounded-[13px] bg-[#f1f2f3] px-3 py-2.5">
+                                        <p className="flex items-start gap-1.5 break-words">
                                           <Link2
-                                            size={
-                                              15
-                                            }
-                                            className="mt-0.5 shrink-0 text-[#7f8893]"
+                                            size={13}
+                                            className="mt-[3px] shrink-0 text-[#9aa2ad]"
                                           />
-
-                                          <div className="min-w-0">
-                                            <div className="text-[8px] font-bold uppercase tracking-[0.08em] text-[#9aa2ad]">
-                                              {isRu
-                                                ? "Путь к теме"
-                                                : "Pfad zum Thema"}
-                                            </div>
-
-                                            <div className="mt-0.5 break-words text-[11px] font-semibold leading-4 text-[#5f6975]">
-                                              {
-                                                materialPath
-                                              }
-                                            </div>
-                                          </div>
-                                        </div>
+                                          <span>{materialPath}</span>
+                                        </p>
                                       )}
                                     </div>
                                   )}
 
+                                  {/* SERVING TEAM */}
+                                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                                    {serviceMembers.length > 0 ? (
+                                      serviceMembers.map(
+                                        (member) => (
+                                          <span
+                                            key={member.id}
+                                            title={
+                                              member.position ||
+                                              undefined
+                                            }
+                                            className="inline-flex items-center gap-2 rounded-full bg-[#f1f2f3] py-1 pl-1 pr-3"
+                                          >
+                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#111820] text-[9px] font-bold text-white">
+                                              {getInitials(member)}
+                                            </span>
+
+                                            <span className="leading-none">
+                                              <span className="text-[14px] font-bold text-[#111820]">
+                                                {member.first_name}
+                                              </span>{" "}
+                                              <span className="text-[12px] font-medium text-[#7a8490]">
+                                                {member.last_name}
+                                              </span>
+                                            </span>
+                                          </span>
+                                        ),
+                                      )
+                                    ) : (
+                                      <span className="flex items-center gap-1.5 text-[12px] text-[#929aa5]">
+                                        <Users size={13} />
+                                        {isRu
+                                          ? "Служители не назначены"
+                                          : "Noch keine Mitarbeiter"}
+                                      </span>
+                                    )}
+                                  </div>
+
                                   {entry.notes && (
-                                    <div className="mt-3 rounded-[13px] bg-[#f1f2f3] px-3 py-2.5 text-[11px] leading-4 text-[#68727e]">
-                                      {
-                                        entry.notes
-                                      }
-                                    </div>
+                                    <p className="mt-2.5 rounded-[11px] bg-[#f6f6f5] px-3 py-2 text-[12px] leading-snug text-[#68727e]">
+                                      {entry.notes}
+                                    </p>
                                   )}
                                 </div>
                               </article>
