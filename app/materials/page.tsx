@@ -25,6 +25,7 @@ import { supabase } from "@/lib/supabase";
 import { type Language } from "@/lib/translations";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/ToastProvider";
+import { normalizeServiceTime } from "@/lib/services";
 
 type MaterialFolder = {
   id: number;
@@ -64,6 +65,15 @@ type Material = {
   sort_order: number;
   created_at: string;
   updated_at: string;
+};
+
+type CurrentService = {
+  id: number;
+  schedule_date: string;
+  service_time: string;
+  title_de: string | null;
+  title_ru: string | null;
+  material_id: number;
 };
 
 type FolderForm = {
@@ -395,6 +405,57 @@ export default function MaterialsPage() {
 
   const highlightedMaterialRef =
     useRef<HTMLDivElement | null>(null);
+
+  /*
+   * Актуальное служение: ближайшая дата расписания, у которой
+   * есть привязанный материал. Показывается вверху корня «Материалов».
+   */
+  const [currentServices, setCurrentServices] =
+    useState<CurrentService[]>([]);
+
+  useEffect(() => {
+    async function loadCurrentServices() {
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(
+        now.getMonth() + 1,
+      ).padStart(2, "0")}-${String(
+        now.getDate(),
+      ).padStart(2, "0")}`;
+
+      const { data, error } = await supabase
+        .from("schedule_entries")
+        .select(
+          "id, schedule_date, service_time, title_de, title_ru, material_id",
+        )
+        .gte("schedule_date", today)
+        .not("material_id", "is", null)
+        .order("schedule_date", { ascending: true })
+        .order("service_time", { ascending: true })
+        .limit(6);
+
+      if (error || !data || data.length === 0) {
+        return;
+      }
+
+      const firstDate = data[0].schedule_date;
+
+      setCurrentServices(
+        (data as CurrentService[])
+          .filter(
+            (entry) =>
+              entry.schedule_date === firstDate,
+          )
+          .map((entry) => ({
+            ...entry,
+            service_time: normalizeServiceTime(
+              entry.service_time,
+            ),
+          })),
+      );
+    }
+
+    loadCurrentServices();
+  }, []);
 
   /*
    * WICHTIG:
@@ -1922,6 +1983,101 @@ export default function MaterialsPage() {
             </span>
           </div>
         )}
+
+        {/* ACTUAL SERVICE */}
+        {!loading &&
+          currentFolderId == null &&
+          !search &&
+          currentServices.map((service) => {
+            const material = materials.find(
+              (item) =>
+                item.id === service.material_id,
+            );
+
+            if (!material) {
+              return null;
+            }
+
+            const serviceTitle =
+              (isRu
+                ? service.title_ru ||
+                  service.title_de
+                : service.title_de ||
+                  service.title_ru) ||
+              material.title;
+
+            const hasLink = Boolean(
+              material.file_url ||
+                material.external_url,
+            );
+
+            return (
+              <section
+                key={service.id}
+                className="mb-3 overflow-hidden rounded-[22px] bg-neutral-950 p-4 text-white shadow-[0_10px_30px_rgba(15,23,42,0.14)]"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/50">
+                  {isRu
+                    ? "Актуальное служение"
+                    : "Aktueller Gottesdienst"}
+                  {" · "}
+                  {new Date(
+                    `${service.schedule_date}T12:00:00`,
+                  ).toLocaleDateString(
+                    isRu ? "ru-RU" : "de-DE",
+                    {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "long",
+                    },
+                  )}
+                  {" · "}
+                  {service.service_time}
+                </p>
+
+                <h2 className="mt-1.5 line-clamp-2 text-[18px] font-bold leading-tight tracking-[-0.02em]">
+                  {serviceTitle}
+                </h2>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {hasLink && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openMaterial(material)
+                      }
+                      className="inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-neutral-950 active:scale-[0.98]"
+                    >
+                      <FileText size={16} />
+                      {isRu
+                        ? "Открыть материал"
+                        : "Material öffnen"}
+                    </button>
+                  )}
+
+                  {material.folder_id != null && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        goToFolder(
+                          material.folder_id as number,
+                        );
+                        setHighlightedMaterialId(
+                          material.id,
+                        );
+                      }}
+                      className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/20 px-4 text-sm font-semibold text-white/90 active:scale-[0.98]"
+                    >
+                      <Folder size={16} />
+                      {isRu
+                        ? "Показать в папке"
+                        : "Im Ordner zeigen"}
+                    </button>
+                  )}
+                </div>
+              </section>
+            );
+          })}
 
         {/* SEARCH */}
         <section className="mb-3">

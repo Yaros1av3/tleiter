@@ -40,6 +40,8 @@ type AvailabilityRow = {
   note: string | null;
 };
 
+type AccountRow = { id: string; full_name: string | null };
+
 type TeamMemberRow = {
   first_name: string;
   last_name: string;
@@ -127,6 +129,7 @@ export default function AvailabilityPage() {
 
   const [overviewRows, setOverviewRows] = useState<AvailabilityRow[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMemberRow[]>([]);
+  const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [loadingOverview, setLoadingOverview] = useState(false);
 
   /* ---------- пользователь и роль ---------- */
@@ -227,7 +230,7 @@ export default function AvailabilityPage() {
       const first = sundays[0] ?? toDateString(viewMonth);
       const last = sundays[sundays.length - 1] ?? first;
 
-      const [availabilityResult, teamResult] = await Promise.all([
+      const [availabilityResult, teamResult, accountsResult] = await Promise.all([
         supabase
           .from("service_availability")
           .select(
@@ -239,6 +242,7 @@ export default function AvailabilityPage() {
           .from("team_members")
           .select("first_name, last_name, user_id")
           .eq("status", "active"),
+        supabase.rpc("get_account_names"),
       ]);
 
       if (cancelled) return;
@@ -252,6 +256,7 @@ export default function AvailabilityPage() {
 
       setOverviewRows((availabilityResult.data ?? []) as AvailabilityRow[]);
       setTeamMembers((teamResult.data ?? []) as TeamMemberRow[]);
+      setAccounts((accountsResult.data ?? []) as AccountRow[]);
       setLoadingOverview(false);
     }
 
@@ -354,8 +359,8 @@ export default function AvailabilityPage() {
       setMessage({
         type: "error",
         text: isRu
-          ? "Выбери служение (10:00 или 13:00) или отметь «Не могу»."
-          : "Wähle einen Gottesdienst (10:00 oder 13:00) oder markiere „Kann nicht“.",
+          ? "Выбери служение (10:00 или 12:30) или отметь «Не могу»."
+          : "Wähle einen Gottesdienst (10:00 oder 12:30) oder markiere „Kann nicht“.",
       });
       return;
     }
@@ -445,15 +450,39 @@ export default function AvailabilityPage() {
 
     const respondedIds = new Set(byUser.keys());
 
+    const cleanName = (first: string, last: string | null) =>
+      `${first} ${(last ?? "").trim() === "-" ? "" : (last ?? "")}`.trim();
+
     const notResponded = teamMembers
       .filter((member) => !member.user_id || !respondedIds.has(member.user_id))
       .map((member) => ({
-        name: `${member.first_name} ${
-          member.last_name.trim() === "-" ? "" : member.last_name
-        }`.trim(),
+        name: cleanName(member.first_name, member.last_name),
         noAccount: !member.user_id,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name, locale));
+      }));
+
+    /* аккаунты, у которых нет карточки в команде (например, супер-админ) */
+    const linkedUserIds = new Set(
+      teamMembers.map((member) => member.user_id).filter(Boolean),
+    );
+    const knownNames = new Set(
+      teamMembers.map((member) =>
+        cleanName(member.first_name, member.last_name).toLowerCase(),
+      ),
+    );
+
+    for (const account of accounts) {
+      if (linkedUserIds.has(account.id) || respondedIds.has(account.id)) {
+        continue;
+      }
+
+      const name = (account.full_name ?? "").trim() || (isRu ? "Без имени" : "Ohne Namen");
+
+      if (knownNames.has(name.toLowerCase())) continue;
+
+      notResponded.push({ name, noAccount: false });
+    }
+
+    notResponded.sort((a, b) => a.name.localeCompare(b.name, locale));
 
     const notes = overviewRows
       .filter((row) => row.note)
@@ -464,7 +493,7 @@ export default function AvailabilityPage() {
       );
 
     return { people, counts, notResponded, notes };
-  }, [overviewRows, teamMembers, sundays, locale]);
+  }, [overviewRows, teamMembers, accounts, sundays, locale, isRu]);
 
   function formatSunday(date: string) {
     return new Date(`${date}T00:00:00`).toLocaleDateString(locale, {
@@ -578,8 +607,8 @@ export default function AvailabilityPage() {
           <div>
             <p className="mb-4 px-1 text-[13px] leading-5 text-[#65707d]">
               {isRu
-                ? "Отметь, в какие воскресенья и на каком служении (10:00 или 13:00) ты можешь служить. Потом нажми «Отправить». Ответ можно изменить позже."
-                : "Markiere, an welchen Sonntagen und in welchem Gottesdienst (10:00 oder 13:00) du dienen kannst. Dann „Senden“ drücken. Du kannst deine Angaben später ändern."}
+                ? "Отметь, в какие воскресенья и на каком служении (10:00 или 12:30) ты можешь служить. Потом нажми «Отправить». Ответ можно изменить позже."
+                : "Markiere, an welchen Sonntagen und in welchem Gottesdienst (10:00 oder 12:30) du dienen kannst. Dann „Senden“ drücken. Du kannst deine Angaben später ändern."}
             </p>
 
             {loadingMine ? (
@@ -648,7 +677,7 @@ export default function AvailabilityPage() {
                           {(
                             [
                               ["s10", "10:00"],
-                              ["s13", "13:00"],
+                              ["s13", "12:30"],
                             ] as const
                           ).map(([key, label]) => (
                             <button
@@ -816,7 +845,7 @@ export default function AvailabilityPage() {
 
                                       {cell.service_13 && (
                                         <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">
-                                          13
+                                          12:30
                                         </span>
                                       )}
                                     </div>
@@ -840,7 +869,7 @@ export default function AvailabilityPage() {
                                 key={count.date}
                                 className="px-2 py-2.5 text-center"
                               >
-                                10: {count.s10} · 13: {count.s13}
+                                10: {count.s10} · 12:30: {count.s13}
                               </td>
                             ))}
                           </tr>
@@ -852,8 +881,8 @@ export default function AvailabilityPage() {
 
                 <p className="mt-2 px-1 text-[11px] text-[#9aa2ad]">
                   {isRu
-                    ? "10 / 13 — время служения, «нет» — не может в этот день, «–» — ещё не ответил."
-                    : "10 / 13 — Gottesdienst, „nein“ — kann nicht, „–“ — noch keine Antwort."}
+                    ? "10 / 12:30 — время служения, «нет» — не может в этот день, «–» — ещё не ответил."
+                    : "10 / 12:30 — Gottesdienst, „nein“ — kann nicht, „–“ — noch keine Antwort."}
                 </p>
 
                 {overview.notes.length > 0 && (

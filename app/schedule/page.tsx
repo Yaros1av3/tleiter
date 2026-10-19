@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -28,6 +28,7 @@ import Header from "@/components/Header";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useAvailabilityReminder } from "@/lib/useAvailabilityReminder";
 import ReminderDot from "@/components/ReminderDot";
+import { normalizeServiceTime } from "@/lib/services";
 
 type TeamMember = {
   id: number;
@@ -40,7 +41,7 @@ type TeamMember = {
 type ScheduleEntry = {
   id: number;
   schedule_date: string;
-  service_time: "10:00" | "13:00";
+  service_time: "10:00" | "12:30";
   entry_type: "lesson" | "event";
   title_de: string | null;
   title_ru: string | null;
@@ -81,7 +82,7 @@ type ScheduleMember = {
 
 type EntryForm = {
   schedule_date: string;
-  service_time: "10:00" | "13:00";
+  service_time: "10:00" | "12:30";
   entry_type: "lesson" | "event";
   title_de: string;
   title_ru: string;
@@ -120,7 +121,41 @@ export default function SchedulePage() {
   const [roleLoading, setRoleLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  /*
+   * Дата из ссылки (?date=2026-10-25), например с главной страницы.
+   * Если её нет — открываем текущий месяц и сами прокручиваем
+   * к ближайшему служению.
+   */
+  const dateFromUrl = useRef<string | null>(
+    typeof window !== "undefined" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(
+        new URLSearchParams(
+          window.location.search,
+        ).get("date") ?? "",
+      )
+      ? new URLSearchParams(
+          window.location.search,
+        ).get("date")
+      : null,
+  );
+
+  const autoFocusDone = useRef(false);
+  const triedNextMonth = useRef(false);
+  const [focusedDate, setFocusedDate] = useState<
+    string | null
+  >(null);
+
   const [currentMonth, setCurrentMonth] = useState(() => {
+    const fromUrl = dateFromUrl.current;
+
+    if (fromUrl) {
+      return new Date(
+        Number(fromUrl.slice(0, 4)),
+        Number(fromUrl.slice(5, 7)) - 1,
+        1,
+      );
+    }
+
     const date = new Date();
 
     return new Date(
@@ -361,7 +396,7 @@ export default function SchedulePage() {
           ? material.title
           : current.title_de,
       title_ru:
-        current.service_time === "13:00"
+        current.service_time === "12:30"
           ? material.title
           : current.title_ru,
     }));
@@ -446,7 +481,13 @@ export default function SchedulePage() {
           : "Der Dienstplan konnte nicht geladen werden.",
       );
     } else {
-      setEntries(entriesResult.data ?? []);
+      setEntries(
+        (entriesResult.data ?? []).map((entry) => ({
+          ...entry,
+          // старые записи с 13:00 показываем как 12:30
+          service_time: normalizeServiceTime(entry.service_time),
+        })),
+      );
     }
 
     if (membersResult.error) {
@@ -675,7 +716,7 @@ export default function SchedulePage() {
     date?: string,
     time:
       | "10:00"
-      | "13:00" = "10:00",
+      | "12:30" = "10:00",
   ) {
     if (!isAdmin) return;
 
@@ -745,21 +786,21 @@ export default function SchedulePage() {
   }
 
   function changeServiceTime(
-    time: "10:00" | "13:00",
+    time: "10:00" | "12:30",
   ) {
     setForm((current) => ({
       ...current,
       service_time: time,
 
       // 10:00 = German only
-      // 13:00 = Russian only
+      // 12:30 = Russian only
       title_de:
         time === "10:00"
           ? current.title_de
           : "",
 
       title_ru:
-        time === "13:00"
+        time === "12:30"
           ? current.title_ru
           : "",
     }));
@@ -835,9 +876,9 @@ export default function SchedulePage() {
           ? form.title_de.trim() || null
           : null,
 
-      // 13:00 → RU
+      // 12:30 → RU
       title_ru:
-        form.service_time === "13:00"
+        form.service_time === "12:30"
           ? form.title_ru.trim() || null
           : null,
 
@@ -1090,6 +1131,75 @@ export default function SchedulePage() {
         groupedEntries,
       ).sort();
     }, [groupedEntries]);
+
+  /*
+   * Автопрокрутка к актуальному служению.
+   * Срабатывает один раз при открытии страницы.
+   */
+  useEffect(() => {
+    if (loading || autoFocusDone.current) {
+      return;
+    }
+
+    const now = new Date();
+
+    const today = `${now.getFullYear()}-${String(
+      now.getMonth() + 1,
+    ).padStart(2, "0")}-${String(
+      now.getDate(),
+    ).padStart(2, "0")}`;
+
+    const target =
+      dateFromUrl.current &&
+      scheduleDays.includes(dateFromUrl.current)
+        ? dateFromUrl.current
+        : (scheduleDays.find(
+            (date) => date >= today,
+          ) ?? null);
+
+    if (!target) {
+      // В этом месяце ближайших служений уже нет — открываем следующий
+      if (
+        !dateFromUrl.current &&
+        !triedNextMonth.current
+      ) {
+        triedNextMonth.current = true;
+
+        setCurrentMonth(
+          new Date(
+            currentMonth.getFullYear(),
+            currentMonth.getMonth() + 1,
+            1,
+          ),
+        );
+      } else {
+        autoFocusDone.current = true;
+      }
+
+      return;
+    }
+
+    autoFocusDone.current = true;
+    setFocusedDate(target);
+
+    const scrollTimer = window.setTimeout(() => {
+      document
+        .getElementById(`day-${target}`)
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    }, 150);
+
+    const clearTimer = window.setTimeout(() => {
+      setFocusedDate(null);
+    }, 3500);
+
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [loading, scheduleDays, currentMonth]);
 
   /*
    * =====================================================
@@ -1492,7 +1602,12 @@ export default function SchedulePage() {
                   return (
                     <section
                       key={date}
-                      className="overflow-hidden rounded-[22px] border border-[#e0e2e5] bg-white shadow-[0_3px_14px_rgba(17,24,32,0.035)]"
+                      id={`day-${date}`}
+                      className={`scroll-mt-20 overflow-hidden rounded-[22px] border bg-white shadow-[0_3px_14px_rgba(17,24,32,0.035)] transition-shadow duration-500 ${
+                        focusedDate === date
+                          ? "border-[#111820] shadow-[0_0_0_3px_rgba(17,24,32,0.12)]"
+                          : "border-[#e0e2e5]"
+                      }`}
                     >
                       {/* DAY HEADER */}
                       <div className="border-b border-[#e8e9eb] bg-[#fafafa] px-3.5 py-3.5 md:px-5">
@@ -1557,7 +1672,7 @@ export default function SchedulePage() {
                               onClick={() =>
                                 openCreateModal(
                                   date,
-                                  "13:00",
+                                  "12:30",
                                 )
                               }
                               className="flex h-10 items-center justify-center gap-1.5 rounded-[12px] border border-[#dedfe2] bg-white text-[11px] font-bold text-[#68717d] active:bg-[#f4f5f5]"
@@ -1565,7 +1680,7 @@ export default function SchedulePage() {
                               <Plus
                                 size={14}
                               />
-                              13:00 · RU
+                              12:30 · RU
                             </button>
                           </div>
                         )}
@@ -1941,8 +2056,8 @@ export default function SchedulePage() {
                           ? "10:00 · немецкое служение"
                           : "10:00 · Deutscher Gottesdienst"
                         : isRu
-                          ? "13:00 · русское служение"
-                          : "13:00 · Russischer Gottesdienst"}
+                          ? "12:30 · русское служение"
+                          : "12:30 · Russischer Gottesdienst"}
                     </p>
                   </div>
 
@@ -2036,24 +2151,24 @@ export default function SchedulePage() {
                         type="button"
                         onClick={() =>
                           changeServiceTime(
-                            "13:00",
+                            "12:30",
                           )
                         }
                         className={`rounded-[15px] border px-3 py-3 text-left ${
                           form.service_time ===
-                          "13:00"
+                          "12:30"
                             ? "border-[#111820] bg-[#111820] text-white"
                             : "border-[#dfe1e4] bg-[#fafafa] text-[#66707d]"
                         }`}
                       >
                         <div className="text-[15px] font-bold">
-                          13:00
+                          12:30
                         </div>
 
                         <div
                           className={`mt-1 text-[10px] ${
                             form.service_time ===
-                            "13:00"
+                            "12:30"
                               ? "text-white/60"
                               : "text-[#9aa2ad]"
                           }`}
@@ -2575,7 +2690,7 @@ export default function SchedulePage() {
                         </label>
 
                         <span className="rounded-full bg-[#eef0f2] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.08em] text-[#707987]">
-                          13:00
+                          12:30
                         </span>
                       </div>
 
@@ -2604,8 +2719,8 @@ export default function SchedulePage() {
 
                       <p className="mt-1.5 px-1 text-[10px] text-[#9aa2ad]">
                         {isRu
-                          ? "Для служения в 13:00 используется только русская тема."
-                          : "Für den Gottesdienst um 13:00 wird nur das russische Thema verwendet."}
+                          ? "Для служения в 12:30 используется только русская тема."
+                          : "Für den Gottesdienst um 12:30 wird nur das russische Thema verwendet."}
                       </p>
                     </div>
                   )}
@@ -2741,7 +2856,7 @@ export default function SchedulePage() {
                         "10:00" &&
                         !form.title_de.trim()) ||
                       (form.service_time ===
-                        "13:00" &&
+                        "12:30" &&
                         !form.title_ru.trim())
                     }
                     className="h-[54px] flex-1 rounded-[15px] bg-[#111820] text-[13px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"

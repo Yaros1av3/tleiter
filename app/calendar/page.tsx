@@ -20,6 +20,13 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/ToastProvider";
+import { pad, dateKey, localDateFromKey } from "@/lib/dates";
+import TimePicker from "@/components/TimePicker";
+import {
+  FIRST_SERVICE,
+  SECOND_SERVICE,
+  normalizeServiceTime,
+} from "@/lib/services";
 
 type Recurrence = "none" | "weekly" | "biweekly" | "monthly" | "yearly";
 type SeriesScope = "single" | "following" | "all";
@@ -115,19 +122,6 @@ const emptyForm: EventForm = {
   recurrenceUntil: "",
 };
 
-function pad(value: number) {
-  return String(value).padStart(2, "0");
-}
-
-function dateKey(date: Date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-function localDateFromKey(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day, 12, 0, 0, 0);
-}
-
 function eventDateKey(value: string) {
   const date = new Date(value);
   return dateKey(date);
@@ -168,6 +162,13 @@ function formatShortDate(value: string, language: "ru" | "de") {
     language === "ru" ? "ru-RU" : "de-DE",
     { day: "numeric", month: "short", year: "numeric" }
   );
+}
+
+// Длительность записи расписания: урок 90 минут, событие 60 минут
+function scheduleEntryEndTime(entry: Pick<ScheduleEntry, "service_time" | "entry_type">) {
+  const [h, m] = entry.service_time.split(":").map(Number);
+  const total = h * 60 + m + (entry.entry_type === "lesson" ? 90 : 60);
+  return `${pad(Math.floor(total / 60) % 24)}:${pad(total % 60)}`;
 }
 
 function toDateTime(date: string, time: string) {
@@ -518,7 +519,12 @@ export default function CalendarPage() {
     setEvents((eventData ?? []) as Event[]);
     setWorkItems((workData ?? []) as WorkItem[]);
     setWorkProjects((projectData ?? []) as WorkProject[]);
-    setScheduleEntries((scheduleData ?? []) as ScheduleEntry[]);
+    setScheduleEntries(
+      ((scheduleData ?? []) as ScheduleEntry[]).map((entry) => ({
+        ...entry,
+        service_time: normalizeServiceTime(entry.service_time),
+      }))
+    );
     setLoading(false);
   };
 
@@ -599,6 +605,32 @@ export default function CalendarPage() {
 
   const updateForm = (field: keyof EventForm, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  // При смене начала сдвигаем конец, сохраняя длительность (в пределах одного дня)
+  const changeStartTime = (value: string) => {
+    setForm((current) => {
+      const toMinutes = (time: string) => {
+        const [h, m] = time.split(":").map(Number);
+        return h * 60 + m;
+      };
+
+      const next = { ...current, startTime: value };
+
+      if (
+        isValidTime(current.startTime) &&
+        isValidTime(current.endTime) &&
+        current.date &&
+        current.date === current.endDate
+      ) {
+        const duration = toMinutes(current.endTime) - toMinutes(current.startTime);
+        const keep = duration > 0 ? duration : 60;
+        const end = Math.min(toMinutes(value) + keep, 23 * 60 + 55);
+        next.endTime = `${pad(Math.floor(end / 60))}:${pad(end % 60)}`;
+      }
+
+      return next;
+    });
   };
 
   const validateForm = () => {
@@ -1550,7 +1582,7 @@ export default function CalendarPage() {
                   {language === "ru" ? "Время" : "Zeit"}
                 </div>
                 <div className="mt-1 text-sm font-semibold">
-                  {selectedScheduleEntry.service_time}–{selectedScheduleEntry.entry_type === "lesson" ? "11:30" : "13:30"}
+                  {selectedScheduleEntry.service_time}–{scheduleEntryEndTime(selectedScheduleEntry)}
                 </div>
               </div>
               <div className="rounded-xl bg-neutral-50 p-3">
@@ -1904,19 +1936,11 @@ export default function CalendarPage() {
                   <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                     {language === "ru" ? "Время начала" : "Beginn"}
                   </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={5}
-                    placeholder="10:00"
+                  <TimePicker
                     value={form.startTime}
-                    onChange={(event) =>
-                      updateForm(
-                        "startTime",
-                        event.target.value.replace(/[^0-9:]/g, "")
-                      )
-                    }
-                    className="mt-1.5 h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-400"
+                    ariaLabel={language === "ru" ? "Время начала" : "Beginn"}
+                    presets={[FIRST_SERVICE, SECOND_SERVICE]}
+                    onChange={changeStartTime}
                   />
                 </div>
 
@@ -1924,19 +1948,10 @@ export default function CalendarPage() {
                   <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                     {language === "ru" ? "Время окончания" : "Ende"}
                   </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={5}
-                    placeholder="11:00"
+                  <TimePicker
                     value={form.endTime}
-                    onChange={(event) =>
-                      updateForm(
-                        "endTime",
-                        event.target.value.replace(/[^0-9:]/g, "")
-                      )
-                    }
-                    className="mt-1.5 h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-400"
+                    ariaLabel={language === "ru" ? "Время окончания" : "Ende"}
+                    onChange={(value) => updateForm("endTime", value)}
                   />
                 </div>
               </div>

@@ -5,13 +5,17 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   BriefcaseBusiness,
+  BookOpen,
   Bus,
   Cake,
   CalendarCheck,
   CalendarDays,
   CalendarRange,
   Clock3,
+  FileText,
+  Lightbulb,
   ListChecks,
+  MapPin,
   Users,
   UserRound,
   X,
@@ -22,6 +26,9 @@ import { supabase } from "@/lib/supabase";
 import { translations } from "@/lib/translations";
 import { useAvailabilityReminder } from "@/lib/useAvailabilityReminder";
 import { useTripsReminder } from "@/lib/useTripsReminder";
+import { useIdeasUnread } from "@/lib/useIdeasUnread";
+import { normalizeServiceTime } from "@/lib/services";
+import { getVerseOfTheDay } from "@/lib/verses";
 import ReminderDot from "@/components/ReminderDot";
 import InstallBanner from "@/components/InstallBanner";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -54,6 +61,15 @@ type ScheduleEntry = {
   bible_text: string | null;
   series: string | null;
   notes: string | null;
+  material_id: number | null;
+};
+
+type NextTrip = {
+  id: number;
+  title: string;
+  start_date: string | null;
+  end_date: string | null;
+  location: string | null;
 };
 
 type TeamMember = {
@@ -218,6 +234,7 @@ export default function Home() {
   const { language } = useLanguage();
   const reminder = useAvailabilityReminder();
   const tripsReminder = useTripsReminder();
+  const ideas = useIdeasUnread();
 
   const t = translations[language];
 
@@ -244,14 +261,39 @@ export default function Home() {
     BirthdayCelebration[]
   >([]);
 
+  const [nextTrip, setNextTrip] = useState<NextTrip | null>(null);
   const [loading, setLoading] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
 
   const isRu = language === "ru";
+  const verse = useMemo(() => getVerseOfTheDay(), []);
 
   useEffect(() => {
     loadDashboard();
+    loadNextTrip();
   }, []);
+
+  // Ближайшая поездка (необязательный блок: если таблицы нет — просто не показываем)
+  async function loadNextTrip() {
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${String(
+      now.getMonth() + 1,
+    ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+    const { data, error } = await supabase
+      .from("trips")
+      .select("id, title, start_date, end_date, location")
+      .in("status", ["planned", "idea"])
+      .gte("start_date", todayKey)
+      .order("start_date", { ascending: true })
+      .limit(1);
+
+    if (error) {
+      return;
+    }
+
+    setNextTrip((data?.[0] as NextTrip | undefined) ?? null);
+  }
 
   async function loadDashboard() {
     setLoading(true);
@@ -267,7 +309,7 @@ export default function Home() {
       supabase
         .from("schedule_entries")
         .select(
-          "id, schedule_date, service_time, entry_type, title_de, title_ru, bible_text, series, notes",
+          "id, schedule_date, service_time, entry_type, title_de, title_ru, bible_text, series, notes, material_id",
         )
         .order("schedule_date", { ascending: true })
         .order("service_time", { ascending: true }),
@@ -351,7 +393,11 @@ export default function Home() {
       );
     }
 
-    const entries = scheduleData ?? [];
+    // старые записи с 13:00 показываем как 12:30
+    const entries = (scheduleData ?? []).map((entry) => ({
+      ...entry,
+      service_time: normalizeServiceTime(entry.service_time),
+    })) as ScheduleEntry[];
 
     let scheduleMemberData: ScheduleMember[] = [];
 
@@ -560,6 +606,30 @@ export default function Home() {
   }
 
   /*
+   * Нажатие на карточку служения — открываем расписание
+   * сразу на этой дате (страница сама прокрутит к нужному дню).
+   */
+  function openService(entry: ScheduleEntry) {
+    router.push(`/schedule?date=${entry.schedule_date}`);
+  }
+
+  function getProjectProgress(projectId: number) {
+    const items = workItems.filter(
+      (item) => item.project_id === projectId,
+    );
+
+    if (items.length === 0) {
+      return 0;
+    }
+
+    const done = items.filter(
+      (item) => item.status === "completed",
+    ).length;
+
+    return Math.round((done / items.length) * 100);
+  }
+
+  /*
    * Menü "Mehr".
    *
    * Идеи убраны.
@@ -652,6 +722,25 @@ export default function Home() {
               </div>
             </div>
 
+            <div className="flex shrink-0 items-center gap-2">
+            {/* IDEAS */}
+            <button
+              type="button"
+              onClick={() => router.push("/ideas")}
+              aria-label={isRu ? "Идеи" : "Ideen"}
+              className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition active:scale-95 ${
+                ideas.unread
+                  ? "border-amber-400 bg-amber-300 text-[#111820] shadow-[0_0_0_4px_rgba(252,211,77,0.35)]"
+                  : "border-[#dfe2e5] bg-white text-[#374353] shadow-[0_2px_8px_rgba(17,24,32,0.05)]"
+              }`}
+            >
+              <Lightbulb
+                size={21}
+                strokeWidth={2}
+                fill={ideas.unread ? "currentColor" : "none"}
+              />
+            </button>
+
             {/* MORE */}
             <button
               type="button"
@@ -680,11 +769,42 @@ export default function Home() {
                 <ReminderDot className="right-0 top-0" />
               )}
             </button>
+            </div>
           </div>
         </header>
 
         <div className="mx-auto w-full max-w-[760px] px-4 pb-28 sm:px-6">
           <InstallBanner isRu={isRu} />
+
+          {/* =====================================================
+              NEW IDEA
+          ====================================================== */}
+          {ideas.unread && (
+            <button
+              type="button"
+              onClick={() => router.push("/ideas")}
+              className="mt-4 flex w-full items-center gap-3 rounded-[18px] border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-left transition active:scale-[0.99]"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-amber-300 text-[#111820]">
+                <Lightbulb size={18} fill="currentColor" />
+              </span>
+
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-bold text-amber-900">
+                  {isRu ? "Новая идея" : "Neue Idee"}
+                  {ideas.count > 1 ? ` · ${ideas.count}` : ""}
+                </span>
+
+                {ideas.latestAuthor && (
+                  <span className="block truncate text-[12px] text-amber-800/80">
+                    {isRu ? "от" : "von"} {ideas.latestAuthor}
+                  </span>
+                )}
+              </span>
+
+              <ArrowRight size={16} className="shrink-0 text-amber-500" />
+            </button>
+          )}
 
           {/* =====================================================
               AVAILABILITY REMINDER
@@ -721,50 +841,42 @@ export default function Home() {
           {/* =====================================================
               NEXT SERVICE
           ====================================================== */}
-          <section className="pt-7">
-            <div className="mb-5 flex items-end justify-between gap-4">
-              <div>
-                <h1 className="text-[29px] font-bold leading-[1.08] tracking-[-0.05em] text-neutral-950">
-                  {isRu
-                    ? "Ближайшее служение"
-                    : "Nächster Dienst"}
-                </h1>
-
-                <p className="mt-2 text-[14px] leading-5 text-neutral-500">
-                  {isRu
-                    ? "Самое важное на ближайшее время"
-                    : "Das Wichtigste für die nächste Zeit"}
-                </p>
-              </div>
+          <section className="pt-5">
+            <div className="mb-3 flex items-end justify-between gap-4">
+              <h1 className="text-[22px] font-bold leading-[1.1] tracking-[-0.04em] text-neutral-950">
+                {isRu
+                  ? "Ближайшее служение"
+                  : "Nächster Dienst"}
+              </h1>
 
               <button
                 type="button"
                 onClick={() =>
                   router.push("/schedule")
                 }
-                className="shrink-0 pb-1 text-[13px] font-semibold text-neutral-500"
+                className="shrink-0 pb-0.5 text-[13px] font-semibold text-neutral-500"
               >
                 {t.dashboard.viewAll}
               </button>
             </div>
 
             {loading ? (
-              <div className="h-[390px] animate-pulse rounded-[27px] bg-white" />
+              <div className="h-[130px] animate-pulse rounded-[22px] bg-white" />
             ) : nextServiceEntries.length === 0 ? (
-              <div className="rounded-[27px] border border-neutral-200 bg-white px-6 py-12 text-center shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
+              <div className="rounded-[22px] border border-neutral-200 bg-white px-6 py-8 text-center shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
                 <CalendarDays
-                  size={30}
+                  size={26}
                   className="mx-auto text-neutral-300"
                 />
 
-                <p className="mt-4 text-[14px] font-medium text-neutral-400">
+                <p className="mt-3 text-[14px] font-medium text-neutral-400">
                   {isRu
                     ? "Ближайших служений пока нет"
                     : "Keine kommenden Dienste"}
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {nextServiceEntries.map(
                   (entry) => {
                     const members =
@@ -777,33 +889,27 @@ export default function Home() {
                         type="button"
                         key={entry.id}
                         onClick={() =>
-                          router.push("/schedule")
+                          openService(entry)
                         }
-                        className="group w-full overflow-hidden rounded-[27px] border border-neutral-200 bg-white text-left shadow-[0_4px_18px_rgba(17,24,32,0.055)] transition active:scale-[0.995]"
+                        className="group w-full overflow-hidden rounded-[22px] border border-neutral-200 bg-white text-left shadow-[0_4px_18px_rgba(17,24,32,0.05)] transition active:scale-[0.995]"
                       >
-                        <div className="flex min-h-[180px]">
-                          <div className="flex w-[112px] shrink-0 flex-col items-center justify-center bg-[#111820] px-2 text-white">
+                        <div className="flex">
+                          <div className="flex w-[78px] shrink-0 flex-col items-center justify-center bg-[#111820] px-2 py-3 text-white">
                             <Clock3
-                              size={23}
+                              size={17}
                               strokeWidth={1.7}
-                              className="mb-3 text-neutral-400"
+                              className="mb-2 text-neutral-400"
                             />
 
-                            <span className="text-[25px] font-bold leading-none tracking-[-0.05em]">
+                            <span className="text-[19px] font-bold leading-none tracking-[-0.04em]">
                               {entry.service_time}
-                            </span>
-
-                            <span className="mt-2 text-[9px] font-semibold uppercase tracking-[0.13em] text-neutral-400">
-                              {isRu
-                                ? "служение"
-                                : "dienst"}
                             </span>
                           </div>
 
-                          <div className="min-w-0 flex-1 p-5">
-                            <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1 p-3.5">
+                            <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="text-[12px] font-medium capitalize text-neutral-400">
+                                <p className="text-[11px] font-medium capitalize text-neutral-400">
                                   {formatDate(
                                     entry.schedule_date,
                                     language,
@@ -816,7 +922,7 @@ export default function Home() {
                                   )}
                                 </p>
 
-                                <h2 className="mt-2 line-clamp-2 text-[20px] font-bold leading-[1.15] tracking-[-0.035em] text-neutral-950">
+                                <h2 className="mt-0.5 line-clamp-2 text-[17px] font-bold leading-[1.15] tracking-[-0.03em] text-neutral-950">
                                   {getScheduleTitle(
                                     entry,
                                   )}
@@ -824,46 +930,56 @@ export default function Home() {
                               </div>
 
                               <ArrowRight
-                                size={20}
+                                size={18}
                                 className="mt-1 shrink-0 text-neutral-300"
                               />
                             </div>
 
-                            {entry.bible_text && (
-                              <span className="mt-4 inline-flex max-w-full truncate rounded-full bg-neutral-100 px-3 py-1.5 text-[11px] font-medium text-neutral-600">
-                                {entry.bible_text}
-                              </span>
+                            {(entry.bible_text ||
+                              entry.material_id != null) && (
+                              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] font-medium text-neutral-500">
+                                {entry.bible_text && (
+                                  <span className="truncate">
+                                    {entry.bible_text}
+                                  </span>
+                                )}
+
+                                {entry.material_id != null && (
+                                  <span className="inline-flex items-center gap-1 text-[#111820]">
+                                    <FileText size={12} />
+                                    {isRu
+                                      ? "Материал"
+                                      : "Material"}
+                                  </span>
+                                )}
+                              </div>
                             )}
 
-                            {entry.series && (
-                              <p className="mt-3 truncate text-[11px] font-medium text-neutral-400">
-                                {entry.series}
-                              </p>
-                            )}
-
-                            <div className="mt-3 flex flex-wrap gap-1.5">
+                            <div className="mt-2.5 flex flex-wrap gap-1.5">
                               {members.length > 0 ? (
-                                members
-                                  .slice(0, 4)
-                                  .map(
-                                    (member) => (
-                                      <span
-                                        key={
-                                          member.id
-                                        }
-                                        className="rounded-full bg-[#f4f5f5] px-2.5 py-1 text-[10px] font-medium text-neutral-600"
-                                      >
+                                members.map(
+                                  (member) => (
+                                    <span
+                                      key={
+                                        member.id
+                                      }
+                                      className="rounded-full bg-[#f1f2f3] px-3 py-1.5 leading-none"
+                                    >
+                                      <span className="text-[15px] font-bold text-[#111820]">
                                         {
                                           member.first_name
-                                        }{" "}
+                                        }
+                                      </span>{" "}
+                                      <span className="text-[12px] font-medium text-neutral-500">
                                         {
                                           member.last_name
                                         }
                                       </span>
-                                    ),
-                                  )
+                                    </span>
+                                  ),
+                                )
                               ) : (
-                                <span className="text-[11px] text-neutral-400">
+                                <span className="text-[12px] text-neutral-400">
                                   {isRu
                                     ? "Служители не назначены"
                                     : "Keine Mitarbeiter zugewiesen"}
@@ -881,14 +997,47 @@ export default function Home() {
           </section>
 
           {/* =====================================================
+              VERSE OF THE DAY
+          ====================================================== */}
+          <section className="mt-3">
+            <div className="rounded-[20px] border border-neutral-200 bg-white px-4 py-3.5 shadow-[0_2px_10px_rgba(17,24,32,0.03)]">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-[9px] bg-[#111820] text-white">
+                  <BookOpen size={14} />
+                </span>
+
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                  {isRu
+                    ? "Слово на сегодня"
+                    : "Wort für heute"}
+                </p>
+              </div>
+
+              <p className="mt-2.5 text-[15px] font-medium leading-[1.5] text-[#1a232d]">
+                «{isRu ? verse.ru : verse.de}»
+              </p>
+
+              <p className="mt-2 text-[12px] font-bold text-neutral-500">
+                {isRu ? verse.ref.ru : verse.ref.de}
+                <span className="font-medium text-neutral-300">
+                  {" · "}
+                  {isRu
+                    ? "Синодальный перевод"
+                    : "Lutherbibel 1912"}
+                </span>
+              </p>
+            </div>
+          </section>
+
+          {/* =====================================================
               TEEN BIRTHDAYS
           ====================================================== */}
           {!loading && upcomingBirthdays.length > 0 && (
             <section className="mt-4">
-              <div className="overflow-hidden rounded-[23px] border border-neutral-200 bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
-                <div className="flex items-center justify-between gap-3 border-b border-neutral-100 px-4 py-3.5">
+              <div className="overflow-hidden rounded-[20px] border border-neutral-200 bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
+                <div className="flex items-center justify-between gap-3 border-b border-neutral-100 px-3.5 py-2.5">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[#111820] text-white">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-[#111820] text-white">
                       <Cake size={18} strokeWidth={1.8} />
                     </div>
 
@@ -929,9 +1078,9 @@ export default function Home() {
                     }) => (
                       <div
                         key={teen.id}
-                        className="flex items-center gap-3 px-4 py-3.5"
+                        className="flex items-center gap-3 px-3.5 py-2.5"
                       >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
                           <span className="text-[13px] font-bold">
                             {teen.first_name.charAt(0)}
                             {teen.last_name.charAt(0)}
@@ -999,10 +1148,10 @@ export default function Home() {
                 onClick={() =>
                   router.push("/schedule")
                 }
-                className="flex w-full items-center justify-between rounded-[20px] border border-neutral-200 bg-white px-4 py-3.5 text-left shadow-[0_2px_10px_rgba(17,24,32,0.03)]"
+                className="flex w-full items-center justify-between rounded-[20px] border border-neutral-200 bg-white px-3.5 py-2.5 text-left shadow-[0_2px_10px_rgba(17,24,32,0.03)]"
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-neutral-100 text-neutral-600">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-neutral-100 text-neutral-600">
                     <CalendarRange size={19} />
                   </div>
 
@@ -1041,193 +1190,143 @@ export default function Home() {
           )}
 
           {/* =====================================================
+              NEXT TRIP
+          ====================================================== */}
+          {nextTrip && (
+            <section className="mt-3">
+              <button
+                type="button"
+                onClick={() => router.push("/trips")}
+                className="flex w-full items-center gap-3 rounded-[20px] border border-neutral-200 bg-white px-3.5 py-2.5 text-left shadow-[0_2px_10px_rgba(17,24,32,0.03)] transition active:scale-[0.99]"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#111820] text-white">
+                  <Bus size={17} />
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[10px] font-semibold uppercase tracking-[0.1em] text-neutral-400">
+                    {isRu
+                      ? "Ближайшая поездка"
+                      : "Nächste Fahrt"}
+                  </span>
+
+                  <span className="block truncate text-[14px] font-bold text-[#111820]">
+                    {nextTrip.title}
+                  </span>
+
+                  <span className="mt-0.5 flex items-center gap-2 text-[11px] text-neutral-500">
+                    <span>
+                      {formatProjectPeriod(
+                        nextTrip.start_date,
+                        nextTrip.end_date,
+                        language,
+                      )}
+                    </span>
+
+                    {nextTrip.location && (
+                      <span className="inline-flex min-w-0 items-center gap-0.5 truncate">
+                        <MapPin size={11} />
+                        {nextTrip.location}
+                      </span>
+                    )}
+                  </span>
+                </span>
+
+                <ArrowRight
+                  size={16}
+                  className="shrink-0 text-neutral-300"
+                />
+              </button>
+            </section>
+          )}
+
+          {/* =====================================================
               CURRENT WORK
           ====================================================== */}
-          <section className="mt-8">
-            <div className="mb-4 flex items-end justify-between gap-4">
-              <div>
-                <h2 className="text-[23px] font-bold tracking-[-0.045em] text-neutral-950">
-                  {isRu
-                    ? "Текущие проекты"
-                    : "Aktuelle Projekte"}
-                </h2>
-
-                <p className="mt-1 text-[13px] text-neutral-500">
-                  {isRu
-                    ? "Над чем команда работает сейчас"
-                    : "Woran das Team gerade arbeitet"}
-                </p>
-              </div>
+          <section className="mt-6">
+            <div className="mb-3 flex items-end justify-between gap-4">
+              <h2 className="text-[19px] font-bold tracking-[-0.04em] text-neutral-950">
+                {isRu
+                  ? "Текущие проекты"
+                  : "Aktuelle Projekte"}
+              </h2>
 
               <button
                 type="button"
-                onClick={() =>
-                  router.push("/work")
-                }
+                onClick={() => router.push("/work")}
                 className="shrink-0 text-[13px] font-semibold text-neutral-500"
               >
-                Alle
+                {t.dashboard.viewAll}
               </button>
             </div>
 
             {loading ? (
-              <div className="h-[190px] animate-pulse rounded-[25px] bg-white" />
-            ) : !currentWork ? (
+              <div className="h-[90px] animate-pulse rounded-[20px] bg-white" />
+            ) : workProjects.length === 0 ? (
               <button
                 type="button"
-                onClick={() =>
-                  router.push("/work")
-                }
-                className="w-full rounded-[25px] border border-neutral-200 bg-white px-5 py-7 text-left shadow-[0_4px_18px_rgba(17,24,32,0.04)] transition active:scale-[0.995]"
+                onClick={() => router.push("/work")}
+                className="w-full rounded-[20px] border border-neutral-200 bg-white px-4 py-4 text-left text-[13px] font-medium text-neutral-400 shadow-[0_2px_10px_rgba(17,24,32,0.03)]"
               >
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] bg-[#111820] text-white">
-                    <BriefcaseBusiness
-                      size={21}
-                      strokeWidth={1.8}
-                    />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[15px] font-semibold text-neutral-900">
-                      {isRu
-                        ? "Пока нет текущих проектов"
-                        : "Noch keine aktuellen Projekte"}
-                    </p>
-
-                    <p className="mt-1 text-[12px] text-neutral-400">
-                      {isRu
-                        ? "Открыть раздел Проекты"
-                        : "Projekte öffnen"}
-                    </p>
-                  </div>
-
-                  <ArrowRight
-                    size={18}
-                    className="shrink-0 text-neutral-300"
-                  />
-                </div>
+                {isRu
+                  ? "Пока нет текущих проектов"
+                  : "Noch keine aktuellen Projekte"}
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    `/work/${currentWork.id}`,
-                  )
-                }
-                className="group w-full overflow-hidden rounded-[25px] bg-[#111820] text-left text-white shadow-[0_7px_24px_rgba(17,24,32,0.13)] transition active:scale-[0.995]"
-              >
-                <div className="p-5">
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] bg-white/10">
-                      <BriefcaseBusiness
-                        size={21}
-                        strokeWidth={1.8}
-                        className="text-white"
-                      />
-                    </div>
+              <div className="divide-y divide-neutral-100 overflow-hidden rounded-[20px] border border-neutral-200 bg-white shadow-[0_2px_10px_rgba(17,24,32,0.03)]">
+                {workProjects
+                  .slice(0, 5)
+                  .map((project) => {
+                    const progress =
+                      getProjectProgress(project.id);
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-                            {currentWork.status ===
-                            "active"
-                              ? isRu
-                                ? "Активная работа"
-                                : "Aktiv"
-                              : isRu
-                                ? "Запланировано"
-                                : "Geplant"}
-                          </p>
+                    return (
+                      <button
+                        type="button"
+                        key={project.id}
+                        onClick={() =>
+                          router.push(
+                            `/work/${project.id}`,
+                          )
+                        }
+                        className="block w-full px-3.5 py-3 text-left transition active:bg-neutral-50"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[#111820]">
+                            {project.title}
+                          </span>
 
-                          <h3 className="mt-1.5 line-clamp-2 text-[19px] font-bold leading-[1.15] tracking-[-0.035em]">
-                            {currentWork.title}
-                          </h3>
+                          <span className="shrink-0 text-[13px] font-bold tabular-nums text-neutral-700">
+                            {progress}%
+                          </span>
                         </div>
 
-                        <ArrowRight
-                          size={19}
-                          className="mt-1 shrink-0 text-neutral-500 transition group-active:translate-x-0.5"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {currentWork.description && (
-                    <p className="mt-4 line-clamp-2 text-[12px] leading-5 text-neutral-400">
-                      {currentWork.description}
-                    </p>
-                  )}
-
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <p className="text-[11px] text-neutral-400">
-                      {formatProjectPeriod(
-                        currentWork.start_date,
-                        currentWork.end_date,
-                        language,
-                      )}
-                    </p>
-
-                    <p className="text-[11px] font-semibold text-neutral-300">
-                      {currentWorkStats.progress}%
-                    </p>
-                  </div>
-
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-white transition-all"
-                      style={{
-                        width: `${currentWorkStats.progress}%`,
-                      }}
-                    />
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {currentWorkStats.open > 0 && (
-                      <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-neutral-300">
-                        {currentWorkStats.open}{" "}
-                        {isRu ? "открыто" : "offen"}
-                      </span>
-                    )}
-
-                    {currentWorkStats.inProgress >
-                      0 && (
-                      <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-neutral-300">
-                        {currentWorkStats.inProgress}{" "}
-                        {isRu
-                          ? "в работе"
-                          : "in Arbeit"}
-                      </span>
-                    )}
-
-                    {currentWorkStats.completed >
-                      0 && (
-                      <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-neutral-300">
-                        {currentWorkStats.completed}{" "}
-                        {isRu
-                          ? "готово"
-                          : "erledigt"}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-100">
+                          <div
+                            className="h-full rounded-full bg-[#111820] transition-all"
+                            style={{
+                              width: `${progress}%`,
+                            }}
+                          />
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
             )}
           </section>
 
           {/* =====================================================
               CALENDAR PREVIEW
           ====================================================== */}
-          <section className="mt-8">
-            <div className="mb-4 flex items-end justify-between gap-4">
+          <section className="mt-6">
+            <div className="mb-3 flex items-end justify-between gap-4">
               <div>
-                <h2 className="text-[23px] font-bold tracking-[-0.045em] text-neutral-950">
+                <h2 className="text-[19px] font-bold tracking-[-0.045em] text-neutral-950">
                   {t.navigation.calendar}
                 </h2>
 
-                <p className="mt-1 text-[13px] text-neutral-500">
+                <p className="mt-0.5 text-[12px] text-neutral-500">
                   {isRu
                     ? "Ближайшие даты"
                     : "Die nächsten Termine"}
@@ -1245,10 +1344,10 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="overflow-hidden rounded-[25px] border border-neutral-200 bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
-              <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
+            <div className="overflow-hidden rounded-[22px] border border-neutral-200 bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
+              <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-neutral-100 text-neutral-700">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-[14px] bg-neutral-100 text-neutral-700">
                     <CalendarDays
                       size={21}
                       strokeWidth={1.8}
@@ -1286,7 +1385,7 @@ export default function Home() {
               </div>
 
               {calendarPreview.length === 0 ? (
-                <div className="px-5 py-9 text-center text-sm text-neutral-400">
+                <div className="px-5 py-6 text-center text-sm text-neutral-400">
                   {isRu
                     ? "Пока нет запланированных дат"
                     : "Noch keine Termine geplant"}
@@ -1311,7 +1410,7 @@ export default function Home() {
                               "/calendar",
                             )
                           }
-                          className={`min-h-[125px] rounded-[19px] p-4 text-left transition active:scale-[0.98] ${
+                          className={`min-h-[92px] rounded-[17px] p-3 text-left transition active:scale-[0.98] ${
                             index === 0
                               ? "bg-[#111820] text-white"
                               : "bg-neutral-50 text-neutral-900"
@@ -1333,13 +1432,13 @@ export default function Home() {
                             )}
                           </p>
 
-                          <p className="mt-2 text-[27px] font-bold leading-none tracking-[-0.04em]">
+                          <p className="mt-2 text-[22px] font-bold leading-none tracking-[-0.04em]">
                             {new Date(
                               `${date}T00:00:00`,
                             ).getDate()}
                           </p>
 
-                          <div className="mt-4 flex flex-wrap gap-1">
+                          <div className="mt-2.5 flex flex-wrap gap-1">
                             {entriesForDate.map(
                               (entry) => (
                                 <span
