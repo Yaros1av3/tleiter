@@ -50,6 +50,7 @@ type TeamMember = {
   avatar_url: string | null;
   created_at: string;
   updated_at: string;
+  user_id?: string | null;
 };
 
 type MemberForm = {
@@ -115,7 +116,7 @@ const emptyForm: MemberForm = {
 
 /* email не запрашивается напрямую — его получают только админы через функцию */
 const MEMBER_COLUMNS =
-  "id,first_name,last_name,position,phone,birth_date,languages,status,notes,avatar_url,created_at,updated_at";
+  "id,first_name,last_name,position,phone,birth_date,languages,status,notes,avatar_url,created_at,updated_at,user_id";
 
 const positionOrder: Record<Position, number> = {
   hauptleiter: 1,
@@ -426,6 +427,9 @@ export default function TeamPage() {
   /* Только админы могут добавлять / менять / удалять и видеть email */
   const [isAdmin, setIsAdmin] = useState(false);
 
+  /* свой аккаунт: каждый может править только свою карточку (по привязке email) */
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
 
   const [positionFilter, setPositionFilter] = useState<
@@ -491,6 +495,12 @@ export default function TeamPage() {
 
     const { data: adminData } = await supabase.rpc("is_admin");
     const adminNow = adminData === true;
+
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+
+    setMyUserId(authUser?.id ?? null);
 
     setIsAdmin(adminNow);
 
@@ -966,13 +976,24 @@ export default function TeamPage() {
           );
         }
 
-        const { error } = await supabase
-          .from("team_members")
-          .update({
-            ...basePayload,
-            avatar_url: avatarUrl,
-          })
-          .eq("id", editingMember.id);
+        // админ правит всё; обычный участник — только свои контакты через защищённую функцию
+        const { error } = isAdmin
+          ? await supabase
+              .from("team_members")
+              .update({
+                ...basePayload,
+                avatar_url: avatarUrl,
+              })
+              .eq("id", editingMember.id)
+          : await supabase.rpc("update_my_team_profile", {
+              p_first_name: basePayload.first_name,
+              p_last_name: basePayload.last_name,
+              p_phone: basePayload.phone,
+              p_birth_date: basePayload.birth_date,
+              p_languages: basePayload.languages,
+              p_notes: basePayload.notes,
+              p_avatar_url: avatarUrl,
+            });
 
         if (error) {
           console.error(
@@ -1134,6 +1155,21 @@ export default function TeamPage() {
     <h1 className="text-[28px] font-bold tracking-tight text-neutral-950">
       {language === "de" ? "Unser Team" : "Наша команда"}
     </h1>
+
+    {!isAdmin && myUserId !== null && members.some((m) => m.user_id === myUserId) && (
+      <button
+        type="button"
+        onClick={() =>
+          setSelectedMember(
+            members.find((m) => m.user_id === myUserId) ?? null,
+          )
+        }
+        className="ml-auto flex h-10 shrink-0 items-center gap-2 rounded-xl bg-neutral-900 px-3.5 text-xs font-bold text-white shadow-sm transition active:scale-95"
+      >
+        <UserRound size={14} />
+        {language === "de" ? "Mein Profil" : "Мой профиль"}
+      </button>
+    )}
 
     {isAdmin && (
       <button
@@ -1810,7 +1846,9 @@ export default function TeamPage() {
                   <X size={18} />
                 </button>
 
-                {isAdmin && (
+                {(isAdmin ||
+                  (myUserId !== null &&
+                    selectedMember.user_id === myUserId)) && (
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -1828,6 +1866,7 @@ export default function TeamPage() {
                       : "Изменить"}
                   </button>
 
+                  {isAdmin && (
                   <button
                     type="button"
                     onClick={() =>
@@ -1839,6 +1878,7 @@ export default function TeamPage() {
                   >
                     <Trash2 size={15} />
                   </button>
+                  )}
                 </div>
                 )}
               </div>
@@ -2425,7 +2465,8 @@ export default function TeamPage() {
                 </div>
               </div>
 
-              {/* Position + Status */}
+              {/* Position + Status (только админ) */}
+              {isAdmin && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-2 block text-xs font-bold text-neutral-700">
@@ -2521,8 +2562,10 @@ export default function TeamPage() {
                   </select>
                 </div>
               </div>
+              )}
 
-              {/* Email */}
+              {/* Email (только админ) */}
+              {isAdmin && (
               <div>
                 <label className="mb-2 block text-xs font-bold text-neutral-700">
                   Email
@@ -2547,6 +2590,7 @@ export default function TeamPage() {
                     : "Должен совпадать с email, на который человек регистрируется — нужен для напоминаний о служении."}
                 </p>
               </div>
+              )}
 
               {/* Phone + Birthday */}
               <div className="grid grid-cols-2 gap-3">
