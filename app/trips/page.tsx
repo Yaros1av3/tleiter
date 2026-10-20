@@ -218,6 +218,32 @@ export default function TripsPage() {
     void load();
   }, [load]);
 
+  /* ссылка вида /trips?trip=5 (с главной): сразу открываем вкладку «Поездки» и эту поездку */
+  const [focusTripId, setFocusTripId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get("trip");
+    const id = raw ? Number(raw) : NaN;
+
+    if (Number.isFinite(id)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTab("trips");
+      setOpenTripId(id);
+      setFocusTripId(id);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (focusTripId === null || loading) return;
+
+    const node = document.getElementById(`trip-${focusTripId}`);
+
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+      setFocusTripId(null);
+    }
+  }, [focusTripId, loading, trips]);
+
   function fail(message: string) {
     setError(message);
   }
@@ -433,7 +459,14 @@ export default function TripsPage() {
     <main className="min-h-screen bg-[#f7f7f6] pb-24 text-[#111820]">
       <div className="sticky top-0 z-20 border-b border-[#e6e8ea] bg-[#f7f7f6]/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
-          
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"
+            aria-label="back"
+          >
+            <ChevronLeft size={20} />
+          </button>
           <div className="min-w-0 flex-1">
             <h1 className="text-[18px] font-bold">{t("Поездки и выезды", "Fahrten & Freizeiten")}</h1>
             <p className="text-[12px] text-[#8a939d]">
@@ -664,7 +697,8 @@ export default function TripsPage() {
               return (
                 <section
                   key={trip.id}
-                  className="rounded-[22px] border border-[#e6e8ea] bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]"
+                  id={`trip-${trip.id}`}
+                  className="scroll-mt-20 rounded-[22px] border border-[#e6e8ea] bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]"
                 >
                   <button
                     type="button"

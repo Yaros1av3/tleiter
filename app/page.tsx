@@ -1288,7 +1288,7 @@ export default function Home() {
             <section className="mt-3">
               <button
                 type="button"
-                onClick={() => router.push("/trips")}
+                onClick={() => router.push(`/trips?trip=${nextTrip.id}`)}
                 className="flex w-full items-center gap-3 rounded-[20px] border border-neutral-200 bg-white px-3.5 py-2.5 text-left shadow-[0_2px_10px_rgba(17,24,32,0.03)] transition active:scale-[0.99]"
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#111820] text-white">
