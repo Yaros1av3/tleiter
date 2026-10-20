@@ -14,7 +14,7 @@ import { supabase } from "@/lib/supabase";
  *
  * Чтобы изменить момент появления — поменяй REMINDER_DAYS.
  */
-export const REMINDER_DAYS = 10;
+export const REMINDER_DAYS = 13;
 
 export const AVAILABILITY_UPDATED_EVENT = "availability-updated";
 
