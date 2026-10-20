@@ -47,6 +47,7 @@ type Teen = {
   first_name: string;
   last_name: string;
   birth_date: string;
+  in_teenie_plus_chat?: boolean | null;
 };
 
 /* =====================================================
@@ -780,7 +781,7 @@ export default function TeeniePlusPage() {
     async function loadTeens() {
       const { data, error } = await supabase
         .from("teens")
-        .select("id, first_name, last_name, birth_date")
+        .select("id, first_name, last_name, birth_date, in_teenie_plus_chat")
         .eq("is_active", true)
         .order("last_name", { ascending: true });
 
@@ -794,6 +795,31 @@ export default function TeeniePlusPage() {
 
     loadTeens();
   }, []);
+
+  /* кого ещё нужно добавить в чат Teenie+ (исполнилось 14) */
+  const [chatBusyId, setChatBusyId] = useState<number | null>(null);
+
+  async function markAddedToChat(teenId: number) {
+    setChatBusyId(teenId);
+
+    const { error } = await supabase
+      .from("teens")
+      .update({ in_teenie_plus_chat: true })
+      .eq("id", teenId);
+
+    setChatBusyId(null);
+
+    if (error) {
+      console.error("Teenie+ chat mark:", error.message, error.code);
+      return;
+    }
+
+    setTeens((current) =>
+      current.map((teen) =>
+        teen.id === teenId ? { ...teen, in_teenie_plus_chat: true } : teen,
+      ),
+    );
+  }
 
   const teenInfo = useMemo(() => {
     const now = new Date();
@@ -827,6 +853,16 @@ export default function TeeniePlusPage() {
       thisMonth: list
         .filter((item) => item.month === month)
         .sort((a, b) => a.day - b.day),
+      needChat: list
+        .filter(
+          (item) =>
+            (item.age === 14 || item.age === 15) &&
+            !item.teen.in_teenie_plus_chat,
+        )
+        .sort(
+          (a, b) =>
+            b.age - a.age || a.teen.last_name.localeCompare(b.teen.last_name),
+        ),
       aged: list
         .filter((item) => item.age === 14 || item.age === 15)
         .sort(
@@ -1069,6 +1105,80 @@ export default function TeeniePlusPage() {
       </header>
 
       <div className="mx-auto w-full max-w-[760px] px-4 pb-32 pt-5 sm:px-6">
+        {/* ДОБАВИТЬ В ЧАТ TEENIE+ */}
+        {teenInfo.needChat.length > 0 && (
+          <section className="mb-5 overflow-hidden rounded-[20px] border border-amber-200 bg-amber-50/60">
+            <div className="flex items-center gap-3 px-4 pb-1 pt-3.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-amber-300 text-[#111820]">
+                <MessageCircle size={17} />
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-bold text-amber-900">
+                  {isRu
+                    ? "Добавь в чат Teenie+"
+                    : "Zum Teenie+-Chat hinzufügen"}
+                </p>
+
+                <p className="text-[11px] text-amber-800/80">
+                  {isRu
+                    ? "Им исполнилось 14 — отметь, когда добавишь"
+                    : "Sie sind 14 geworden – hake ab, wenn hinzugefügt"}
+                </p>
+              </div>
+
+              <span className="text-[12px] font-bold text-amber-800">
+                {teenInfo.needChat.length}
+              </span>
+            </div>
+
+            <div className="mt-1 divide-y divide-amber-100">
+              {teenInfo.needChat.map(({ teen }) => {
+                const birth = parseDate(teen.birth_date);
+                const turned14 = new Date(
+                  birth.getFullYear() + 14,
+                  birth.getMonth(),
+                  birth.getDate(),
+                ).toLocaleDateString(locale, {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                });
+
+                return (
+                  <div
+                    key={teen.id}
+                    className="flex items-center gap-3 px-4 py-2.5"
+                  >
+                    <button
+                      type="button"
+                      disabled={chatBusyId === teen.id}
+                      onClick={() => markAddedToChat(teen.id)}
+                      aria-label={
+                        isRu ? "Отметить, что добавили" : "Als hinzugefügt markieren"
+                      }
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-300 bg-white text-amber-600 transition active:scale-95 disabled:opacity-50"
+                    >
+                      <Check size={16} strokeWidth={2.6} />
+                    </button>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-semibold text-[#111820]">
+                        {teen.first_name} {teen.last_name}
+                      </p>
+
+                      <p className="text-[12px] text-amber-800/70">
+                        {isRu ? "14 лет с " : "14 seit "}
+                        {turned14}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* TABS */}
         <div className="mb-5 flex gap-2 rounded-[16px] border border-[#e2e5e8] bg-white p-1.5">
           <button

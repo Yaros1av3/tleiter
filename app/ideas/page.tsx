@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import {
   FolderPlus,
+  Languages,
   Lightbulb,
   Send,
   Trash2,
@@ -26,6 +27,10 @@ type Idea = {
 
 const MAX_LENGTH = 2000;
 
+const REACTIONS = ["👍", "❤️", "🔥", "🙏", "💡", "🤔"] as const;
+
+type Reaction = { idea_id: number; user_id: string; emoji: string };
+
 export default function IdeasPage() {
   const router = useRouter();
   const toast = useToast();
@@ -33,6 +38,7 @@ export default function IdeasPage() {
   const isRu = language === "ru";
 
   const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [reactions, setReactions] = useState<Reaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [text, setText] = useState("");
@@ -60,6 +66,16 @@ export default function IdeasPage() {
     }
 
     setIdeas((data ?? []) as Idea[]);
+
+    // реакции (если таблицы ещё нет — просто без них)
+    const reactionsResult = await supabase
+      .from("team_idea_reactions")
+      .select("idea_id, user_id, emoji");
+
+    if (!reactionsResult.error) {
+      setReactions((reactionsResult.data ?? []) as Reaction[]);
+    }
+
     setLoading(false);
   }, [isRu, toast]);
 
@@ -121,6 +137,42 @@ export default function IdeasPage() {
     toast.success(isRu ? "Идея сохранена" : "Idee gespeichert");
     window.dispatchEvent(new Event(IDEAS_UPDATED_EVENT));
     await load();
+  }
+
+  async function toggleReaction(ideaId: number, emoji: string) {
+    if (!myId) return;
+
+    const mine = reactions.some(
+      (item) =>
+        item.idea_id === ideaId && item.user_id === myId && item.emoji === emoji,
+    );
+
+    // сразу показываем результат, потом сохраняем
+    setReactions((current) =>
+      mine
+        ? current.filter(
+            (item) =>
+              !(item.idea_id === ideaId && item.user_id === myId && item.emoji === emoji),
+          )
+        : [...current, { idea_id: ideaId, user_id: myId, emoji }],
+    );
+
+    const { error } = mine
+      ? await supabase
+          .from("team_idea_reactions")
+          .delete()
+          .eq("idea_id", ideaId)
+          .eq("user_id", myId)
+          .eq("emoji", emoji)
+      : await supabase
+          .from("team_idea_reactions")
+          .insert({ idea_id: ideaId, emoji });
+
+    if (error) {
+      console.error("Reaction error:", error);
+      toast.error(isRu ? "Не удалось сохранить реакцию." : "Reaktion konnte nicht gespeichert werden.");
+      await load();
+    }
   }
 
   async function deleteIdea(idea: Idea) {
@@ -229,6 +281,15 @@ export default function IdeasPage() {
 
         {/* форма */}
         <div className="rounded-[22px] border border-neutral-200 bg-white p-3 shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
+          <div className="mb-2 flex items-start gap-2 rounded-xl bg-sky-50 px-3 py-2 text-[12px] leading-snug text-sky-800">
+            <Languages size={15} className="mt-0.5 shrink-0" />
+            <span>
+              {isRu
+                ? "Пиши идею и по-русски, и по-немецки — так её поймут все в команде."
+                : "Schreibe deine Idee auf Russisch und auf Deutsch – so versteht sie das ganze Team."}
+            </span>
+          </div>
+
           <textarea
             value={text}
             onChange={(event) => setText(event.target.value.slice(0, MAX_LENGTH))}
@@ -293,6 +354,39 @@ export default function IdeasPage() {
                       {isRu ? "Новая" : "Neu"}
                     </span>
                   )}
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {REACTIONS.map((emoji) => {
+                    const count = reactions.filter(
+                      (item) => item.idea_id === idea.id && item.emoji === emoji,
+                    ).length;
+
+                    const mine = reactions.some(
+                      (item) =>
+                        item.idea_id === idea.id &&
+                        item.user_id === myId &&
+                        item.emoji === emoji,
+                    );
+
+                    return (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => toggleReaction(idea.id, emoji)}
+                        className={`inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-[13px] transition active:scale-95 ${
+                          mine
+                            ? "border-amber-300 bg-amber-50 font-bold text-amber-900"
+                            : count > 0
+                              ? "border-neutral-200 bg-neutral-50 text-neutral-700"
+                              : "border-transparent bg-neutral-50 text-neutral-400 opacity-70"
+                        }`}
+                      >
+                        <span>{emoji}</span>
+                        {count > 0 && <span className="text-[12px]">{count}</span>}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {(isAdmin || idea.project_id) && (
