@@ -603,8 +603,8 @@ export default function TeensPage() {
         return true;
       })
       .sort((a, b) =>
-        `${a.last_name} ${a.first_name}`.localeCompare(
-          `${b.last_name} ${b.first_name}`,
+        `${a.first_name} ${a.last_name}`.localeCompare(
+          `${b.first_name} ${b.last_name}`,
           isRu ? "ru" : "de",
           {
             sensitivity: "base",
@@ -695,8 +695,8 @@ export default function TeensPage() {
           return yearA - yearB;
         }
 
-        return `${a.last_name} ${a.first_name}`.localeCompare(
-          `${b.last_name} ${b.first_name}`,
+        return `${a.first_name} ${a.last_name}`.localeCompare(
+          `${b.first_name} ${b.last_name}`,
           isRu ? "ru" : "de"
         );
       });
