@@ -51,7 +51,7 @@ type BirthdayCelebration = {
   updated_at?: string;
 };
 
-type AgeFilter = "all" | 12 | 13 | 14 | 15;
+type AgeFilter = "all" | 12 | 13 | 14 | 15 | "other";
 type GenderFilter = "all" | Gender;
 type LanguageFilter = "all" | TeenLanguage;
 type StatusFilter = "active" | "all" | "inactive";
@@ -520,7 +520,13 @@ export default function TeensPage() {
           teen.birth_date
         );
 
-        if (age < 12 || age > 15) {
+        const outsideRange = age < 12 || age > 15;
+
+        // «Другой возраст» показывает тех, кто не попал в 12–15 (в т.ч. ошибки в дате рождения);
+        // при поиске по имени ищем среди всех, чтобы никого нельзя было «потерять»
+        if (ageFilter === "other") {
+          if (!outsideRange) return false;
+        } else if (outsideRange && !normalizedSearch) {
           return false;
         }
 
@@ -556,6 +562,7 @@ export default function TeensPage() {
 
         if (
           ageFilter !== "all" &&
+          ageFilter !== "other" &&
           age !== ageFilter
         ) {
           return false;
@@ -724,6 +731,12 @@ export default function TeensPage() {
       );
     }
   ).length;
+
+  const otherAgeCount = teens.filter((teen) => {
+    const age = calculateAge(teen.birth_date);
+
+    return age < 12 || age > 15;
+  }).length;
 
   const boysCount = teens.filter(
     (teen) =>
@@ -1321,6 +1334,7 @@ export default function TeensPage() {
                   13,
                   14,
                   15,
+                  "other",
                 ] as AgeFilter[]
               ).map((age) => (
                 <button
@@ -1341,7 +1355,9 @@ export default function TeensPage() {
                     ? isRu
                       ? "Все"
                       : "Alle"
-                    : `${age}`}
+                    : age === "other"
+                      ? `${isRu ? "Др. возраст" : "Andere"} · ${otherAgeCount}`
+                      : `${age}`}
                 </button>
               ))}
             </div>

@@ -27,6 +27,9 @@ import { translations } from "@/lib/translations";
 import { useAvailabilityReminder } from "@/lib/useAvailabilityReminder";
 import { useTripsReminder } from "@/lib/useTripsReminder";
 import { useIdeasUnread } from "@/lib/useIdeasUnread";
+import { useMyTeenBirthdays } from "@/lib/useMyTeenBirthdays";
+import { shortDays } from "@/lib/birthdays";
+import { useReplacementRequests } from "@/lib/useReplacementRequests";
 import { normalizeServiceTime } from "@/lib/services";
 import { getVerseOfTheDay } from "@/lib/verses";
 import ReminderDot from "@/components/ReminderDot";
@@ -235,6 +238,8 @@ export default function Home() {
   const reminder = useAvailabilityReminder();
   const tripsReminder = useTripsReminder();
   const ideas = useIdeasUnread();
+  const myTeenBirthdays = useMyTeenBirthdays();
+  const replacementRequests = useReplacementRequests();
 
   const t = translations[language];
 
@@ -644,6 +649,14 @@ export default function Home() {
       icon: BriefcaseBusiness,
     },
     {
+      href: "/birthdays",
+      label: isRu ? "Дни рождения" : "Geburtstage",
+      description: isRu
+        ? "Кто за кого отвечает"
+        : "Wer für wen zuständig ist",
+      icon: Cake,
+    },
+    {
       href: "/team",
       label: isRu ? "Команда" : "Team",
       description: isRu
@@ -813,6 +826,75 @@ export default function Home() {
               </span>
 
               <ArrowRight size={16} className="shrink-0 text-amber-500" />
+            </button>
+          )}
+
+          {/* =====================================================
+              REPLACEMENT REQUESTS (admins)
+          ====================================================== */}
+          {replacementRequests.length > 0 && (
+            <button
+              type="button"
+              onClick={() =>
+                router.push(`/schedule?date=${replacementRequests[0].date}`)
+              }
+              className="mt-5 flex w-full items-center gap-3 rounded-[20px] border border-red-200 bg-red-50 px-4 py-3.5 text-left transition active:scale-[0.99]"
+            >
+              <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-red-500 text-white">
+                <Users size={19} />
+                <ReminderDot className="-right-0.5 -top-0.5" />
+              </span>
+
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-bold text-red-800">
+                  {isRu ? "Нужна замена" : "Ersatz gesucht"}
+                  {replacementRequests.length > 1
+                    ? ` · ${replacementRequests.length}`
+                    : ""}
+                </span>
+
+                <span className="mt-0.5 block truncate text-[12px] text-red-700/80">
+                  {replacementRequests
+                    .slice(0, 2)
+                    .map((item) => {
+                      const [, month, day] = item.date.split("-");
+                      return `${item.name} · ${day}.${month} ${item.time}`;
+                    })
+                    .join(", ")}
+                  {replacementRequests.length > 2
+                    ? ` +${replacementRequests.length - 2}`
+                    : ""}
+                </span>
+              </span>
+            </button>
+          )}
+
+          {/* =====================================================
+              MY TEENS BIRTHDAYS
+          ====================================================== */}
+          {myTeenBirthdays.length > 0 && (
+            <button
+              type="button"
+              onClick={() => router.push("/birthdays")}
+              className="mt-5 flex w-full items-center gap-3 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3.5 text-left transition active:scale-[0.99]"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-amber-300 text-[#111820]">
+                <Cake size={19} />
+              </span>
+
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-bold text-amber-900">
+                  {isRu ? "Поздравь своих подростков" : "Gratuliere deinen Teenagern"}
+                </span>
+
+                <span className="mt-0.5 block truncate text-[12px] text-amber-800/80">
+                  {myTeenBirthdays
+                    .slice(0, 3)
+                    .map((item) => `${item.name} · ${shortDays(item.days, isRu)}`)
+                    .join(", ")}
+                  {myTeenBirthdays.length > 3 ? ` +${myTeenBirthdays.length - 3}` : ""}
+                </span>
+              </span>
             </button>
           )}
 
@@ -1548,6 +1630,11 @@ export default function Home() {
                         {item.href.startsWith("/availability") && reminder.needed && (
                           <ReminderDot className="-right-0.5 -top-0.5" />
                         )}
+
+                        {item.href === "/birthdays" &&
+                          myTeenBirthdays.length > 0 && (
+                            <ReminderDot className="-right-0.5 -top-0.5" />
+                          )}
 
                         {item.href === "/trips" && tripsReminder.needed && (
                           <ReminderDot className="-right-0.5 -top-0.5" />

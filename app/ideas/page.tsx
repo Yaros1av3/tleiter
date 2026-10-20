@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
-  ArrowLeft,
   FolderPlus,
   Lightbulb,
   Send,
@@ -210,16 +209,7 @@ export default function IdeasPage() {
 
   return (
     <main className="min-h-screen bg-[#f7f7f6] pb-28 text-[#111820]">
-      <div className="mx-auto w-full max-w-[640px] px-4 pt-5 sm:px-6">
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          className="mb-4 inline-flex h-10 items-center gap-2 rounded-xl bg-white px-3 text-sm font-medium text-neutral-600 shadow-sm"
-        >
-          <ArrowLeft size={15} />
-          {isRu ? "Назад" : "Zurück"}
-        </button>
-
+      <div className="mx-auto w-full max-w-[640px] px-4 pt-6 sm:px-6">
         <div className="mb-5 flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-300 text-[#111820]">
             <Lightbulb size={22} fill="currentColor" />

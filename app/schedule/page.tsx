@@ -20,6 +20,8 @@ import {
   FileText,
   Search,
   Link2,
+  UserRoundX,
+  RefreshCw,
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
@@ -29,6 +31,8 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { useAvailabilityReminder } from "@/lib/useAvailabilityReminder";
 import ReminderDot from "@/components/ReminderDot";
 import { normalizeServiceTime } from "@/lib/services";
+import { useToast } from "@/components/ToastProvider";
+import { REPLACEMENTS_UPDATED_EVENT } from "@/lib/useReplacementRequests";
 
 type TeamMember = {
   id: number;
@@ -36,6 +40,13 @@ type TeamMember = {
   last_name: string;
   position: string;
   status: "active" | "inactive";
+  user_id?: string | null;
+};
+
+type ReplacementRequest = {
+  schedule_entry_id: number;
+  team_member_id: number;
+  reason: string | null;
 };
 
 type ScheduleEntry = {
@@ -109,6 +120,7 @@ const emptyForm: EntryForm = {
 export default function SchedulePage() {
   const router = useRouter();
   const reminder = useAvailabilityReminder();
+  const toast = useToast();
   const { language, t } = useLanguage();
 
   const isRu = language === "ru";
@@ -120,6 +132,22 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [roleLoading, setRoleLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  /* замены: «не смогу, нужна замена» */
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [requests, setRequests] = useState<ReplacementRequest[]>([]);
+  const [cancelTarget, setCancelTarget] = useState<{
+    entry: ScheduleEntry;
+    memberId: number;
+  } | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [replaceBusy, setReplaceBusy] = useState(false);
+  const [replaceTarget, setReplaceTarget] = useState<{
+    entry: ScheduleEntry;
+    memberId: number;
+  } | null>(null);
+  const [freeUserIds, setFreeUserIds] = useState<string[]>([]);
+  const [freeNames, setFreeNames] = useState<string[]>([]);
 
   /*
    * Дата из ссылки (?date=2026-10-25), например с главной страницы.
@@ -221,6 +249,8 @@ export default function SchedulePage() {
       setRoleLoading(false);
       return;
     }
+
+    setMyUserId(user.id);
 
     const { data, error } = await supabase
       .from("profiles")
@@ -418,8 +448,8 @@ export default function SchedulePage() {
     setMaterialSearch("");
   }
 
-  async function loadData() {
-    setLoading(true);
+  async function loadData(silent = false) {
+    if (!silent) setLoading(true);
     setErrorMessage("");
 
     const year = currentMonth.getFullYear();
@@ -459,7 +489,7 @@ export default function SchedulePage() {
         supabase
           .from("team_members")
           .select(
-            "id, first_name, last_name, position, status",
+            "id, first_name, last_name, position, status, user_id",
           )
           .eq("status", "active")
           .order("last_name", {
@@ -510,6 +540,18 @@ export default function SchedulePage() {
       ) ?? [];
 
     if (entryIds.length > 0) {
+      const requestsResult = await supabase
+        .from("replacement_requests")
+        .select("schedule_entry_id, team_member_id, reason")
+        .in("schedule_entry_id", entryIds);
+
+      // если таблицы ещё нет (SQL не запускали) — просто без замен
+      setRequests(
+        requestsResult.error
+          ? []
+          : ((requestsResult.data ?? []) as ReplacementRequest[]),
+      );
+
       const scheduleMembersResult =
         await supabase
           .from("schedule_entry_members")
@@ -535,9 +577,227 @@ export default function SchedulePage() {
       }
     } else {
       setEntryMembers([]);
+      setRequests([]);
     }
 
     setLoading(false);
+  }
+
+  /*
+   * =====================================================
+   * REPLACEMENTS
+   * =====================================================
+   */
+
+  const myMemberId = useMemo(
+    () => members.find((member) => member.user_id === myUserId)?.id ?? null,
+    [members, myUserId],
+  );
+
+  function todayKeyLocal() {
+    const now = new Date();
+
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  }
+
+  function getRequest(entryId: number, memberId: number) {
+    return requests.find(
+      (item) =>
+        item.schedule_entry_id === entryId && item.team_member_id === memberId,
+    );
+  }
+
+  async function submitCancel() {
+    if (!cancelTarget || !myUserId) return;
+
+    const { entry, memberId } = cancelTarget;
+    const me = members.find((member) => member.id === memberId);
+
+    setReplaceBusy(true);
+
+    const reason = cancelReason.trim() || null;
+
+    const { error } = await supabase.from("replacement_requests").insert({
+      schedule_entry_id: entry.id,
+      team_member_id: memberId,
+      reason,
+    });
+
+    if (error) {
+      console.error("Replacement request error:", error);
+      toast.error(
+        isRu
+          ? "Не удалось отправить. Попробуй ещё раз."
+          : "Senden fehlgeschlagen. Versuche es noch einmal.",
+      );
+      setReplaceBusy(false);
+      return;
+    }
+
+    /* в «Когда могу служить» этот сервис тоже становится «не могу» */
+    try {
+      const { data: existing } = await supabase
+        .from("service_availability")
+        .select("service_10, service_13, note")
+        .eq("user_id", myUserId)
+        .eq("sunday_date", entry.schedule_date)
+        .maybeSingle();
+
+      const s10 = entry.service_time === "10:00" ? false : Boolean(existing?.service_10);
+      const s13 = entry.service_time === "10:00" ? Boolean(existing?.service_13) : false;
+
+      await supabase.from("service_availability").upsert(
+        {
+          user_id: myUserId,
+          member_name: me ? `${me.first_name} ${me.last_name}`.trim() : "",
+          sunday_date: entry.schedule_date,
+          status: s10 || s13 ? "available" : "unavailable",
+          service_10: s10,
+          service_13: s13,
+          note: existing?.note || reason,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,sunday_date" },
+      );
+
+      window.dispatchEvent(new Event("availability-updated"));
+    } catch (availabilityError) {
+      console.error("Availability sync error:", availabilityError);
+    }
+
+    /* пуш админам (в том числе секретарю) */
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.access_token) {
+        await fetch("/api/replacement-notify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ entryId: entry.id, memberId }),
+        });
+      }
+    } catch (notifyError) {
+      console.error("Replacement notify error:", notifyError);
+    }
+
+    setReplaceBusy(false);
+    setCancelTarget(null);
+    setCancelReason("");
+
+    toast.success(
+      isRu
+        ? "Готово — админы получили уведомление."
+        : "Erledigt – die Admins wurden benachrichtigt.",
+    );
+
+    await loadData(true);
+    window.dispatchEvent(new Event(REPLACEMENTS_UPDATED_EVENT));
+  }
+
+  async function removeRequest(entryId: number, memberId: number) {
+    setReplaceBusy(true);
+
+    const { error } = await supabase
+      .from("replacement_requests")
+      .delete()
+      .eq("schedule_entry_id", entryId)
+      .eq("team_member_id", memberId);
+
+    setReplaceBusy(false);
+
+    if (error) {
+      console.error("Remove request error:", error);
+      toast.error(isRu ? "Не удалось отозвать." : "Zurückziehen fehlgeschlagen.");
+      return;
+    }
+
+    setReplaceTarget(null);
+    await loadData(true);
+    window.dispatchEvent(new Event(REPLACEMENTS_UPDATED_EVENT));
+  }
+
+  async function openReplace(entry: ScheduleEntry, memberId: number) {
+    setReplaceTarget({ entry, memberId });
+    setFreeUserIds([]);
+    setFreeNames([]);
+
+    const { data } = await supabase
+      .from("service_availability")
+      .select("user_id, member_name, status, service_10, service_13")
+      .eq("sunday_date", entry.schedule_date)
+      .eq("status", "available");
+
+    const wanted = entry.service_time === "10:00" ? "service_10" : "service_13";
+
+    const rows = (data ?? []).filter(
+      (row) => (row as Record<string, unknown>)[wanted] === true,
+    );
+
+    setFreeUserIds(rows.map((row) => row.user_id as string));
+    setFreeNames(
+      rows.map((row) => String(row.member_name ?? "").trim().toLowerCase()),
+    );
+  }
+
+  async function doReplace(newMemberId: number) {
+    if (!replaceTarget) return;
+
+    const { entry, memberId } = replaceTarget;
+
+    setReplaceBusy(true);
+
+    const removeOld = await supabase
+      .from("schedule_entry_members")
+      .delete()
+      .eq("schedule_entry_id", entry.id)
+      .eq("team_member_id", memberId);
+
+    if (removeOld.error) {
+      console.error("Replace remove error:", removeOld.error);
+      toast.error(isRu ? "Не удалось заменить." : "Ersetzen fehlgeschlagen.");
+      setReplaceBusy(false);
+      return;
+    }
+
+    const alreadyIn = entryMembers.some(
+      (item) =>
+        item.schedule_entry_id === entry.id &&
+        item.team_member_id === newMemberId,
+    );
+
+    if (!alreadyIn) {
+      const add = await supabase.from("schedule_entry_members").insert({
+        schedule_entry_id: entry.id,
+        team_member_id: newMemberId,
+      });
+
+      if (add.error) {
+        console.error("Replace add error:", add.error);
+        toast.error(isRu ? "Не удалось поставить замену." : "Ersatz konnte nicht eingetragen werden.");
+        setReplaceBusy(false);
+        await loadData(true);
+        return;
+      }
+    }
+
+    await supabase
+      .from("replacement_requests")
+      .delete()
+      .eq("schedule_entry_id", entry.id)
+      .eq("team_member_id", memberId);
+
+    setReplaceBusy(false);
+    setReplaceTarget(null);
+
+    toast.success(isRu ? "Замена поставлена." : "Ersatz eingetragen.");
+
+    await loadData(true);
+    window.dispatchEvent(new Event(REPLACEMENTS_UPDATED_EVENT));
   }
 
   /*
@@ -1037,7 +1297,7 @@ export default function SchedulePage() {
       }
     }
 
-    await loadData();
+    await loadData(true);
 
     setSaving(false);
     setModalOpen(false);
@@ -1088,7 +1348,7 @@ export default function SchedulePage() {
       return;
     }
 
-    await loadData();
+    await loadData(true);
 
     setDeleting(false);
     setDeleteTarget(null);
@@ -1872,7 +2132,11 @@ export default function SchedulePage() {
                                               member.position ||
                                               undefined
                                             }
-                                            className="inline-flex items-center gap-2 rounded-full bg-[#f1f2f3] py-1 pl-1 pr-3"
+                                            className={`inline-flex items-center gap-2 rounded-full py-1 pl-1 pr-3 ${
+                                              getRequest(entry.id, member.id)
+                                                ? "bg-red-50 ring-1 ring-red-200"
+                                                : "bg-[#f1f2f3]"
+                                            }`}
                                           >
                                             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#111820] text-[9px] font-bold text-white">
                                               {getInitials(member)}
@@ -1899,6 +2163,78 @@ export default function SchedulePage() {
                                     )}
                                   </div>
 
+                                  {/* REPLACEMENT REQUESTS */}
+                                  {serviceMembers
+                                    .filter((member) => getRequest(entry.id, member.id))
+                                    .map((member) => {
+                                      const request = getRequest(entry.id, member.id)!;
+                                      const mine = member.id === myMemberId;
+
+                                      return (
+                                        <div
+                                          key={`req-${member.id}`}
+                                          className="mt-2.5 rounded-[12px] border border-red-200 bg-red-50 px-3 py-2.5"
+                                        >
+                                          <p className="flex items-start gap-1.5 text-[12.5px] font-semibold leading-snug text-red-700">
+                                            <UserRoundX size={14} className="mt-0.5 shrink-0" />
+                                            <span>
+                                              {member.first_name}{" "}
+                                              {isRu ? "не сможет — нужна замена" : "kann nicht – Ersatz gesucht"}
+                                            </span>
+                                          </p>
+
+                                          {request.reason && (
+                                            <p className="mt-1 pl-5 text-[12px] leading-snug text-red-600/80">
+                                              {request.reason}
+                                            </p>
+                                          )}
+
+                                          <div className="mt-2 flex flex-wrap gap-2 pl-5">
+                                            {isAdmin && (
+                                              <button
+                                                type="button"
+                                                onClick={() => openReplace(entry, member.id)}
+                                                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-red-600 px-3 text-[12px] font-bold text-white active:scale-[0.98]"
+                                              >
+                                                <RefreshCw size={12} />
+                                                {isRu ? "Найти замену" : "Ersatz finden"}
+                                              </button>
+                                            )}
+
+                                            {(isAdmin || mine) && (
+                                              <button
+                                                type="button"
+                                                disabled={replaceBusy}
+                                                onClick={() => removeRequest(entry.id, member.id)}
+                                                className="inline-flex h-8 items-center rounded-full bg-white px-3 text-[12px] font-semibold text-red-700 ring-1 ring-red-200 active:scale-[0.98]"
+                                              >
+                                                {mine
+                                                  ? isRu ? "Я смогу, отозвать" : "Doch möglich, zurückziehen"
+                                                  : isRu ? "Оставить как есть" : "Beibehalten"}
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+
+                                  {myMemberId !== null &&
+                                    entry.schedule_date >= todayKeyLocal() &&
+                                    serviceMembers.some((member) => member.id === myMemberId) &&
+                                    !getRequest(entry.id, myMemberId) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setCancelReason("");
+                                          setCancelTarget({ entry, memberId: myMemberId });
+                                        }}
+                                        className="mt-2.5 inline-flex h-8 items-center gap-1.5 rounded-full border border-[#e0e3e6] bg-white px-3 text-[12px] font-semibold text-[#68727e] transition active:scale-[0.98]"
+                                      >
+                                        <UserRoundX size={13} />
+                                        {isRu ? "Не смогу — нужна замена" : "Ich kann nicht – Ersatz nötig"}
+                                      </button>
+                                    )}
+
                                   {entry.notes && (
                                     <p className="mt-2.5 rounded-[11px] bg-[#f6f6f5] px-3 py-2 text-[12px] leading-snug text-[#68727e]">
                                       {entry.notes}
@@ -1918,6 +2254,175 @@ export default function SchedulePage() {
           )}
         </div>
       </div>
+
+      {/* CANCEL SHEET */}
+      {cancelTarget && (
+        <div
+          className="fixed inset-0 z-[110] flex items-end justify-center bg-[#111820]/35 backdrop-blur-[3px] md:items-center md:p-5"
+          onClick={() => !replaceBusy && setCancelTarget(null)}
+        >
+          <div
+            className="w-full rounded-t-[27px] bg-white p-5 shadow-2xl md:max-w-[460px] md:rounded-[22px]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="text-[18px] font-bold tracking-[-0.02em]">
+              {isRu ? "Не смогу служить" : "Ich kann nicht dienen"}
+            </h2>
+
+            <p className="mt-1 text-[13px] leading-snug text-[#68727e]">
+              {new Date(`${cancelTarget.entry.schedule_date}T12:00:00`).toLocaleDateString(
+                isRu ? "ru-RU" : "de-DE",
+                { day: "numeric", month: "long" },
+              )}
+              {" · "}
+              {cancelTarget.entry.service_time}.{" "}
+              {isRu
+                ? "Админы получат уведомление и найдут замену."
+                : "Die Admins werden benachrichtigt und suchen Ersatz."}
+            </p>
+
+            <textarea
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              rows={3}
+              maxLength={300}
+              placeholder={isRu ? "Причина (по желанию)" : "Grund (optional)"}
+              className="mt-3 w-full resize-none rounded-[14px] border border-[#e0e3e6] bg-[#fafafa] px-3.5 py-3 text-[14px] outline-none focus:border-[#111820]"
+            />
+
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                disabled={replaceBusy}
+                onClick={() => setCancelTarget(null)}
+                className="h-12 flex-1 rounded-[14px] bg-[#f1f2f3] text-[14px] font-semibold text-[#4e5966]"
+              >
+                {isRu ? "Отмена" : "Abbrechen"}
+              </button>
+
+              <button
+                type="button"
+                disabled={replaceBusy}
+                onClick={submitCancel}
+                className="h-12 flex-[1.4] rounded-[14px] bg-red-600 text-[14px] font-bold text-white disabled:opacity-60"
+              >
+                {replaceBusy
+                  ? isRu ? "Отправляю…" : "Sende…"
+                  : isRu ? "Сообщить" : "Melden"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REPLACE SHEET (admin) */}
+      {replaceTarget && isAdmin && (() => {
+        const { entry, memberId } = replaceTarget;
+        const alreadyIds = entryMembers
+          .filter((item) => item.schedule_entry_id === entry.id)
+          .map((item) => item.team_member_id);
+
+        const candidates = members.filter(
+          (member) =>
+            !alreadyIds.includes(member.id) &&
+            ((member.user_id && freeUserIds.includes(member.user_id)) ||
+              freeNames.includes(`${member.first_name} ${member.last_name}`.trim().toLowerCase())),
+        );
+
+        const others = members.filter(
+          (member) =>
+            !alreadyIds.includes(member.id) &&
+            !candidates.some((candidate) => candidate.id === member.id),
+        );
+
+        const leaving = members.find((member) => member.id === memberId);
+
+        const renderRow = (member: TeamMember, free: boolean) => (
+          <button
+            key={member.id}
+            type="button"
+            disabled={replaceBusy}
+            onClick={() => doReplace(member.id)}
+            className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left transition active:bg-[#f1f2f3] hover:bg-[#f6f7f7]"
+          >
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${
+                free ? "bg-emerald-600 text-white" : "bg-[#f1f2f3] text-[#65707d]"
+              }`}
+            >
+              {getInitials(member)}
+            </span>
+
+            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[#111820]">
+              {member.first_name} {member.last_name}
+            </span>
+
+            {free && (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                {isRu ? "может" : "kann"}
+              </span>
+            )}
+          </button>
+        );
+
+        return (
+          <div
+            className="fixed inset-0 z-[110] flex items-end justify-center bg-[#111820]/35 backdrop-blur-[3px] md:items-center md:p-5"
+            onClick={() => !replaceBusy && setReplaceTarget(null)}
+          >
+            <div
+              className="flex max-h-[85vh] w-full flex-col rounded-t-[27px] bg-white shadow-2xl md:max-w-[480px] md:rounded-[22px]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 px-5 pb-2 pt-5">
+                <div>
+                  <h2 className="text-[18px] font-bold tracking-[-0.02em]">
+                    {isRu ? "Кто заменит" : "Wer springt ein"}
+                    {leaving ? ` · ${leaving.first_name}` : ""}
+                  </h2>
+                  <p className="mt-0.5 text-[12px] text-[#858e99]">
+                    {new Date(`${entry.schedule_date}T12:00:00`).toLocaleDateString(
+                      isRu ? "ru-RU" : "de-DE",
+                      { day: "numeric", month: "long" },
+                    )}
+                    {" · "}
+                    {entry.service_time}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setReplaceTarget(null)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f2f3f4] text-[#68727e]"
+                  aria-label={isRu ? "Закрыть" : "Schließen"}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto px-2 pb-4">
+                <p className="px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-[0.08em] text-emerald-700">
+                  {isRu ? "Отметили, что могут" : "Haben „kann“ angegeben"}
+                </p>
+
+                {candidates.length === 0 ? (
+                  <p className="px-3 pb-2 text-[13px] text-[#9aa2ad]">
+                    {isRu ? "Никто не отметил это служение." : "Niemand hat diesen Dienst angegeben."}
+                  </p>
+                ) : (
+                  candidates.map((member) => renderRow(member, true))
+                )}
+
+                <p className="px-3 pb-1 pt-4 text-[11px] font-bold uppercase tracking-[0.08em] text-[#9aa2ad]">
+                  {isRu ? "Остальные" : "Weitere"}
+                </p>
+
+                {others.map((member) => renderRow(member, false))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* =====================================================
           CREATE / EDIT SHEET

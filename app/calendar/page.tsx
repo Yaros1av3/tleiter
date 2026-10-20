@@ -95,7 +95,7 @@ const categories = [
   { id: "church", ru: "Церковь", de: "Gemeinde", dot: "bg-emerald-500" },
   { id: "lesson", ru: "Урок", de: "Unterricht", dot: "bg-amber-500" },
   { id: "important", ru: "Важное", de: "Wichtig", dot: "bg-red-500" },
-  { id: "work", ru: "Работа", de: "Arbeit", dot: "bg-slate-700" },
+  { id: "work", ru: "Задачи", de: "To Do", dot: "bg-slate-700" },
   { id: "other", ru: "Другое", de: "Sonstiges", dot: "bg-neutral-400" },
 ] as const;
 
@@ -1770,7 +1770,7 @@ export default function CalendarPage() {
               <div className="min-w-0">
                 <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
                   <BriefcaseBusiness size={13} />
-                  {language === "ru" ? "Работа" : "Arbeit"}
+                  {language === "ru" ? "Задачи" : "To Do"}
                 </div>
                 <h2 className="text-xl font-semibold tracking-tight">{selectedWorkItem.title}</h2>
                 <p className="mt-1 text-sm text-neutral-500">
