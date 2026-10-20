@@ -35,6 +35,8 @@ type Teen = {
   parent2_name: string | null;
   parent2_phone: string | null;
   notes: string | null;
+  in_teen_chat?: boolean | null;
+  in_parent_chat?: boolean | null;
   gender: Gender | null;
   languages: TeenLanguage[];
   is_active: boolean;
@@ -192,6 +194,8 @@ export default function TeensPage() {
   const [parent2Name, setParent2Name] = useState("");
   const [parent2Phone, setParent2Phone] = useState("");
   const [notes, setNotes] = useState("");
+  const [inTeenChat, setInTeenChat] = useState(false);
+  const [inParentChat, setInParentChat] = useState(false);
 
   const [gender, setGender] =
     useState<Gender | "">("");
@@ -828,10 +832,46 @@ export default function TeensPage() {
     setParent2Name("");
     setParent2Phone("");
     setNotes("");
+    setInTeenChat(false);
+    setInParentChat(false);
     setGender("");
     setSelectedLanguages([]);
     setIsActive(true);
     setEditingTeen(null);
+  }
+
+  /* быстрая отметка «в чате» прямо из профиля */
+  async function toggleChat(
+    teen: Teen,
+    field: "in_teen_chat" | "in_parent_chat"
+  ) {
+    const next = !teen[field];
+
+    const patch = { ...teen, [field]: next };
+    setSelectedTeen(patch);
+    setTeens((current) =>
+      current.map((item) =>
+        item.id === teen.id ? patch : item
+      )
+    );
+
+    const { error } = await supabase
+      .from("teens")
+      .update({ [field]: next })
+      .eq("id", teen.id);
+
+    if (error) {
+      console.error("Chat toggle error:", error);
+
+      // откатываем
+      const back = { ...teen, [field]: !next };
+      setSelectedTeen(back);
+      setTeens((current) =>
+        current.map((item) =>
+          item.id === teen.id ? back : item
+        )
+      );
+    }
   }
 
   function openCreateModal() {
@@ -862,6 +902,8 @@ export default function TeensPage() {
     setParent2Name(teen.parent2_name ?? "");
     setParent2Phone(teen.parent2_phone ?? "");
     setNotes(teen.notes ?? "");
+    setInTeenChat(Boolean(teen.in_teen_chat));
+    setInParentChat(Boolean(teen.in_parent_chat));
     setGender(
       teen.gender ?? ""
     );
@@ -925,6 +967,8 @@ export default function TeensPage() {
       parent2_name: parent2Name.trim() || null,
       parent2_phone: parent2Phone.trim() || null,
       notes: notes.trim() || null,
+      in_teen_chat: inTeenChat,
+      in_parent_chat: inParentChat,
       gender:
         gender || null,
       languages:
@@ -2099,6 +2143,74 @@ export default function TeensPage() {
               </div>
             )}
 
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {(
+                [
+                  [
+                    "in_teen_chat",
+                    isRu ? "Чат подростков" : "Teenie-Chat",
+                  ],
+                  [
+                    "in_parent_chat",
+                    isRu ? "Чат родителей" : "Eltern-Chat",
+                  ],
+                ] as const
+              ).map(([field, label]) => {
+                const on = Boolean(selectedTeen[field]);
+
+                return (
+                  <button
+                    key={field}
+                    type="button"
+                    onClick={() =>
+                      toggleChat(selectedTeen, field)
+                    }
+                    className={`flex items-center gap-2.5 rounded-2xl p-3 text-left transition active:scale-[0.98] ${
+                      on
+                        ? "bg-emerald-50"
+                        : "bg-neutral-50"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                        on
+                          ? "bg-emerald-600 text-white"
+                          : "bg-neutral-200 text-neutral-400"
+                      }`}
+                    >
+                      {on ? (
+                        <Check size={15} strokeWidth={2.6} />
+                      ) : (
+                        <MessageCircle size={15} />
+                      )}
+                    </span>
+
+                    <span className="min-w-0">
+                      <span className="block text-[12px] font-bold leading-tight text-neutral-900">
+                        {label}
+                      </span>
+
+                      <span
+                        className={`block text-[10px] font-semibold ${
+                          on
+                            ? "text-emerald-700"
+                            : "text-neutral-400"
+                        }`}
+                      >
+                        {on
+                          ? isRu
+                            ? "состоит"
+                            : "ist drin"
+                          : isRu
+                            ? "не состоит"
+                            : "nicht drin"}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="mt-2 flex items-center justify-between rounded-2xl bg-neutral-50 p-4">
               <span className="text-sm font-semibold">
                 {isRu
@@ -2480,6 +2592,48 @@ export default function TeensPage() {
                   }
                   className="w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm outline-none focus:border-neutral-400 focus:bg-white"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    [
+                      isRu ? "Чат подростков" : "Teenie-Chat",
+                      inTeenChat,
+                      setInTeenChat,
+                    ],
+                    [
+                      isRu ? "Чат родителей" : "Eltern-Chat",
+                      inParentChat,
+                      setInParentChat,
+                    ],
+                  ] as const
+                ).map(([label, value, setValue]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setValue(!value)}
+                    className={`flex items-center justify-between gap-2 rounded-2xl p-3.5 text-left ${
+                      value
+                        ? "bg-emerald-50"
+                        : "bg-neutral-50"
+                    }`}
+                  >
+                    <span className="text-[12px] font-bold text-neutral-800">
+                      {label}
+                    </span>
+
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                        value
+                          ? "bg-emerald-600 text-white"
+                          : "bg-neutral-200 text-transparent"
+                      }`}
+                    >
+                      <Check size={13} strokeWidth={3} />
+                    </span>
+                  </button>
+                ))}
               </div>
 
               <div className="flex items-center justify-between rounded-2xl bg-neutral-50 p-4">
