@@ -22,6 +22,7 @@ import {
 
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
+import TeeniePlans from "@/components/TeeniePlans";
 
 /* =====================================================
    TYPES
@@ -428,7 +429,7 @@ export default function TeeniePlusPage() {
   const locale = isRu ? "ru-RU" : "de-DE";
   const weekdayLabels = isRu ? WEEKDAY_LABELS_RU : WEEKDAY_LABELS_DE;
 
-  const [tab, setTab] = useState<"attendance" | "shopping">("attendance");
+  const [tab, setTab] = useState<"attendance" | "shopping" | "plans">("attendance");
 
   /* ================= ПОСЕЩАЕМОСТЬ ================= */
 
@@ -877,6 +878,7 @@ export default function TeeniePlusPage() {
 
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [loadingShopping, setLoadingShopping] = useState(true);
+  const [shoppingReload, setShoppingReload] = useState(0);
   const [newItemTitle, setNewItemTitle] = useState("");
   const [newItemNote, setNewItemNote] = useState("");
   const [showPurchased, setShowPurchased] = useState(false);
@@ -904,7 +906,7 @@ export default function TeeniePlusPage() {
     }
 
     loadShopping();
-  }, []);
+  }, [shoppingReload]);
 
   async function addItem() {
     const title = newItemTitle.trim();
@@ -1192,6 +1194,19 @@ export default function TeeniePlusPage() {
           >
             <Calendar size={15} />
             {isRu ? "Посещаемость" : "Anwesenheit"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTab("plans")}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-[12px] py-2.5 text-[13px] font-semibold transition ${
+              tab === "plans"
+                ? "bg-[#111820] text-white"
+                : "text-[#65707d]"
+            }`}
+          >
+            <Sparkles size={15} />
+            {isRu ? "Планы" : "Pläne"}
           </button>
 
           <button
@@ -1640,6 +1655,14 @@ export default function TeeniePlusPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* ================= PLANS TAB ================= */}
+        {tab === "plans" && (
+          <TeeniePlans
+            isRu={isRu}
+            onShoppingAdded={() => setShoppingReload((value) => value + 1)}
+          />
         )}
 
         {/* ================= SHOPPING TAB ================= */}
