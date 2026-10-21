@@ -158,6 +158,8 @@ export default function AvailabilityPage() {
   const [overviewView, setOverviewView] = useState<"days" | "people">("days");
   const [openSilent, setOpenSilent] = useState<Record<string, boolean>>({});
   const [exemptIds, setExemptIds] = useState<string[]>([]);
+  const [reminding, setReminding] = useState(false);
+  const [remindResult, setRemindResult] = useState("");
 
   /* в конце месяца форма сразу открывается на следующий месяц */
   const [viewMonth, setViewMonth] = useState(() => {
@@ -646,6 +648,44 @@ export default function AvailabilityPage() {
     return { people, counts, notResponded, notes, days };
   }, [overviewRows, teamMembers, accounts, exemptIds, sundays, locale, isRu]);
 
+  async function sendReminderNow() {
+    setReminding(true);
+    setRemindResult("");
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const response = await fetch("/api/availability-remind", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+      });
+
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || !result) {
+        setRemindResult(
+          (isRu ? "Не удалось отправить" : "Senden fehlgeschlagen") +
+            ` (HTTP ${response.status}${result?.error ? `: ${result.error}` : ""})`,
+        );
+      } else {
+        setRemindResult(
+          isRu
+            ? `Отправлено устройств: ${result.sent}. Не ответили: ${result.pending}, получили из них: ${result.pendingReached}.`
+            : `Geräte erreicht: ${result.sent}. Nicht geantwortet: ${result.pending}, davon erreicht: ${result.pendingReached}.`,
+        );
+      }
+    } catch (error) {
+      setRemindResult(
+        (isRu ? "Не удалось отправить" : "Senden fehlgeschlagen") +
+          ` (${error instanceof Error ? error.message : "network"})`,
+      );
+    } finally {
+      setReminding(false);
+    }
+  }
+
   function formatSunday(date: string) {
     return new Date(`${date}T00:00:00`).toLocaleDateString(locale, {
       day: "numeric",
@@ -1128,6 +1168,33 @@ export default function AvailabilityPage() {
                   ))}
               </div>
             )}
+
+            {/* ручное напоминание */}
+            <div className="mt-3 rounded-[20px] border border-[#e6e8ea] bg-white p-4">
+              <button
+                type="button"
+                onClick={sendReminderNow}
+                disabled={reminding}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#111820] text-[13px] font-bold text-white transition active:scale-[0.99] disabled:opacity-50"
+              >
+                <Send size={15} />
+                {reminding
+                  ? isRu ? "Отправляю…" : "Sende…"
+                  : isRu ? "Напомнить не ответившим (push)" : "Nicht Geantwortete erinnern (Push)"}
+              </button>
+
+              <p className="mt-2 text-[11.5px] leading-snug text-[#8a939d]">
+                {isRu
+                  ? "Уйдёт тем, кто не ответил на следующий месяц, и копия тебе."
+                  : "Geht an alle, die für den nächsten Monat nicht geantwortet haben – und eine Kopie an dich."}
+              </p>
+
+              {remindResult && (
+                <p className="mt-2 text-[12px] font-semibold text-[#374353]">
+                  {remindResult}
+                </p>
+              )}
+            </div>
 
             {/* ещё не ответили вообще */}
             {!loadingOverview && overview.notResponded.length > 0 && (
