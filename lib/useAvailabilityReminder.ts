@@ -8,13 +8,13 @@ import { supabase } from "@/lib/supabase";
 /*
  * Напоминание «запиши, когда можешь служить в следующем месяце».
  *
- * Показывается в последние REMINDER_DAYS дней месяца (по умолчанию 10 —
- * примерно с конца предпоследней недели) и пока человек не ответил
+ * Показывается, начиная с 13-го дня до конца месяца (REMINDER_DAYS = 14 —
+ * тот же день, когда уходит push-напоминание) и пока человек не ответил
  * на ВСЕ воскресенья следующего месяца.
  *
  * Чтобы изменить момент появления — поменяй REMINDER_DAYS.
  */
-export const REMINDER_DAYS = 13;
+export const REMINDER_DAYS = 14;
 
 export const AVAILABILITY_UPDATED_EVENT = "availability-updated";
 

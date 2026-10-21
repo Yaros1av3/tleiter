@@ -1,8 +1,12 @@
 {
   "crons": [
     {
-      "path": "/api/cron/weekly-reminder",
-      "schedule": "0 17 * * 6"
+      "path": "/api/cron/weekly-reminder?slot=14",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-reminder?slot=15",
+      "schedule": "0 15 * * *"
     }
   ]
 }
