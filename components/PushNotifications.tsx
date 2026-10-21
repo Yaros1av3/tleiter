@@ -151,19 +151,41 @@ export default function PushNotifications({ isRu }: { isRu: boolean }) {
         headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
       });
 
-      const result = await response.json();
+      const result = await response.json().catch(() => null);
+
+      if (response.ok && result && result.sent > 0) {
+        setMessage(
+          isRu
+            ? "Тест отправлен — проверь уведомление."
+            : "Test gesendet — prüfe die Benachrichtigung.",
+        );
+        return;
+      }
+
+      // показываем причину, чтобы было понятно, что чинить
+      let reason = `HTTP ${response.status}`;
+
+      if (response.status === 404) {
+        reason += isRu ? " — на сервере нет файла теста" : " — Test-Route fehlt";
+      } else if (result?.error) {
+        reason += `: ${result.error}`;
+      } else if (result && result.subscriptions === 0) {
+        reason += isRu
+          ? " — в базе нет подписки для этого аккаунта, выключи и включи уведомления"
+          : " — keine Subscription in der Datenbank, Benachrichtigungen aus- und einschalten";
+      } else if (result?.lastError) {
+        reason += `: ${result.lastError}`;
+      }
 
       setMessage(
-        response.ok && result.sent > 0
-          ? isRu
-            ? "Тест отправлен — проверь уведомление."
-            : "Test gesendet — prüfe die Benachrichtigung."
-          : isRu
-            ? "Не удалось отправить тест."
-            : "Test konnte nicht gesendet werden.",
+        (isRu ? "Не удалось отправить тест." : "Test konnte nicht gesendet werden.") +
+          ` (${reason})`,
       );
-    } catch {
-      setMessage(isRu ? "Не удалось отправить тест." : "Test konnte nicht gesendet werden.");
+    } catch (error) {
+      setMessage(
+        (isRu ? "Не удалось отправить тест." : "Test konnte nicht gesendet werden.") +
+          ` (${error instanceof Error ? error.message : "network"})`,
+      );
     }
   }
 
