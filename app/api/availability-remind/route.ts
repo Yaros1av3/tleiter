@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import webpush from "web-push";
+import { createClient } from "@supabase/supabase-js";
 
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
@@ -52,14 +53,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userData.user.id)
-    .maybeSingle();
+  // проверяем админа так же, как приложение: функцией is_admin() от имени самого пользователя
+  let isAdmin = false;
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  if (profile?.role !== "admin") {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (publishableKey && supabaseUrl) {
+    const asUser = createClient(supabaseUrl, publishableKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+
+    const { data: adminFlag } = await asUser.rpc("is_admin");
+    isAdmin = adminFlag === true;
+  }
+
+  if (!isAdmin) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", userData.user.id)
+      .maybeSingle();
+
+    isAdmin = profile?.role === "admin";
+  }
+
+  if (!isAdmin) {
+    return NextResponse.json(
+      { error: "forbidden (not admin)" },
+      { status: 403 },
+    );
   }
 
   webpush.setVapidDetails(subject, publicKey, privateKey);
