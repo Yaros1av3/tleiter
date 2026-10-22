@@ -17,6 +17,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/ToastProvider";
+import Avatar from "@/components/Avatar";
 import {
   BIRTHDAYS_UPDATED_EVENT,
   nextBirthday,
@@ -36,6 +37,7 @@ type Member = {
   first_name: string;
   last_name: string;
   user_id: string | null;
+  avatar_url: string | null;
 };
 
 type Link = { teen_id: number; team_member_id: number };
@@ -87,7 +89,7 @@ export default function BirthdaysPage() {
         .order("first_name", { ascending: true }),
       supabase
         .from("team_members")
-        .select("id, first_name, last_name, user_id")
+        .select("id, first_name, last_name, user_id, avatar_url")
         .eq("status", "active")
         .order("first_name", { ascending: true }),
       supabase.from("teen_mentors").select("teen_id, team_member_id"),
@@ -496,14 +498,13 @@ export default function BirthdaysPage() {
                       onClick={() => setOpenId(open ? "none" : member.id)}
                       className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
                     >
-                      <span
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[14px] font-bold ${
+                      <Avatar
+                        src={member.avatar_url}
+                        initials={`${member.first_name.charAt(0)}${member.last_name.charAt(0)}`}
+                        className={`h-10 w-10 rounded-full text-[14px] font-bold ${
                           rows.length > 0 ? "bg-[#111820] text-white" : "bg-[#f1f2f3] text-[#9aa2ad]"
                         }`}
-                      >
-                        {member.first_name.charAt(0)}
-                        {member.last_name.charAt(0)}
-                      </span>
+                      />
 
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[15px] font-bold">
@@ -686,10 +687,11 @@ export default function BirthdaysPage() {
                       onClick={() => addResponsible(m.id)}
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-[#f6f7f7] active:bg-[#f1f2f3]"
                     >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f1f2f3] text-[13px] font-bold text-[#65707d]">
-                        {m.first_name.charAt(0)}
-                        {m.last_name.charAt(0)}
-                      </span>
+                      <Avatar
+                        src={m.avatar_url}
+                        initials={`${m.first_name.charAt(0)}${m.last_name.charAt(0)}`}
+                        className="h-9 w-9 rounded-full bg-[#f1f2f3] text-[13px] font-bold text-[#65707d]"
+                      />
                       <span className="text-[14px] font-semibold">{fullName(m)}</span>
                     </button>
                   ))

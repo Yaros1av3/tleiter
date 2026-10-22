@@ -1,5 +1,7 @@
 "use client";
 
+import Avatar from "@/components/Avatar";
+
 import DatePicker from "@/components/DatePicker";
 
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
@@ -1542,21 +1544,7 @@ export default function TeamPage() {
                   <div className="p-4">
                     <div className="flex items-start gap-3.5">
                       {/* Avatar */}
-                      {member.avatar_url ? (
-                        <img
-                          src={member.avatar_url}
-                          alt={`${member.first_name} ${member.last_name}`}
-                          className="h-14 w-14 shrink-0 rounded-[20px] object-cover"
-                        />
-                      ) : (
-                        <div
-                          className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] text-sm font-bold ${getAvatarTone(
-                            member,
-                          )}`}
-                        >
-                          {getInitials(member)}
-                        </div>
-                      )}
+                      <Avatar src={member.avatar_url} className="h-14 w-14 rounded-[20px]" />
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
@@ -1890,25 +1878,7 @@ export default function TeamPage() {
               {/* Profile */}
               <section className="rounded-[28px] border border-neutral-200 bg-white p-5">
                 <div className="flex items-center gap-4">
-                  {selectedMember.avatar_url ? (
-                    <img
-                      src={
-                        selectedMember.avatar_url
-                      }
-                      alt={`${selectedMember.first_name} ${selectedMember.last_name}`}
-                      className="h-[72px] w-[72px] shrink-0 rounded-[24px] object-cover"
-                    />
-                  ) : (
-                    <div
-                      className={`flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-[24px] text-xl font-bold ${getAvatarTone(
-                        selectedMember,
-                      )}`}
-                    >
-                      {getInitials(
-                        selectedMember,
-                      )}
-                    </div>
-                  )}
+                  <Avatar src={selectedMember.avatar_url} className="h-[72px] w-[72px] rounded-[24px]" />
 
                   <div className="min-w-0">
                     <h2 className="text-xl font-bold tracking-tight text-neutral-950">
@@ -2371,29 +2341,7 @@ export default function TeamPage() {
                 </label>
 
                 <div className="flex items-center gap-4">
-                  {previewUrl ? (
-                    <img
-                      src={previewUrl}
-                      alt="Avatar Vorschau"
-                      className="h-20 w-20 rounded-[24px] object-cover"
-                    />
-                  ) : (
-                    <div
-                      className={`flex h-20 w-20 items-center justify-center rounded-[24px] text-lg font-bold ${
-                        editingMember
-                          ? getAvatarTone(
-                              editingMember,
-                            )
-                          : "bg-neutral-100 text-neutral-400"
-                      }`}
-                    >
-                      {editingMember
-                        ? getInitials(
-                            editingMember,
-                          )
-                        : "?"}
-                    </div>
-                  )}
+                  <Avatar src={previewUrl} className="h-20 w-20 rounded-[24px]" />
 
                   <div className="min-w-0">
                     <label className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-neutral-900 px-4 text-xs font-bold text-white">

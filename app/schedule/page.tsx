@@ -1,6 +1,7 @@
 "use client";
 
 import DatePicker from "@/components/DatePicker";
+import Avatar from "@/components/Avatar";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -43,6 +44,7 @@ type TeamMember = {
   position: string;
   status: "active" | "inactive";
   user_id?: string | null;
+  avatar_url?: string | null;
 };
 
 type ReplacementRequest = {
@@ -491,7 +493,7 @@ export default function SchedulePage() {
         supabase
           .from("team_members")
           .select(
-            "id, first_name, last_name, position, status, user_id",
+            "id, first_name, last_name, position, status, user_id, avatar_url",
           )
           .eq("status", "active")
           .order("last_name", {
@@ -2140,9 +2142,11 @@ export default function SchedulePage() {
                                                 : "bg-[#f1f2f3]"
                                             }`}
                                           >
-                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#111820] text-[9px] font-bold text-white">
-                                              {getInitials(member)}
-                                            </span>
+                                            <Avatar
+                                              src={member.avatar_url}
+                                              initials={getInitials(member)}
+                                              className="h-7 w-7 rounded-full bg-[#111820] text-[9px] font-bold text-white"
+                                            />
 
                                             <span className="leading-none">
                                               <span className="text-[14px] font-bold text-[#111820]">
@@ -2347,13 +2351,13 @@ export default function SchedulePage() {
             onClick={() => doReplace(member.id)}
             className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left transition active:bg-[#f1f2f3] hover:bg-[#f6f7f7]"
           >
-            <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${
+            <Avatar
+              src={member.avatar_url}
+              initials={getInitials(member)}
+              className={`h-9 w-9 rounded-full text-[12px] font-bold ${
                 free ? "bg-emerald-600 text-white" : "bg-[#f1f2f3] text-[#65707d]"
               }`}
-            >
-              {getInitials(member)}
-            </span>
+            />
 
             <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[#111820]">
               {member.first_name} {member.last_name}
@@ -2683,17 +2687,15 @@ export default function SchedulePage() {
                                 }`}
                               >
                                 <div className="flex min-w-0 items-center gap-2.5">
-                                  <div
-                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-[9px] font-bold ${
+                                  <Avatar
+                                    src={member.avatar_url}
+                                    initials={getInitials(member)}
+                                    className={`h-9 w-9 rounded-[10px] text-[9px] font-bold ${
                                       selected
                                         ? "bg-white/10 text-white"
                                         : "bg-[#f0f1f2] text-[#4d5864]"
                                     }`}
-                                  >
-                                    {getInitials(
-                                      member,
-                                    )}
-                                  </div>
+                                  />
 
                                   <span className="truncate text-[13px] font-semibold">
                                     {

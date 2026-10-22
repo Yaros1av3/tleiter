@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  Camera,
   Check,
   ChevronRight,
   Eye,
@@ -16,6 +17,7 @@ import {
 
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
+import Avatar from "@/components/Avatar";
 import PushNotifications from "@/components/PushNotifications";
 import InstallApp from "@/components/InstallApp";
 
@@ -39,6 +41,10 @@ export default function SettingsPage() {
     useState<Profile | null>(null);
 
   const [email, setEmail] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [memberId, setMemberId] = useState<number | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarMessage, setAvatarMessage] = useState("");
 
   const [loading, setLoading] =
     useState(true);
@@ -106,7 +112,122 @@ export default function SettingsPage() {
       setProfile(data);
     }
 
+    // фото из карточки в «Команде» (если человек его поставил)
+    const { data: card } = await supabase
+      .from("team_members")
+      .select("id, first_name, last_name, avatar_url")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (card) {
+      setMemberId(card.id as number);
+      setAvatarUrl(card.avatar_url ?? null);
+    }
+
     setLoading(false);
+  }
+
+  /* уменьшаем фото до 512 px, чтобы не грузить многомегабайтные снимки с телефона */
+  async function resizeImage(file: File): Promise<Blob> {
+    const bitmap = await createImageBitmap(file);
+    const side = Math.min(bitmap.width, bitmap.height);
+    const target = Math.min(512, side);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = target;
+    canvas.height = target;
+
+    const context = canvas.getContext("2d");
+
+    if (!context) throw new Error("canvas");
+
+    // квадрат по центру
+    context.drawImage(
+      bitmap,
+      (bitmap.width - side) / 2,
+      (bitmap.height - side) / 2,
+      side,
+      side,
+      0,
+      0,
+      target,
+      target,
+    );
+
+    return await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("blob"))),
+        "image/jpeg",
+        0.86,
+      ),
+    );
+  }
+
+  async function handleAvatarFile(file: File | undefined) {
+    if (!file || memberId === null) return;
+
+    setAvatarMessage("");
+
+    if (!file.type.startsWith("image/")) {
+      setAvatarMessage(isRu ? "Выбери картинку." : "Bitte ein Bild wählen.");
+      return;
+    }
+
+    setAvatarBusy(true);
+
+    try {
+      const blob = await resizeImage(file);
+      const path = `${memberId}-${Date.now()}.jpg`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("team-avatars")
+        .upload(path, blob, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: "image/jpeg",
+        });
+
+      if (uploadError) throw uploadError;
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("team-avatars").getPublicUrl(path);
+
+      const { error: saveError } = await supabase.rpc("set_my_avatar", {
+        p_avatar_url: publicUrl,
+      });
+
+      if (saveError) throw saveError;
+
+      setAvatarUrl(publicUrl);
+      setAvatarMessage(isRu ? "Фото обновлено." : "Foto aktualisiert.");
+    } catch (error) {
+      console.error("Avatar upload:", error);
+      setAvatarMessage(
+        isRu
+          ? "Не удалось сохранить фото. Попробуй другое изображение."
+          : "Foto konnte nicht gespeichert werden. Versuche ein anderes Bild.",
+      );
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
+  async function removeAvatar() {
+    setAvatarBusy(true);
+    setAvatarMessage("");
+
+    const { error } = await supabase.rpc("set_my_avatar", { p_avatar_url: "" });
+
+    setAvatarBusy(false);
+
+    if (error) {
+      console.error("Avatar remove:", error);
+      setAvatarMessage(isRu ? "Не удалось удалить фото." : "Foto konnte nicht entfernt werden.");
+      return;
+    }
+
+    setAvatarUrl(null);
   }
 
   async function handlePasswordChange(
@@ -225,8 +346,32 @@ export default function SettingsPage() {
         <section className="overflow-hidden rounded-[24px] border border-[#e0e3e6] bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
 
           <div className="flex items-center gap-4 border-b border-[#eceef0] px-5 py-5">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#111820] text-white">
-              <UserRound size={23} />
+            <div className="relative shrink-0">
+              <Avatar
+                src={avatarUrl}
+                className="h-16 w-16 rounded-[20px]"
+              />
+
+              {memberId !== null && (
+                <label
+                  className={`absolute -bottom-1 -right-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-[#111820] text-white shadow ${
+                    avatarBusy ? "opacity-50" : ""
+                  }`}
+                  aria-label={isRu ? "Сменить фото" : "Foto ändern"}
+                >
+                  <Camera size={13} />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={avatarBusy}
+                    className="hidden"
+                    onChange={(event) => {
+                      void handleAvatarFile(event.target.files?.[0]);
+                      event.target.value = "";
+                    }}
+                  />
+                </label>
+              )}
             </div>
 
             <div className="min-w-0">
@@ -238,6 +383,27 @@ export default function SettingsPage() {
               <p className="mt-1 truncate text-[14px] text-[#7a8490]">
                 {email}
               </p>
+
+              {memberId !== null && (
+                <p className="mt-1.5 flex flex-wrap items-center gap-x-3 text-[12px] font-semibold">
+                  <span className="text-[#65707d]">
+                    {avatarBusy
+                      ? isRu ? "Загружаю…" : "Lade…"
+                      : avatarMessage ||
+                        (isRu ? "Нажми на камеру, чтобы сменить фото" : "Tippe auf die Kamera, um das Foto zu ändern")}
+                  </span>
+
+                  {avatarUrl && !avatarBusy && (
+                    <button
+                      type="button"
+                      onClick={removeAvatar}
+                      className="text-red-500"
+                    >
+                      {isRu ? "Удалить" : "Entfernen"}
+                    </button>
+                  )}
+                </p>
+              )}
             </div>
           </div>
 

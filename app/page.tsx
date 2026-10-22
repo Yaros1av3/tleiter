@@ -26,6 +26,7 @@ import { supabase } from "@/lib/supabase";
 import { translations } from "@/lib/translations";
 import { useAvailabilityReminder } from "@/lib/useAvailabilityReminder";
 import { useTripsReminder } from "@/lib/useTripsReminder";
+import Avatar from "@/components/Avatar";
 import { useIdeasUnread } from "@/lib/useIdeasUnread";
 import { useMyTeenBirthdays } from "@/lib/useMyTeenBirthdays";
 import { shortDays } from "@/lib/birthdays";
@@ -81,6 +82,7 @@ type TeamMember = {
   last_name: string;
   position: string;
   status: "active" | "inactive";
+  avatar_url?: string | null;
 };
 
 type ScheduleMember = {
@@ -322,7 +324,7 @@ export default function Home() {
       supabase
         .from("team_members")
         .select(
-          "id, first_name, last_name, position, status",
+          "id, first_name, last_name, position, status, avatar_url",
         )
         .eq("status", "active")
         .order("last_name", { ascending: true }),
@@ -1055,17 +1057,25 @@ export default function Home() {
                                       key={
                                         member.id
                                       }
-                                      className="rounded-full bg-[#f1f2f3] px-3 py-1.5 leading-none"
+                                      className="inline-flex items-center gap-2 rounded-full bg-[#f1f2f3] py-1 pl-1 pr-3 leading-none"
                                     >
-                                      <span className="text-[15px] font-bold text-[#111820]">
-                                        {
-                                          member.first_name
-                                        }
-                                      </span>{" "}
-                                      <span className="text-[12px] font-medium text-neutral-500">
-                                        {
-                                          member.last_name
-                                        }
+                                      <Avatar
+                                        src={member.avatar_url}
+                                        initials={`${member.first_name.charAt(0)}${member.last_name.charAt(0)}`.toUpperCase()}
+                                        className="h-7 w-7 rounded-full bg-[#111820] text-[9px] font-bold text-white"
+                                      />
+
+                                      <span>
+                                        <span className="text-[15px] font-bold text-[#111820]">
+                                          {
+                                            member.first_name
+                                          }
+                                        </span>{" "}
+                                        <span className="text-[12px] font-medium text-neutral-500">
+                                          {
+                                            member.last_name
+                                          }
+                                        </span>
                                       </span>
                                     </span>
                                   ),
