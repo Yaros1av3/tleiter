@@ -1,5 +1,7 @@
 "use client";
 
+import DatePicker from "@/components/DatePicker";
+
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -2269,16 +2271,9 @@ export default function WorkProjectPage() {
                     {text.deadline}
                   </label>
 
-                  <input
-                    type="date"
-                    value={editDeadline}
-                    onChange={(event) =>
-                      setEditDeadline(
-                        event.target.value
-                      )
-                    }
-                    className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none"
-                  />
+                  <DatePicker value={editDeadline} onChange={(__value: string) => setEditDeadline(
+                        __value
+                      )} className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none" />
                 </div>
 
                 <div>
@@ -2433,19 +2428,9 @@ export default function WorkProjectPage() {
                       {text.deadline}
                     </label>
 
-                    <input
-                      type="date"
-                      value={
-                        newDeadline
-                      }
-                      onChange={(event) =>
-                        setNewDeadline(
-                          event.target
-                            .value
-                        )
-                      }
-                      className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none"
-                    />
+                    <DatePicker value={newDeadline} onChange={(__value: string) => setNewDeadline(
+                          __value
+                        )} className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none" />
                   </div>
 
                   <div>

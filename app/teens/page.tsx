@@ -1,5 +1,7 @@
 "use client";
 
+import DatePicker from "@/components/DatePicker";
+
 import { useEffect, useMemo, useState } from "react";
 import {
   Cake,
@@ -2376,16 +2378,9 @@ export default function TeensPage() {
                     : "Geburtsdatum"}
                 </label>
 
-                <input
-                  type="date"
-                  value={birthDate}
-                  onChange={(event) =>
-                    setBirthDate(
-                      event.target.value
-                    )
-                  }
-                  className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
-                />
+                <DatePicker value={birthDate} onChange={(__value: string) => setBirthDate(
+                      __value
+                    )} birth className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white" />
 
                 {birthDate && (
                   <div className="mt-2 flex flex-wrap gap-1.5">

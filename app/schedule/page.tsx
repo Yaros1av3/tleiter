@@ -1,5 +1,7 @@
 "use client";
 
+import DatePicker from "@/components/DatePicker";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -2482,28 +2484,15 @@ export default function SchedulePage() {
                         : "Datum"}
                     </label>
 
-                    <input
-                      type="date"
-                      value={
-                        form.schedule_date
-                      }
-                      onChange={(
-                        event,
-                      ) =>
-                        setForm(
+                    <DatePicker value={form.schedule_date} onChange={(__value: string) => setForm(
                           (
                             current,
                           ) => ({
                             ...current,
                             schedule_date:
-                              event
-                                .target
-                                .value,
+                              __value,
                           }),
-                        )
-                      }
-                      className="h-[52px] w-full rounded-[15px] border border-[#dfe1e4] bg-[#fafafa] px-3.5 text-[15px] outline-none focus:border-[#111820] focus:bg-white"
-                    />
+                        )} className="h-[52px] w-full rounded-[15px] border border-[#dfe1e4] bg-[#fafafa] px-3.5 text-[15px] outline-none focus:border-[#111820] focus:bg-white" />
                   </div>
 
                   {/* SERVICE */}

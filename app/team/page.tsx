@@ -1,5 +1,7 @@
 "use client";
 
+import DatePicker from "@/components/DatePicker";
+
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -2622,18 +2624,11 @@ export default function TeamPage() {
                       : "Дата рождения"}
                   </label>
 
-                  <input
-                    type="date"
-                    value={form.birth_date}
-                    onChange={(event) =>
-                      setForm((current) => ({
+                  <DatePicker value={form.birth_date} onChange={(__value: string) => setForm((current) => ({
                         ...current,
                         birth_date:
-                          event.target.value,
-                      }))
-                    }
-                    className="h-12 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
-                  />
+                          __value,
+                      }))} birth className="h-12 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white" />
                 </div>
               </div>
 

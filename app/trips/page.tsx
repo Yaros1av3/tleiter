@@ -1,5 +1,7 @@
 "use client";
 
+import DatePicker from "@/components/DatePicker";
+
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -842,6 +844,15 @@ function Field({
     if (local !== value) onSave(local);
   };
 
+  if (type === "date") {
+    return (
+      <div className="block">
+        <span className="mb-1 block text-[12px] text-[#65707d]">{label}</span>
+        <DatePicker value={value} onChange={onSave} />
+      </div>
+    );
+  }
+
   return (
     <label className="block">
       <span className="mb-1 block text-[12px] text-[#65707d]">{label}</span>
@@ -1650,7 +1661,7 @@ function PollForm({
 
       <label className="block text-[13px]">
         <span className="mb-1 block text-[#65707d]">{t("Крайний срок (необязательно)", "Frist (optional)")}</span>
-        <input type="date" className={inputCls} value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+        <DatePicker value={deadline} onChange={(__value: string) => setDeadline(__value)} className={inputCls} />
       </label>
 
       <div className="flex gap-2">

@@ -1,5 +1,7 @@
 "use client";
 
+import DatePicker from "@/components/DatePicker";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -95,7 +97,7 @@ const categories = [
   { id: "church", ru: "Церковь", de: "Gemeinde", dot: "bg-emerald-500" },
   { id: "lesson", ru: "Урок", de: "Unterricht", dot: "bg-amber-500" },
   { id: "important", ru: "Важное", de: "Wichtig", dot: "bg-red-500" },
-  { id: "work", ru: "Задачи", de: "To Do", dot: "bg-slate-700" },
+  { id: "work", ru: "Работа", de: "Arbeit", dot: "bg-slate-700" },
   { id: "other", ru: "Другое", de: "Sonstiges", dot: "bg-neutral-400" },
 ] as const;
 
@@ -1770,7 +1772,7 @@ export default function CalendarPage() {
               <div className="min-w-0">
                 <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
                   <BriefcaseBusiness size={13} />
-                  {language === "ru" ? "Задачи" : "To Do"}
+                  {language === "ru" ? "Работа" : "Arbeit"}
                 </div>
                 <h2 className="text-xl font-semibold tracking-tight">{selectedWorkItem.title}</h2>
                 <p className="mt-1 text-sm text-neutral-500">
@@ -1905,31 +1907,20 @@ export default function CalendarPage() {
                   <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                     {language === "ru" ? "Дата начала" : "Startdatum"}
                   </label>
-                  <input
-                    type="date"
-                    value={form.date}
-                    onChange={(event) => {
-                      const value = event.target.value;
+                  <DatePicker value={form.date} onChange={(__value: string) => {
+                      const value = __value;
                       updateForm("date", value);
                       if (!form.endDate || form.endDate < value) {
                         updateForm("endDate", value);
                       }
-                    }}
-                    className="mt-1.5 h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-400"
-                  />
+                    }} className="mt-1.5 h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-400" />
                 </div>
 
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                     {language === "ru" ? "Дата окончания" : "Enddatum"}
                   </label>
-                  <input
-                    type="date"
-                    value={form.endDate}
-                    min={form.date || undefined}
-                    onChange={(event) => updateForm("endDate", event.target.value)}
-                    className="mt-1.5 h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-400"
-                  />
+                  <DatePicker value={form.endDate} onChange={(__value: string) => updateForm("endDate", __value)} min={form.date || undefined} className="mt-1.5 h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-neutral-400" />
                 </div>
 
                 <div>
@@ -2034,15 +2025,7 @@ export default function CalendarPage() {
                   </select>
 
                   {form.recurrence !== "none" && (
-                    <input
-                      type="date"
-                      value={form.recurrenceUntil}
-                      min={form.date}
-                      onChange={(event) =>
-                        updateForm("recurrenceUntil", event.target.value)
-                      }
-                      className="mt-2 h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm outline-none"
-                    />
+                    <DatePicker value={form.recurrenceUntil} onChange={(__value: string) => updateForm("recurrenceUntil", __value)} min={form.date} className="mt-2 h-11 w-full rounded-xl border border-neutral-200 bg-white px-3 text-sm outline-none" />
                   )}
                 </div>
               )}

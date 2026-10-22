@@ -1,5 +1,7 @@
 "use client";
 
+import DatePicker from "@/components/DatePicker";
+
 import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
@@ -1135,19 +1137,12 @@ export default function WorkPage() {
                     <div className="relative">
                       <CalendarDays
                         size={16}
-                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        className="pointer-events-none absolute left-4 top-6 z-10 -translate-y-1/2 text-slate-400"
                       />
 
-                      <input
-                        type="date"
-                        value={newStartDate}
-                        onChange={(event) =>
-                          setNewStartDate(
-                            event.target.value
-                          )
-                        }
-                        className="h-12 w-full rounded-2xl bg-[#f7f7f5] pl-11 pr-3 text-[13px] outline-none"
-                      />
+                      <DatePicker value={newStartDate} onChange={(__value: string) => setNewStartDate(
+                            __value
+                          )} className="h-12 w-full rounded-2xl bg-[#f7f7f5] pl-11 pr-3 text-[13px] outline-none" />
                     </div>
                   </div>
 
@@ -1159,19 +1154,12 @@ export default function WorkPage() {
                     <div className="relative">
                       <Clock3
                         size={16}
-                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        className="pointer-events-none absolute left-4 top-6 z-10 -translate-y-1/2 text-slate-400"
                       />
 
-                      <input
-                        type="date"
-                        value={newEndDate}
-                        onChange={(event) =>
-                          setNewEndDate(
-                            event.target.value
-                          )
-                        }
-                        className="h-12 w-full rounded-2xl bg-[#f7f7f5] pl-11 pr-3 text-[13px] outline-none"
-                      />
+                      <DatePicker value={newEndDate} onChange={(__value: string) => setNewEndDate(
+                            __value
+                          )} className="h-12 w-full rounded-2xl bg-[#f7f7f5] pl-11 pr-3 text-[13px] outline-none" />
                     </div>
                   </div>
                 </div>
@@ -1320,16 +1308,9 @@ export default function WorkPage() {
                         {text.start}
                       </label>
 
-                      <input
-                        type="date"
-                        value={editStartDate}
-                        onChange={(event) =>
-                          setEditStartDate(
-                            event.target.value
-                          )
-                        }
-                        className="h-12 w-full rounded-2xl bg-[#f7f7f5] px-3 text-[13px] outline-none"
-                      />
+                      <DatePicker value={editStartDate} onChange={(__value: string) => setEditStartDate(
+                            __value
+                          )} className="h-12 w-full rounded-2xl bg-[#f7f7f5] px-3 text-[13px] outline-none" />
                     </div>
 
                     <div>
@@ -1337,16 +1318,9 @@ export default function WorkPage() {
                         {text.end}
                       </label>
 
-                      <input
-                        type="date"
-                        value={editEndDate}
-                        onChange={(event) =>
-                          setEditEndDate(
-                            event.target.value
-                          )
-                        }
-                        className="h-12 w-full rounded-2xl bg-[#f7f7f5] px-3 text-[13px] outline-none"
-                      />
+                      <DatePicker value={editEndDate} onChange={(__value: string) => setEditEndDate(
+                            __value
+                          )} className="h-12 w-full rounded-2xl bg-[#f7f7f5] px-3 text-[13px] outline-none" />
                     </div>
                   </div>
 
