@@ -16,6 +16,8 @@ import {
   Info,
   LockKeyhole,
   Mail,
+  Phone,
+  Cake,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
@@ -24,14 +26,29 @@ import { supabase } from "@/lib/supabase";
 
 type Language = "de" | "ru";
 
+const MONTHS_RU = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
+const MONTHS_DE = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+
 export default function RegisterPage() {
   const router = useRouter();
 
   const [language, setLanguage] =
     useState<Language>("de");
 
-  const [fullName, setFullName] =
+  const [firstName, setFirstName] =
     useState("");
+
+  const [lastName, setLastName] =
+    useState("");
+
+  const [phone, setPhone] =
+    useState("");
+
+  const [bDay, setBDay] = useState("");
+  const [bMonth, setBMonth] = useState("");
+  const [bYear, setBYear] = useState("");
+
+  const [langs, setLangs] = useState<string[]>([]);
 
   const [email, setEmail] =
     useState("");
@@ -122,23 +139,46 @@ export default function RegisterPage() {
 
     setError("");
 
-    const cleanName = fullName.trim();
+    const cleanFirst = firstName.trim();
+    const cleanLast = lastName.trim();
+    const cleanName = `${cleanFirst} ${cleanLast}`.trim();
     const cleanEmail = email.trim();
+    const cleanPhone = phone.trim();
 
-    if (!cleanName) {
-      setError(
-        isRu
-          ? "Пожалуйста, введи своё полное имя и фамилию."
-          : "Bitte gib deinen vollständigen Vor- und Nachnamen ein.",
-      );
-      return;
+    let birthDate = "";
+    if (bDay || bMonth || bYear) {
+      if (!bDay || !bMonth || !bYear) {
+        setError(
+          isRu
+            ? "Укажи дату рождения полностью (день, месяц, год) или оставь пустой."
+            : "Bitte gib das Geburtsdatum vollständig an (Tag, Monat, Jahr) oder lass es leer.",
+        );
+        return;
+      }
+      const d = Number(bDay);
+      const m = Number(bMonth);
+      const y = Number(bYear);
+      const test = new Date(y, m - 1, d);
+      if (
+        test.getFullYear() !== y ||
+        test.getMonth() !== m - 1 ||
+        test.getDate() !== d
+      ) {
+        setError(
+          isRu
+            ? "Такой даты не существует."
+            : "Dieses Datum existiert nicht.",
+        );
+        return;
+      }
+      birthDate = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     }
 
-    if (!cleanName.includes(" ")) {
+    if (!cleanFirst || !cleanLast) {
       setError(
         isRu
           ? "Пожалуйста, укажи имя и фамилию."
-          : "Bitte gib deinen Vor- und Nachnamen ein.",
+          : "Bitte gib Vor- und Nachnamen ein.",
       );
       return;
     }
@@ -170,6 +210,11 @@ export default function RegisterPage() {
         options: {
           data: {
             full_name: cleanName,
+            first_name: cleanFirst,
+            last_name: cleanLast,
+            phone: cleanPhone,
+            birth_date: birthDate,
+            languages: langs,
           },
         },
       });
@@ -287,62 +332,202 @@ export default function RegisterPage() {
             className="mt-8 space-y-5"
           >
 
-            {/* Full name */}
             <div>
               <label
-                htmlFor="fullName"
+                htmlFor="firstName"
                 className="mb-2 block px-1 text-[14px] font-semibold text-[#374353]"
               >
-                {isRu
-                  ? "Полное имя и фамилия"
-                  : "Vollständiger Name"}
+                {isRu ? "Имя" : "Vorname"}
               </label>
 
-              <div
-                className={`relative transition ${
-                  focusedField === "name"
-                    ? "scale-[1.005]"
-                    : ""
-                }`}
-              >
+              <div className="relative">
                 <UserRound
                   size={19}
                   strokeWidth={1.9}
                   className={`absolute left-5 top-1/2 -translate-y-1/2 transition ${
-                    focusedField === "name"
+                    focusedField === "firstName"
                       ? "text-[#111820]"
                       : "text-[#9ba4ae]"
                   }`}
                 />
 
                 <input
-                  id="fullName"
+                  id="firstName"
                   type="text"
-                  value={fullName}
-                  onChange={(event) =>
-                    setFullName(
-                      event.target.value,
-                    )
-                  }
-                  onFocus={() =>
-                    setFocusedField("name")
-                  }
-                  onBlur={() =>
-                    setFocusedField(null)
-                  }
-                  placeholder={
-                    isRu
-                      ? "Имя и фамилия"
-                      : "Vorname und Nachname"
-                  }
-                  autoComplete="name"
+                  value={firstName}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  onFocus={() => setFocusedField("firstName")}
+                  onBlur={() => setFocusedField(null)}
+                  placeholder={isRu ? "Имя" : "Vorname"}
+                  autoComplete="given-name"
                   autoCapitalize="words"
                   className={`h-[62px] w-full rounded-[18px] border bg-white pl-13 pr-5 text-[16px] text-[#111820] shadow-[0_2px_8px_rgba(17,24,32,0.03)] outline-none transition placeholder:text-[#aab2bd] ${
-                    focusedField === "name"
+                    focusedField === "firstName"
                       ? "border-[#111820] ring-4 ring-[#111820]/5"
                       : "border-[#d9dee4]"
                   }`}
                 />
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor="lastName"
+                className="mb-2 block px-1 text-[14px] font-semibold text-[#374353]"
+              >
+                {isRu ? "Фамилия" : "Nachname"}
+              </label>
+
+              <div className="relative">
+                <UserRound
+                  size={19}
+                  strokeWidth={1.9}
+                  className={`absolute left-5 top-1/2 -translate-y-1/2 transition ${
+                    focusedField === "lastName"
+                      ? "text-[#111820]"
+                      : "text-[#9ba4ae]"
+                  }`}
+                />
+
+                <input
+                  id="lastName"
+                  type="text"
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  onFocus={() => setFocusedField("lastName")}
+                  onBlur={() => setFocusedField(null)}
+                  placeholder={isRu ? "Фамилия" : "Nachname"}
+                  autoComplete="family-name"
+                  autoCapitalize="words"
+                  className={`h-[62px] w-full rounded-[18px] border bg-white pl-13 pr-5 text-[16px] text-[#111820] shadow-[0_2px_8px_rgba(17,24,32,0.03)] outline-none transition placeholder:text-[#aab2bd] ${
+                    focusedField === "lastName"
+                      ? "border-[#111820] ring-4 ring-[#111820]/5"
+                      : "border-[#d9dee4]"
+                  }`}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor="phone"
+                className="mb-2 block px-1 text-[14px] font-semibold text-[#374353]"
+              >
+                {isRu ? "Телефон" : "Telefon"}
+              </label>
+
+              <div className="relative">
+                <Phone
+                  size={19}
+                  strokeWidth={1.9}
+                  className={`absolute left-5 top-1/2 -translate-y-1/2 transition ${
+                    focusedField === "phone"
+                      ? "text-[#111820]"
+                      : "text-[#9ba4ae]"
+                  }`}
+                />
+
+                <input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  onFocus={() => setFocusedField("phone")}
+                  onBlur={() => setFocusedField(null)}
+                  placeholder={"+49 …"}
+                  autoComplete="tel"
+                  
+                  className={`h-[62px] w-full rounded-[18px] border bg-white pl-13 pr-5 text-[16px] text-[#111820] shadow-[0_2px_8px_rgba(17,24,32,0.03)] outline-none transition placeholder:text-[#aab2bd] ${
+                    focusedField === "phone"
+                      ? "border-[#111820] ring-4 ring-[#111820]/5"
+                      : "border-[#d9dee4]"
+                  }`}
+                />
+              </div>
+            </div>
+
+            {/* Birth date */}
+            <div>
+              <label className="mb-2 block px-1 text-[14px] font-semibold text-[#374353]">
+                {isRu ? "Дата рождения" : "Geburtsdatum"}
+              </label>
+
+              <div className="grid grid-cols-[1fr_1.6fr_1.2fr] gap-2">
+                <select
+                  value={bDay}
+                  onChange={(event) => setBDay(event.target.value)}
+                  aria-label={isRu ? "День" : "Tag"}
+                  className="h-[54px] w-full rounded-[16px] border border-[#d9dee4] bg-white px-3 text-[16px] text-[#111820] outline-none focus:border-[#111820]"
+                >
+                  <option value="">{isRu ? "День" : "Tag"}</option>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={bMonth}
+                  onChange={(event) => setBMonth(event.target.value)}
+                  aria-label={isRu ? "Месяц" : "Monat"}
+                  className="h-[54px] w-full rounded-[16px] border border-[#d9dee4] bg-white px-3 text-[16px] text-[#111820] outline-none focus:border-[#111820]"
+                >
+                  <option value="">{isRu ? "Месяц" : "Monat"}</option>
+                  {(isRu ? MONTHS_RU : MONTHS_DE).map((name, index) => (
+                    <option key={name} value={index + 1}>{name}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={bYear}
+                  onChange={(event) => setBYear(event.target.value)}
+                  aria-label={isRu ? "Год" : "Jahr"}
+                  className="h-[54px] w-full rounded-[16px] border border-[#d9dee4] bg-white px-3 text-[16px] text-[#111820] outline-none focus:border-[#111820]"
+                >
+                  <option value="">{isRu ? "Год" : "Jahr"}</option>
+                  {Array.from(
+                    { length: 80 },
+                    (_, i) => new Date().getFullYear() - 12 - i,
+                  ).map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Languages */}
+            <div>
+              <label className="mb-2 block px-1 text-[14px] font-semibold text-[#374353]">
+                {isRu ? "Языки" : "Sprachen"}
+              </label>
+
+              <div className="flex gap-2">
+                {[
+                  ["DE", "Deutsch"],
+                  ["RU", "Русский"],
+                ].map(([code, label]) => {
+                  const on = langs.includes(code);
+                  return (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() =>
+                        setLangs((current) =>
+                          current.includes(code)
+                            ? current.filter((item) => item !== code)
+                            : [...current, code],
+                        )
+                      }
+                      className={`flex h-[48px] flex-1 items-center justify-center gap-2 rounded-full border text-[15px] font-semibold transition ${
+                        on
+                          ? "border-[#111820] bg-[#111820] text-white"
+                          : "border-[#d9dee4] bg-white text-[#374353]"
+                      }`}
+                    >
+                      {on && <Check size={16} strokeWidth={2.4} />}
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

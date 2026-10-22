@@ -7,10 +7,12 @@ import {
   FolderPlus,
   Languages,
   Lightbulb,
+  Pencil,
   Send,
   Trash2,
 } from "lucide-react";
 
+import Avatar from "@/components/Avatar";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/ToastProvider";
@@ -23,6 +25,7 @@ type Idea = {
   author_name: string;
   project_id: number | null;
   created_at: string;
+  edited_at?: string | null;
 };
 
 const MAX_LENGTH = 2000;
@@ -44,6 +47,9 @@ export default function IdeasPage() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [avatars, setAvatars] = useState<Record<string, string | null>>({});
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   // момент прошлого визита — по нему подсвечиваем «новые» идеи
@@ -51,10 +57,20 @@ export default function IdeasPage() {
   const [myId, setMyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("team_ideas")
-      .select("id, body, author_id, author_name, project_id, created_at")
+      .select("id, body, author_id, author_name, project_id, created_at, edited_at")
       .order("created_at", { ascending: false });
+
+    // если SQL для редактирования ещё не запущен — работаем без «изменено»
+    if (error) {
+      const fallback = await supabase
+        .from("team_ideas")
+        .select("id, body, author_id, author_name, project_id, created_at")
+        .order("created_at", { ascending: false });
+      data = fallback.data as typeof data;
+      error = fallback.error;
+    }
 
     if (error) {
       console.error("Ideas load error:", error);
@@ -66,6 +82,23 @@ export default function IdeasPage() {
     }
 
     setIdeas((data ?? []) as Idea[]);
+
+    // аватарки авторов — из карточек команды
+    const membersResult = await supabase
+      .from("team_members")
+      .select("user_id, avatar_url")
+      .not("user_id", "is", null);
+
+    if (!membersResult.error) {
+      const map: Record<string, string | null> = {};
+      for (const row of (membersResult.data ?? []) as {
+        user_id: string;
+        avatar_url: string | null;
+      }[]) {
+        map[row.user_id] = row.avatar_url;
+      }
+      setAvatars(map);
+    }
 
     // реакции (если таблицы ещё нет — просто без них)
     const reactionsResult = await supabase
@@ -136,6 +169,38 @@ export default function IdeasPage() {
     setText("");
     toast.success(isRu ? "Идея сохранена" : "Idee gespeichert");
     window.dispatchEvent(new Event(IDEAS_UPDATED_EVENT));
+    await load();
+  }
+
+  async function saveEdit(idea: Idea) {
+    const body = editText.trim();
+
+    if (!body || busyId === idea.id) return;
+
+    if (body === idea.body.trim()) {
+      setEditingId(null);
+      return;
+    }
+
+    setBusyId(idea.id);
+
+    const { error } = await supabase.rpc("edit_my_idea", {
+      p_id: idea.id,
+      p_body: body,
+    });
+
+    setBusyId(null);
+
+    if (error) {
+      console.error("Idea edit error:", error);
+      toast.error(
+        isRu ? "Не удалось сохранить изменения." : "Änderungen konnten nicht gespeichert werden.",
+      );
+      return;
+    }
+
+    setEditingId(null);
+    toast.success(isRu ? "Идея обновлена" : "Idee aktualisiert");
     await load();
   }
 
@@ -339,15 +404,71 @@ export default function IdeasPage() {
                   isNew(idea) ? "border-amber-300" : "border-neutral-200"
                 }`}
               >
-                <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">
-                  {idea.body}
-                </p>
+                {editingId === idea.id ? (
+                  <div>
+                    <textarea
+                      value={editText}
+                      onChange={(event) =>
+                        setEditText(event.target.value.slice(0, MAX_LENGTH))
+                      }
+                      rows={4}
+                      autoFocus
+                      className="w-full resize-none rounded-xl bg-[#f7f7f6] px-3 py-2.5 text-[15px] outline-none"
+                    />
+                    <div className="mt-2 flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(null)}
+                        className="inline-flex h-9 items-center rounded-lg bg-neutral-100 px-3 text-xs font-semibold text-neutral-600"
+                      >
+                        {isRu ? "Отмена" : "Abbrechen"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => saveEdit(idea)}
+                        disabled={!editText.trim() || busyId === idea.id}
+                        className="inline-flex h-9 items-center rounded-lg bg-[#111820] px-4 text-xs font-semibold text-white disabled:opacity-40"
+                      >
+                        {isRu ? "Сохранить" : "Speichern"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">
+                    {idea.body}
+                  </p>
+                )}
 
                 <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+                  <Avatar
+                    src={idea.author_id ? avatars[idea.author_id] : null}
+                    className="h-7 w-7 rounded-full"
+                  />
                   <span className="font-bold text-[#111820]">
                     {idea.author_name || (isRu ? "Без имени" : "Ohne Namen")}
                   </span>
                   <span className="text-neutral-400">{formatWhen(idea.created_at)}</span>
+
+                  {idea.edited_at && (
+                    <span className="text-neutral-400">
+                      · {isRu ? "изменено" : "bearbeitet"}
+                    </span>
+                  )}
+
+                  {idea.author_id === myId && editingId !== idea.id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(idea.id);
+                        setEditText(idea.body);
+                      }}
+                      aria-label={isRu ? "Редактировать идею" : "Idee bearbeiten"}
+                      className="ml-auto inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold text-neutral-500 transition hover:bg-neutral-100"
+                    >
+                      <Pencil size={13} />
+                      {isRu ? "Изменить" : "Bearbeiten"}
+                    </button>
+                  )}
 
                   {isNew(idea) && (
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">

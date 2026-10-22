@@ -2716,6 +2716,14 @@ export default function TeamPage() {
                 : `Ты действительно хочешь удалить ${deleteMember.first_name} ${deleteMember.last_name} из команды?`}
             </p>
 
+            {(deleteMember as { user_id?: string | null }).user_id && (
+              <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-[13px] font-medium leading-5 text-red-700">
+                {language === "de"
+                  ? "Achtung: Auch das Konto dieser Person wird endgültig gelöscht – sie kann sich nicht mehr anmelden."
+                  : "Внимание: аккаунт этого человека тоже будет удалён навсегда — войти в приложение он больше не сможет."}
+              </p>
+            )}
+
             <div className="mt-6 flex gap-2">
               <button
                 type="button"
