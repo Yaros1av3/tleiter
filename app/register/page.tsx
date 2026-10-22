@@ -66,9 +66,7 @@ export default function RegisterPage() {
     useState("");
 
   const [focusedField, setFocusedField] =
-    useState<
-      "name" | "email" | "password" | null
-    >(null);
+    useState<string | null>(null);
 
   const isRu = language === "ru";
 
