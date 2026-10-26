@@ -113,7 +113,7 @@ export default function FormsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f7f6] pb-28 text-[#111820]">
+    <main className="min-h-screen overflow-x-hidden bg-[#f7f7f6] pb-28 text-[#111820]">
       <div className="mx-auto w-full max-w-[640px] px-4 pt-6 sm:px-6">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">

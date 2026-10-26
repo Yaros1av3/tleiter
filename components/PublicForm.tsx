@@ -294,17 +294,17 @@ export default function PublicForm({ slug }: { slug: string }) {
     setSubmitting(false);
   }
 
-  const inputClass = `w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3.5 text-[16px] text-[#111820] outline-none transition placeholder:text-neutral-400 focus:ring-4 ${theme.ring}`;
+  const inputClass = `block min-w-0 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3.5 text-[16px] text-[#111820] outline-none transition placeholder:text-neutral-400 focus:ring-4 ${theme.ring}`;
 
   const title = form ? pickText(form.title_de, form.title_ru, lang) : "";
   const description = form ? pickText(form.desc_de, form.desc_ru, lang) : "";
 
   return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#f7f7f6] text-[#111820]">
+    <div className="fixed inset-0 z-[60] overflow-y-auto overflow-x-hidden bg-[#f7f7f6] text-[#111820] [overflow-wrap:anywhere]">
       <div className="mx-auto w-full max-w-[520px] pb-16">
         {/* HERO */}
         <div
-          className={`relative overflow-hidden bg-gradient-to-br ${theme.hero} px-5 pb-16 pt-5 text-white`}
+          className={`relative overflow-hidden bg-gradient-to-br ${theme.hero} px-5 pb-14 pt-5 text-white`}
         >
           <div className="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10" />
           <div className="absolute -bottom-14 -left-8 h-40 w-40 rounded-full bg-white/10" />
@@ -328,18 +328,18 @@ export default function PublicForm({ slug }: { slug: string }) {
 
           {form && (
             <div className="relative mt-6">
-              <div className="text-[56px] leading-none drop-shadow">
+              <div className="text-[48px] leading-none drop-shadow">
                 {form.emoji}
               </div>
 
-              <h1 className="mt-4 text-[32px] font-extrabold leading-[1.05] tracking-[-0.03em]">
+              <h1 className="mt-3 text-[28px] font-extrabold leading-[1.1] tracking-[-0.03em] sm:text-[32px]">
                 {title}
               </h1>
             </div>
           )}
         </div>
 
-        <div className="-mt-9 px-4">
+        <div className="relative z-10 -mt-8 px-4">
           {loading ? (
             <div className="h-40 animate-pulse rounded-[26px] bg-white shadow-sm" />
           ) : notFound || !form ? (
@@ -445,7 +445,7 @@ export default function PublicForm({ slug }: { slug: string }) {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <label className="mb-1.5 block text-[13px] font-bold text-neutral-700">
                         {t.first}
                       </label>
@@ -458,7 +458,7 @@ export default function PublicForm({ slug }: { slug: string }) {
                         className={inputClass}
                       />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="mb-1.5 block text-[13px] font-bold text-neutral-700">
                         {t.last}
                       </label>

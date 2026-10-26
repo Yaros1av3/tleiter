@@ -76,7 +76,7 @@ function toLocalDate(iso: string | null) {
 }
 
 const inputCls =
-  "w-full rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 text-[15px] outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-4 focus:ring-neutral-950/5";
+  "block min-w-0 w-full rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 text-[15px] outline-none transition placeholder:text-neutral-400 focus:border-neutral-400 focus:ring-4 focus:ring-neutral-950/5";
 
 /* ---------- page ---------- */
 
@@ -403,7 +403,7 @@ export default function FormDetailPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#f7f7f6] pb-32 text-[#111820]">
+    <main className="min-h-screen overflow-x-hidden bg-[#f7f7f6] pb-32 text-[#111820]">
       <div className="mx-auto w-full max-w-[640px] px-4 pt-5 sm:px-6">
         {/* header */}
         <button
@@ -671,16 +671,17 @@ function EditTab({
 
       {/* когда и где */}
       <div className={`${card} space-y-3`}>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
+        <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
+          <div className="min-w-0">
             <label className={label}>{isRu ? "Дата" : "Datum"}</label>
             <DatePicker
               value={draft.event_date ?? ""}
               onChange={(value: string) => patch({ event_date: value || null })}
               placeholder={isRu ? "Выбрать" : "Wählen"}
+              clearable={false}
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className={label}>{isRu ? "Время" : "Uhrzeit"}</label>
             {draft.event_time ? (
               <div className="flex items-center gap-2">
@@ -720,8 +721,8 @@ function EditTab({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
+        <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
+          <div className="min-w-0">
             <label className={label}>{isRu ? "Мест (необязательно)" : "Plätze (optional)"}</label>
             <input
               type="number"
@@ -734,7 +735,7 @@ function EditTab({
               className={inputCls}
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className={label}>{isRu ? "Запись до" : "Anmeldung bis"}</label>
             <DatePicker
               value={toLocalDate(draft.closes_at)}
