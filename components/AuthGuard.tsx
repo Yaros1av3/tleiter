@@ -32,7 +32,23 @@ const publicRoutes = [
 
 const recoveryRoute = "/update-password";
 
+/*
+ * Публичные страницы форм (/f/...) открываются без входа:
+ * по ссылке их заполняют подростки.
+ */
 export default function AuthGuard({
+  children,
+}: AuthGuardProps) {
+  const pathname = usePathname();
+
+  if (pathname.startsWith("/f/")) {
+    return <>{children}</>;
+  }
+
+  return <AuthGuardInner>{children}</AuthGuardInner>;
+}
+
+function AuthGuardInner({
   children,
 }: AuthGuardProps) {
   const router = useRouter();

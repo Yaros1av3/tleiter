@@ -15,6 +15,7 @@ import {
   FileText,
   Lightbulb,
   ListChecks,
+  ClipboardList,
   MapPin,
   Users,
   UserRound,
@@ -681,6 +682,14 @@ export default function Home() {
         ? "Посещаемость и список покупок"
         : "Anwesenheit und Einkaufsliste",
       icon: ListChecks,
+    },
+    {
+      href: "/forms",
+      label: isRu ? "Формы" : "Formulare",
+      description: isRu
+        ? "Запись на мероприятия и опросы"
+        : "Anmeldungen und Umfragen",
+      icon: ClipboardList,
     },
     {
       href: "/trips",
