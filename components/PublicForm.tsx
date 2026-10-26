@@ -43,6 +43,7 @@ const TEXT = {
     closed: "Die Anmeldung ist geschlossen.",
     full: "Leider sind alle Plätze vergeben.",
     notFound: "Diese Seite gibt es nicht.",
+    loadError: "Die Seite konnte nicht geladen werden. Bitte versuche es später noch einmal.",
     doneTitle: "Du bist dabei!",
     doneText: "Deine Anmeldung ist angekommen. Wir freuen uns auf dich!",
     errName: "Bitte gib Vor- und Nachnamen ein.",
@@ -70,6 +71,7 @@ const TEXT = {
     closed: "Запись закрыта.",
     full: "К сожалению, все места заняты.",
     notFound: "Такой страницы нет.",
+    loadError: "Не удалось загрузить страницу. Попробуй чуть позже.",
     doneTitle: "Ты записан(а)!",
     doneText: "Мы получили твою заявку. Ждём тебя!",
     errName: "Пожалуйста, укажи имя и фамилию.",
@@ -91,6 +93,7 @@ export default function PublicForm({ slug }: { slug: string }) {
   const [form, setForm] = useState<PublicFormData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -144,7 +147,8 @@ export default function PublicForm({ slug }: { slug: string }) {
       if (cancelled) return;
 
       if (!response.ok) {
-        setNotFound(true);
+        if (response.status === 404) setNotFound(true);
+        else setLoadError(true);
         setLoading(false);
         return;
       }
@@ -153,7 +157,7 @@ export default function PublicForm({ slug }: { slug: string }) {
       setLoading(false);
     })().catch(() => {
       if (!cancelled) {
-        setNotFound(true);
+        setLoadError(true);
         setLoading(false);
       }
     });
@@ -335,7 +339,7 @@ export default function PublicForm({ slug }: { slug: string }) {
             <div className="h-40 animate-pulse rounded-[26px] bg-white shadow-sm" />
           ) : notFound || !form ? (
             <div className="rounded-[26px] bg-white p-8 text-center text-[15px] text-neutral-500 shadow-sm">
-              {t.notFound}
+              {loadError ? t.loadError : t.notFound}
             </div>
           ) : (
             <>

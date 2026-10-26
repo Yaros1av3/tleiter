@@ -10,11 +10,14 @@ export async function loadFormBySlug(slug: string): Promise<FormRow | null> {
   if (!/^[a-z0-9]{6,32}$/i.test(slug)) return null;
 
   const admin = getSupabaseAdmin();
-  const { data } = await admin
+  const { data, error } = await admin
     .from("forms")
     .select("*")
     .eq("slug", slug)
     .maybeSingle();
+
+  // настоящая ошибка (например, не найден ключ) — не путаем с «формы нет»
+  if (error) throw error;
 
   return (data as FormRow | null) ?? null;
 }

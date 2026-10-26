@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import DatePicker from "@/components/DatePicker";
+import TimePicker from "@/components/TimePicker";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/ToastProvider";
@@ -681,12 +682,32 @@ function EditTab({
           </div>
           <div>
             <label className={label}>{isRu ? "Время" : "Uhrzeit"}</label>
-            <input
-              type="time"
-              value={draft.event_time}
-              onChange={(e) => patch({ event_time: e.target.value })}
-              className={inputCls}
-            />
+            {draft.event_time ? (
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <TimePicker
+                    value={draft.event_time}
+                    onChange={(value: string) => patch({ event_time: value })}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => patch({ event_time: "" })}
+                  aria-label="clear time"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-neutral-400 active:bg-neutral-100"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => patch({ event_time: "16:00" })}
+                className={`${inputCls} text-left text-neutral-400`}
+              >
+                {isRu ? "Указать время" : "Zeit angeben"}
+              </button>
+            )}
           </div>
         </div>
 

@@ -13,16 +13,21 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
-  const { slug } = await params;
-  const form = await loadFormBySlug(slug);
+  try {
+    const { slug } = await params;
+    const form = await loadFormBySlug(slug);
 
-  if (!form) {
-    return NextResponse.json({ error: "not_found" }, { status: 404 });
+    if (!form) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    const taken = await countResponses(form.id);
+
+    return NextResponse.json(publicView(form, taken), {
+      headers: { "Cache-Control": "no-store" },
+    });
+  } catch (error) {
+    console.error("Public form load error:", error);
+    return NextResponse.json({ error: "server" }, { status: 500 });
   }
-
-  const taken = await countResponses(form.id);
-
-  return NextResponse.json(publicView(form, taken), {
-    headers: { "Cache-Control": "no-store" },
-  });
 }
