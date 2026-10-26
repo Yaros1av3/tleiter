@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import type { FormQuestion } from "@/lib/forms";
+import { isLatinName, type FormQuestion } from "@/lib/forms";
 import {
   countResponses,
+  findTeens,
+  uniqueMatch,
   ipHash,
   isClosed,
   loadFormBySlug,
@@ -17,6 +19,7 @@ type Body = {
   last_name?: string;
   answers?: Record<string, unknown>;
   teen_id?: number | null;
+  declined?: boolean; // подросток нажал «Нет, это не я» — тогда не привязываем
   lang?: string;
   website?: string; // ловушка для ботов: настоящие люди её не видят и не заполняют
   elapsed?: number; // сколько секунд форма была открыта
@@ -58,6 +61,11 @@ export async function POST(
 
   if (first.length < 2 || last.length < 2) {
     return NextResponse.json({ error: "name" }, { status: 422 });
+  }
+
+  // имя и фамилия — только латиницей (по-немецки), форма на русском тоже
+  if (!isLatinName(first) || !isLatinName(last)) {
+    return NextResponse.json({ error: "latin" }, { status: 422 });
   }
 
   const admin = getSupabaseAdmin();
@@ -146,22 +154,26 @@ export async function POST(
     answers[q.id] = result;
   }
 
-  // привязка к подростку из базы — только если имя и фамилия совпали
+  // привязка к подростку из базы: подтверждённая («Да, это я») или автоматическая
   let teenId: number | null = null;
 
-  if (typeof body.teen_id === "number") {
-    const { data: teen } = await admin
-      .from("teens")
-      .select("id, first_name, last_name")
-      .eq("id", body.teen_id)
-      .maybeSingle();
+  if (!body.declined) {
+    try {
+      const candidates = await findTeens(first, last);
 
-    if (
-      teen &&
-      String(teen.first_name).trim().toLowerCase() === first.toLowerCase() &&
-      String(teen.last_name).trim().toLowerCase() === last.toLowerCase()
-    ) {
-      teenId = teen.id as number;
+      if (typeof body.teen_id === "number") {
+        // подросток сам подтвердил — проверяем, что это действительно подходящий вариант
+        teenId = candidates.some((item) => item.id === body.teen_id)
+          ? body.teen_id
+          : null;
+      }
+
+      if (teenId === null) {
+        teenId = uniqueMatch(candidates)?.id ?? null;
+      }
+    } catch (error) {
+      // без привязки запись всё равно сохранится
+      console.error("Teen match error:", error);
     }
   }
 

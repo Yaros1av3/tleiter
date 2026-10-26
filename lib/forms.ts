@@ -185,3 +185,12 @@ export function calcAge(birth: string) {
   if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age--;
   return age;
 }
+
+/* Имя и фамилия — только латиницей (по-немецки), даже если форму заполняют на русском */
+export function isLatinName(value: string) {
+  return /^[A-Za-zÀ-ÖØ-öø-ÿĀ-žß\s'’.\-]+$/.test(value.trim());
+}
+
+export function hasCyrillic(value: string) {
+  return /[\u0400-\u04FF]/.test(value);
+}

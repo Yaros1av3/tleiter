@@ -143,6 +143,131 @@ function ContactRow({
   );
 }
 
+/* Мероприятия, на которые подросток записывался через формы, и была ли явка */
+type TeenEvent = {
+  attendance: "registered" | "came" | "absent";
+  forms: {
+    title_de: string;
+    title_ru: string;
+    event_date: string | null;
+    emoji: string;
+  } | null;
+};
+
+function TeenEvents({
+  teenId,
+  isRu,
+}: {
+  teenId: number;
+  isRu: boolean;
+}) {
+  const [events, setEvents] = useState<TeenEvent[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const { data, error } = await supabase
+        .from("form_responses")
+        .select("attendance, forms(title_de, title_ru, event_date, emoji)")
+        .eq("teen_id", teenId);
+
+      if (cancelled) return;
+
+      if (error) {
+        // таблицы форм может ещё не быть — тогда просто ничего не показываем
+        setEvents([]);
+        return;
+      }
+
+      const rows = ((data ?? []) as unknown as TeenEvent[]).sort((a, b) =>
+        (b.forms?.event_date ?? "").localeCompare(a.forms?.event_date ?? ""),
+      );
+
+      setEvents(rows);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [teenId]);
+
+  if (!events || events.length === 0) return null;
+
+  const came = events.filter((item) => item.attendance === "came").length;
+
+  return (
+    <div className="mt-2 rounded-2xl border border-neutral-200 bg-white p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+          {isRu ? "Мероприятия" : "Veranstaltungen"}
+        </p>
+        <p className="text-[11px] font-semibold text-neutral-500">
+          {isRu
+            ? `был на ${came} из ${events.length}`
+            : `dabei: ${came} von ${events.length}`}
+        </p>
+      </div>
+
+      <div className="mt-2 space-y-1.5">
+        {events.map((item, index) => {
+          const title =
+            (isRu
+              ? item.forms?.title_ru || item.forms?.title_de
+              : item.forms?.title_de || item.forms?.title_ru) ||
+            (isRu ? "Мероприятие" : "Veranstaltung");
+
+          const date = item.forms?.event_date
+            ? new Date(`${item.forms.event_date}T12:00:00`).toLocaleDateString(
+                isRu ? "ru-RU" : "de-DE",
+                { day: "numeric", month: "short", year: "numeric" },
+              )
+            : "";
+
+          return (
+            <div key={index} className="flex items-center gap-2.5">
+              <span className="text-[18px] leading-none">
+                {item.forms?.emoji ?? "🎉"}
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-semibold text-neutral-800">
+                  {title}
+                </div>
+                {date && (
+                  <div className="text-[11px] text-neutral-400">{date}</div>
+                )}
+              </div>
+
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  item.attendance === "came"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : item.attendance === "absent"
+                      ? "bg-rose-50 text-rose-600"
+                      : "bg-neutral-100 text-neutral-500"
+                }`}
+              >
+                {item.attendance === "came"
+                  ? isRu
+                    ? "пришёл"
+                    : "dabei"
+                  : item.attendance === "absent"
+                    ? isRu
+                      ? "не пришёл"
+                      : "nicht da"
+                    : isRu
+                      ? "записан"
+                      : "angemeldet"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function TeensPage() {
   const { language } = useLanguage();
 
@@ -2117,6 +2242,8 @@ export default function TeensPage() {
               phone={selectedTeen.parent2_phone}
               callLabel={isRu ? "Позвонить" : "Anrufen"}
             />
+
+            <TeenEvents teenId={selectedTeen.id} isRu={isRu} />
 
             {selectedTeen.notes && (
               <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">

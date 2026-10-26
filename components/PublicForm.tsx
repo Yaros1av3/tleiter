@@ -5,6 +5,8 @@ import { CalendarDays, Check, Clock3, MapPin, Users } from "lucide-react";
 
 import {
   formatEventDate,
+  hasCyrillic,
+  isLatinName,
   pickText,
   themeOf,
   type FormQuestion,
@@ -47,6 +49,8 @@ const TEXT = {
     doneTitle: "Du bist dabei!",
     doneText: "Deine Anmeldung ist angekommen. Wir freuen uns auf dich!",
     errName: "Bitte gib Vor- und Nachnamen ein.",
+    errLatin: "Bitte schreibe Vor- und Nachnamen mit lateinischen Buchstaben (auf Deutsch).",
+    nameHint: "",
     errReq: "Bitte fülle alle Pflichtfelder aus.",
     errDup: "Du bist schon angemeldet.",
     errMany: "Zu viele Versuche. Bitte warte kurz.",
@@ -75,6 +79,8 @@ const TEXT = {
     doneTitle: "Ты записан(а)!",
     doneText: "Мы получили твою заявку. Ждём тебя!",
     errName: "Пожалуйста, укажи имя и фамилию.",
+    errLatin: "Имя и фамилию нужно писать латиницей, по-немецки (например: Anna Müller).",
+    nameHint: "Имя и фамилию пиши латиницей, по-немецки — например: Anna Müller",
     errReq: "Пожалуйста, заполни все обязательные поля.",
     errDup: "Ты уже записан(а).",
     errMany: "Слишком много попыток. Подожди немного.",
@@ -180,6 +186,7 @@ export default function PublicForm({ slug }: { slug: string }) {
     setTeenId(null);
 
     if (firstName.trim().length < 2 || lastName.trim().length < 2) return;
+    if (!isLatinName(firstName) || !isLatinName(lastName)) return;
 
     const timer = setTimeout(async () => {
       try {
@@ -240,6 +247,11 @@ export default function PublicForm({ slug }: { slug: string }) {
       return;
     }
 
+    if (!isLatinName(firstName) || !isLatinName(lastName)) {
+      setError(t.errLatin);
+      return;
+    }
+
     for (const q of form.questions) {
       if (!q.required) continue;
       const value = answers[q.id];
@@ -265,6 +277,7 @@ export default function PublicForm({ slug }: { slug: string }) {
           last_name: lastName,
           answers,
           teen_id: teenId,
+          declined: declinedKey === nameKey,
           lang,
           website: honeypot,
           elapsed: Math.round((Date.now() - openedAt.current) / 1000),
@@ -285,6 +298,7 @@ export default function PublicForm({ slug }: { slug: string }) {
         else if (data.error === "too_many") setError(t.errMany);
         else if (data.error === "required") setError(t.errReq);
         else if (data.error === "name") setError(t.errName);
+        else if (data.error === "latin") setError(t.errLatin);
         else setError(t.errGeneric);
       }
     } catch {
@@ -472,6 +486,18 @@ export default function PublicForm({ slug }: { slug: string }) {
                       />
                     </div>
                   </div>
+
+                  {(hasCyrillic(firstName) || hasCyrillic(lastName)) ? (
+                    <div className="-mt-2 rounded-xl bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
+                      {t.errLatin}
+                    </div>
+                  ) : (
+                    t.nameHint && (
+                      <p className="-mt-2 px-1 text-[12px] text-neutral-400">
+                        {t.nameHint}
+                      </p>
+                    )
+                  )}
 
                   {/* Это ты? */}
                   {match && declinedKey !== nameKey && (
