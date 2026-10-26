@@ -28,6 +28,14 @@ export async function GET(
     });
   } catch (error) {
     console.error("Public form load error:", error);
-    return NextResponse.json({ error: "server" }, { status: 500 });
+    const err = error as { message?: string; details?: string; code?: string };
+    return NextResponse.json(
+      {
+        error: "server",
+        // временно: показываем причину, чтобы быстро найти проблему
+        detail: [err?.code, err?.message].filter(Boolean).join(" · ").slice(0, 300),
+      },
+      { status: 500 },
+    );
   }
 }

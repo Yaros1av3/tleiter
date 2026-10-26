@@ -94,6 +94,7 @@ export default function PublicForm({ slug }: { slug: string }) {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [loadDetail, setLoadDetail] = useState("");
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -148,7 +149,11 @@ export default function PublicForm({ slug }: { slug: string }) {
 
       if (!response.ok) {
         if (response.status === 404) setNotFound(true);
-        else setLoadError(true);
+        else {
+          setLoadError(true);
+          const data = (await response.json().catch(() => ({}))) as { detail?: string };
+          setLoadDetail(data.detail ?? "");
+        }
         setLoading(false);
         return;
       }
@@ -340,6 +345,11 @@ export default function PublicForm({ slug }: { slug: string }) {
           ) : notFound || !form ? (
             <div className="rounded-[26px] bg-white p-8 text-center text-[15px] text-neutral-500 shadow-sm">
               {loadError ? t.loadError : t.notFound}
+              {loadError && loadDetail && (
+                <div className="mt-3 break-words text-[11px] text-neutral-400">
+                  {loadDetail}
+                </div>
+              )}
             </div>
           ) : (
             <>
