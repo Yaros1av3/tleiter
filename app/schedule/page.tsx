@@ -153,6 +153,21 @@ export default function SchedulePage() {
   const [freeUserIds, setFreeUserIds] = useState<string[]>([]);
   const [freeNames, setFreeNames] = useState<string[]>([]);
 
+  /* выбор служителей в форме: кто отметил, что может, и кто уже где стоит */
+  type FormAvail = {
+    user_id: string;
+    member_name: string;
+    status: string;
+    service_10: boolean;
+    service_13: boolean;
+  };
+  const [formAvail, setFormAvail] = useState<FormAvail[]>([]);
+  const [formAvailLoaded, setFormAvailLoaded] = useState(false);
+  const [formLoad, setFormLoad] = useState<
+    { member_id: number; date: string; time: string }[]
+  >([]);
+  const [showAllMembers, setShowAllMembers] = useState(false);
+
   /*
    * Дата из ссылки (?date=2026-10-25), например с главной страницы.
    * Если её нет — открываем текущий месяц и сами прокручиваем
@@ -973,6 +988,89 @@ export default function SchedulePage() {
     return `${member.first_name.charAt(0)}${member.last_name.charAt(0)}`.toUpperCase();
   }
 
+  /* загружаем отметки доступности и текущую загрузку служителей для даты из формы */
+  useEffect(() => {
+    if (!modalOpen || !isAdmin) return;
+
+    const date = form.schedule_date;
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      setFormAvail([]);
+      setFormAvailLoaded(false);
+      setFormLoad([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      const [availResult, entriesResult] = await Promise.all([
+        supabase
+          .from("service_availability")
+          .select("user_id, member_name, status, service_10, service_13")
+          .eq("sunday_date", date),
+        supabase
+          .from("schedule_entries")
+          .select("id, schedule_date, service_time")
+          .gte("schedule_date", `${date.slice(0, 7)}-01`)
+          .lte(
+            "schedule_date",
+            `${date.slice(0, 7)}-${String(new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)), 0).getDate()).padStart(2, "0")}`,
+          ),
+      ]);
+
+      if (cancelled) return;
+
+      if (availResult.error) {
+        console.error("Form availability error:", availResult.error);
+        setFormAvail([]);
+        setFormAvailLoaded(false);
+      } else {
+        setFormAvail((availResult.data ?? []) as FormAvail[]);
+        setFormAvailLoaded(true);
+      }
+
+      const monthEntries = (entriesResult.data ?? []).filter(
+        (entry) => entry.id !== editingEntry?.id,
+      );
+      const ids = monthEntries.map((entry) => entry.id);
+
+      if (ids.length === 0) {
+        setFormLoad([]);
+        return;
+      }
+
+      const membersResult = await supabase
+        .from("schedule_entry_members")
+        .select("schedule_entry_id, team_member_id")
+        .in("schedule_entry_id", ids);
+
+      if (cancelled) return;
+
+      const byEntry = new Map(monthEntries.map((entry) => [entry.id, entry]));
+
+      setFormLoad(
+        (membersResult.data ?? []).flatMap((row) => {
+          const entry = byEntry.get(row.schedule_entry_id);
+          return entry
+            ? [
+                {
+                  member_id: row.team_member_id as number,
+                  date: entry.schedule_date as string,
+                  time: normalizeServiceTime(entry.service_time),
+                },
+              ]
+            : [];
+        }),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalOpen, isAdmin, form.schedule_date, editingEntry?.id]);
+
   /*
    * =====================================================
    * CREATE / EDIT
@@ -988,6 +1086,7 @@ export default function SchedulePage() {
     if (!isAdmin) return;
 
     setErrorMessage("");
+    setShowAllMembers(false);
     setEditingEntry(null);
     setMaterialSearch("");
     setMaterialPickerOpen(false);
@@ -1012,6 +1111,7 @@ export default function SchedulePage() {
     if (!isAdmin) return;
 
     setErrorMessage("");
+    setShowAllMembers(false);
     setEditingEntry(entry);
     setMaterialSearch("");
     setMaterialPickerOpen(false);
@@ -2651,71 +2751,202 @@ export default function SchedulePage() {
                       )}
                     </div>
 
-                    <div className="max-h-[240px] space-y-1.5 overflow-y-auto rounded-[16px] border border-[#e0e2e5] bg-[#fafafa] p-2">
-                      {members.length ===
-                      0 ? (
-                        <div className="px-3 py-4 text-center text-[12px] text-[#939ba5]">
-                          {isRu
-                            ? "Нет активных служителей."
-                            : "Keine aktiven Mitarbeiter."}
-                        </div>
-                      ) : (
-                        members.map(
-                          (
-                            member,
-                          ) => {
-                            const selected =
-                              form.member_ids.includes(
-                                member.id,
-                              );
+                    {(() => {
+                      const timeKey =
+                        form.service_time === "10:00"
+                          ? "service_10"
+                          : "service_13";
 
-                            return (
+                      const answerOf = (member: TeamMember) => {
+                        const row = formAvail.find(
+                          (item) =>
+                            (member.user_id &&
+                              item.user_id === member.user_id) ||
+                            String(item.member_name ?? "")
+                              .trim()
+                              .toLowerCase() ===
+                              `${member.first_name} ${member.last_name}`
+                                .trim()
+                                .toLowerCase(),
+                        );
+                        if (!row) return "none" as const;
+                        if (row.status !== "available") return "no" as const;
+                        return row[timeKey] ? ("yes" as const) : ("other" as const);
+                      };
+
+                      const monthCount = (memberId: number) =>
+                        formLoad.filter((item) => item.member_id === memberId)
+                          .length;
+
+                      const sameDay = (memberId: number) =>
+                        formLoad.filter(
+                          (item) =>
+                            item.member_id === memberId &&
+                            item.date === form.schedule_date,
+                        );
+
+                      // если на эту дату никто ничего не отмечал (не воскресенье) — показываем всех
+                      const useFilter = formAvailLoaded && formAvail.length > 0;
+
+                      const visible = members.filter((member) => {
+                        if (!useFilter || showAllMembers) return true;
+                        if (form.member_ids.includes(member.id)) return true;
+                        return answerOf(member) === "yes";
+                      });
+
+                      const hiddenCount = members.length - visible.length;
+
+                      return (
+                        <>
+                          {useFilter && (
+                            <div className="mb-2 flex items-center justify-between gap-2 px-1 text-[11px] text-[#7a838f]">
+                              <span>
+                                {showAllMembers
+                                  ? isRu
+                                    ? "Показаны все служители"
+                                    : "Alle Mitarbeiter angezeigt"
+                                  : isRu
+                                    ? `Могут служить в ${form.service_time}: ${members.filter((m) => answerOf(m) === "yes").length}`
+                                    : `Können um ${form.service_time} dienen: ${members.filter((m) => answerOf(m) === "yes").length}`}
+                              </span>
                               <button
-                                key={
-                                  member.id
-                                }
                                 type="button"
-                                onClick={() =>
-                                  toggleMember(
-                                    member.id,
-                                  )
-                                }
-                                className={`flex min-h-[52px] w-full items-center justify-between rounded-[13px] border px-3.5 text-left ${
-                                  selected
-                                    ? "border-[#111820] bg-[#111820] text-white"
-                                    : "border-transparent bg-white text-[#5f6975]"
-                                }`}
+                                onClick={() => setShowAllMembers((v) => !v)}
+                                className="font-bold text-[#111820] underline underline-offset-2"
                               >
-                                <div className="flex min-w-0 items-center gap-2.5">
-                                  <Avatar
-                                    src={member.avatar_url}
-                                    initials={getInitials(member)}
-                                    className={`h-9 w-9 rounded-[10px] text-[9px] font-bold ${
-                                      selected
-                                        ? "bg-white/10 text-white"
-                                        : "bg-[#f0f1f2] text-[#4d5864]"
-                                    }`}
-                                  />
-
-                                  <span className="truncate text-[13px] font-semibold">
-                                    {
-                                      member.first_name
-                                    }{" "}
-                                    {
-                                      member.last_name
-                                    }
-                                  </span>
-                                </div>
-
-                                {selected && (
-                                  <CheckIcon />
-                                )}
+                                {showAllMembers
+                                  ? isRu
+                                    ? "Только доступные"
+                                    : "Nur Verfügbare"
+                                  : isRu
+                                    ? "Показать всех"
+                                    : "Alle zeigen"}
                               </button>
-                            );
-                          },
-                        )
-                      )}
-                    </div>
+                            </div>
+                          )}
+
+                          <div className="max-h-[300px] space-y-1.5 overflow-y-auto rounded-[16px] border border-[#e0e2e5] bg-[#fafafa] p-2">
+                            {members.length === 0 ? (
+                              <div className="px-3 py-4 text-center text-[12px] text-[#939ba5]">
+                                {isRu
+                                  ? "Нет активных служителей."
+                                  : "Keine aktiven Mitarbeiter."}
+                              </div>
+                            ) : visible.length === 0 ? (
+                              <div className="px-3 py-4 text-center text-[12px] leading-5 text-[#939ba5]">
+                                {isRu
+                                  ? `Пока никто не отметил, что может служить ${form.schedule_date} в ${form.service_time}. Нажми «Показать всех».`
+                                  : `Noch niemand hat für den ${form.schedule_date} um ${form.service_time} zugesagt. Tippe auf „Alle zeigen“.`}
+                              </div>
+                            ) : (
+                              visible.map((member) => {
+                                const selected = form.member_ids.includes(
+                                  member.id,
+                                );
+                                const answer = useFilter
+                                  ? answerOf(member)
+                                  : null;
+                                const count = monthCount(member.id);
+                                const today = sameDay(member.id);
+
+                                const subtle = selected
+                                  ? "text-white/70"
+                                  : "text-[#8a939e]";
+
+                                return (
+                                  <button
+                                    key={member.id}
+                                    type="button"
+                                    onClick={() => toggleMember(member.id)}
+                                    className={`flex min-h-[56px] w-full items-center justify-between rounded-[13px] border px-3.5 py-1.5 text-left ${
+                                      selected
+                                        ? "border-[#111820] bg-[#111820] text-white"
+                                        : "border-transparent bg-white text-[#5f6975]"
+                                    }`}
+                                  >
+                                    <div className="flex min-w-0 items-center gap-2.5">
+                                      <Avatar
+                                        src={member.avatar_url}
+                                        initials={getInitials(member)}
+                                        className="h-9 w-9 rounded-[10px]"
+                                      />
+
+                                      <div className="min-w-0">
+                                        <div className="truncate text-[13px] font-semibold">
+                                          {member.first_name} {member.last_name}
+                                        </div>
+
+                                        <div
+                                          className={`mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] font-medium ${subtle}`}
+                                        >
+                                          {answer === "no" && (
+                                            <span className={selected ? "text-red-200" : "text-red-500"}>
+                                              {isRu ? "не может" : "kann nicht"}
+                                            </span>
+                                          )}
+                                          {answer === "none" && (
+                                            <span>
+                                              {isRu ? "не отметился" : "keine Angabe"}
+                                            </span>
+                                          )}
+                                          {answer === "other" && (
+                                            <span>
+                                              {isRu
+                                                ? "может в другое время"
+                                                : "nur zur anderen Zeit"}
+                                            </span>
+                                          )}
+
+                                          <span
+                                            className={
+                                              count === 0
+                                                ? selected
+                                                  ? "text-emerald-200"
+                                                  : "text-emerald-600"
+                                                : count >= 3
+                                                  ? selected
+                                                    ? "text-amber-200"
+                                                    : "text-amber-600"
+                                                  : ""
+                                            }
+                                          >
+                                            {count === 0
+                                              ? isRu
+                                                ? "ещё не стоит в месяце"
+                                                : "noch nicht eingeteilt"
+                                              : isRu
+                                                ? `в месяце: ${count}`
+                                                : `im Monat: ${count}`}
+                                          </span>
+
+                                          {today.length > 0 && (
+                                            <span className={selected ? "text-sky-200" : "text-sky-600"}>
+                                              {isRu
+                                                ? `в этот день уже в ${today.map((item) => item.time).join(", ")}`
+                                                : `an diesem Tag schon um ${today.map((item) => item.time).join(", ")}`}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {selected && <CheckIcon />}
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          {useFilter && !showAllMembers && hiddenCount > 0 && (
+                            <p className="mt-1.5 px-1 text-[10.5px] text-[#9aa2ad]">
+                              {isRu
+                                ? `Скрыто: ${hiddenCount} (не отметились или не могут)`
+                                : `Ausgeblendet: ${hiddenCount} (keine Angabe oder nicht verfügbar)`}
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
 
                   {/* =================================================

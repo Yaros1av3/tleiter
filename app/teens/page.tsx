@@ -1,7 +1,5 @@
 "use client";
 
-import DatePicker from "@/components/DatePicker";
-
 import { useEffect, useMemo, useState } from "react";
 import {
   Cake,
@@ -55,7 +53,7 @@ type BirthdayCelebration = {
   updated_at?: string;
 };
 
-type AgeFilter = "all" | 12 | 13 | 14 | 15 | "other";
+type AgeFilter = "all" | 12 | 13 | "plus" | "other";
 type GenderFilter = "all" | Gender;
 type LanguageFilter = "all" | TeenLanguage;
 type StatusFilter = "active" | "all" | "inactive";
@@ -569,7 +567,9 @@ export default function TeensPage() {
         if (
           ageFilter !== "all" &&
           ageFilter !== "other" &&
-          age !== ageFilter
+          (ageFilter === "plus"
+            ? age < 14
+            : age !== ageFilter)
         ) {
           return false;
         }
@@ -1378,8 +1378,7 @@ export default function TeensPage() {
                   "all",
                   12,
                   13,
-                  14,
-                  15,
+                  "plus",
                   "other",
                 ] as AgeFilter[]
               ).map((age) => (
@@ -1392,9 +1391,13 @@ export default function TeensPage() {
                     )
                   }
                   className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold transition ${
-                    ageFilter === age
-                      ? "bg-neutral-950 text-white"
-                      : "bg-white text-neutral-500"
+                    age === "plus"
+                      ? ageFilter === age
+                        ? "bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-sm"
+                        : "bg-amber-50 text-orange-600 ring-1 ring-inset ring-amber-200"
+                      : ageFilter === age
+                        ? "bg-neutral-950 text-white"
+                        : "bg-white text-neutral-500"
                   }`}
                 >
                   {age === "all"
@@ -1403,7 +1406,9 @@ export default function TeensPage() {
                       : "Alle"
                     : age === "other"
                       ? `${isRu ? "Др. возраст" : "Andere"} · ${otherAgeCount}`
-                      : `${age}`}
+                      : age === "plus"
+                        ? "Teenie+"
+                        : `${age}`}
                 </button>
               ))}
             </div>
@@ -1721,10 +1726,10 @@ export default function TeensPage() {
                             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
                               teen.gender ===
                               "female"
-                                ? "bg-pink-50 text-pink-500"
+                                ? "bg-pink-100 text-pink-600"
                                 : teen.gender ===
                                   "male"
-                                ? "bg-blue-50 text-blue-500"
+                                ? "bg-sky-100 text-sky-600"
                                 : "bg-neutral-100 text-neutral-500"
                             }`}
                           >
@@ -1753,48 +1758,28 @@ export default function TeensPage() {
                               />
                             </div>
 
-                            <div className="mt-1.5 flex flex-wrap gap-1.5">
-                              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-600">
+                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="text-[12px] font-semibold text-neutral-500">
                                 {age}{" "}
                                 {isRu
                                   ? "лет"
                                   : "Jahre"}
                               </span>
 
-                              {teen.gender && (
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                    teen.gender ===
-                                    "male"
-                                      ? "bg-blue-50 text-blue-600"
-                                      : "bg-pink-50 text-pink-600"
-                                  }`}
-                                >
-                                  {getGenderLabel(
-                                    teen.gender
-                                  )}
+                              {age >= 14 && (
+                                <span className="rounded-full bg-gradient-to-r from-amber-100 to-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-600 ring-1 ring-inset ring-amber-300/70">
+                                  Teenie+
                                 </span>
                               )}
 
-                              {(
-                                teen.languages ??
-                                []
-                              ).map(
-                                (
-                                  item
-                                ) => (
-                                  <span
-                                    key={
-                                      item
-                                    }
-                                    className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-500"
-                                  >
-                                    {item ===
-                                    "de"
-                                      ? "DE"
-                                      : "RU"}
-                                  </span>
-                                )
+                              {(teen.languages ?? []).length > 0 && (
+                                <span className="text-[9px] font-semibold tracking-wide text-neutral-300">
+                                  {(teen.languages ?? [])
+                                    .map((item) =>
+                                      item === "de" ? "DE" : "RU"
+                                    )
+                                    .join(" · ")}
+                                </span>
                               )}
                             </div>
 
@@ -2378,9 +2363,16 @@ export default function TeensPage() {
                     : "Geburtsdatum"}
                 </label>
 
-                <DatePicker value={birthDate} onChange={(__value: string) => setBirthDate(
-                      __value
-                    )} birth className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white" />
+                <input
+                  type="date"
+                  value={birthDate}
+                  onChange={(event) =>
+                    setBirthDate(
+                      event.target.value
+                    )
+                  }
+                  className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
+                />
 
                 {birthDate && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
