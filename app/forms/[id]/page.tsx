@@ -10,6 +10,7 @@ import {
   Check,
   Copy,
   Download,
+  Lock,
   ExternalLink,
   Plus,
   Search,
@@ -28,6 +29,7 @@ import { useToast } from "@/components/ToastProvider";
 import {
   EMOJIS,
   QUESTION_TYPES,
+  STANDARD_FIELDS,
   THEMES,
   calcAge,
   needsOptions,
@@ -341,6 +343,11 @@ export default function FormDetailPage() {
       isRu ? "Фамилия" : "Nachname",
       isRu ? "Явка" : "Anwesenheit",
       isRu ? "Дата записи" : "Angemeldet am",
+      isRu ? "Дата рождения" : "Geburtsdatum",
+      isRu ? "Телефон подростка" : "Handynummer Teen",
+      isRu ? "Почта подростка" : "E-Mail Teen",
+      isRu ? "Родитель" : "Elternteil",
+      isRu ? "Телефон родителя" : "Handynummer Eltern",
       ...draft.questions.map((q) => pickText(q.label_de, q.label_ru, lang)),
     ];
 
@@ -356,6 +363,11 @@ export default function FormDetailPage() {
       row.last_name,
       attendanceLabel(row.attendance),
       new Date(row.created_at).toLocaleString(isRu ? "ru-RU" : "de-DE"),
+      row.birth_date ?? "",
+      row.phone ?? "",
+      row.email ?? "",
+      row.parent_name ?? "",
+      row.parent_phone ?? "",
       ...draft.questions.map((q) => answerText(q, row.answers[q.id], lang, yes, no)),
     ]);
 
@@ -769,6 +781,32 @@ function EditTab({
             />
           </span>
         </button>
+      </div>
+
+      {/* поля, которые есть в каждой форме */}
+      <div className="rounded-[20px] border border-dashed border-neutral-300 bg-white/60 p-4">
+        <div className="flex items-center gap-2 text-[13px] font-bold">
+          <Lock size={14} className="text-neutral-400" />
+          {isRu ? "Всегда спрашиваем (для нашей базы)" : "Immer abgefragt (für unsere Datenbank)"}
+        </div>
+        <p className="mt-1 text-[12px] text-neutral-500">
+          {isRu
+            ? "Эти поля есть в каждой форме, их не нужно добавлять. Свои вопросы — ниже."
+            : "Diese Felder sind in jedem Formular enthalten. Eigene Fragen stehen unten."}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {STANDARD_FIELDS.map((field) => (
+            <span
+              key={field.key}
+              className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2.5 py-1 text-[12px] font-semibold text-neutral-700"
+            >
+              {isRu ? field.ru : field.de}
+              <span className={field.required ? "text-orange-500" : "text-neutral-400"}>
+                {field.required ? "*" : isRu ? "· по желанию" : "· optional"}
+              </span>
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* вопросы */}
@@ -1219,11 +1257,39 @@ function AnswersTab({
 
                 {expanded && (
                   <dl className="mt-3 space-y-2 rounded-xl bg-neutral-50 p-3">
-                    {filled.length === 0 ? (
-                      <div className="text-[12px] text-neutral-400">
-                        {isRu ? "Ответов нет" : "Keine Antworten"}
-                      </div>
-                    ) : (
+                    {[
+                      [
+                        isRu ? "Дата рождения" : "Geburtsdatum",
+                        row.birth_date
+                          ? `${new Date(`${row.birth_date}T12:00:00`).toLocaleDateString(isRu ? "ru-RU" : "de-DE")} · ${calcAge(row.birth_date)} ${isRu ? "лет" : "Jahre"}`
+                          : "",
+                        "",
+                      ],
+                      [isRu ? "Телефон подростка" : "Handynummer Teen", row.phone ?? "", "tel"],
+                      [isRu ? "Почта подростка" : "E-Mail Teen", row.email ?? "", "mail"],
+                      [isRu ? "Родитель" : "Elternteil", row.parent_name ?? "", ""],
+                      [isRu ? "Телефон родителя" : "Handynummer Eltern", row.parent_phone ?? "", "tel"],
+                    ]
+                      .filter(([, value]) => value)
+                      .map(([title, value, kind]) => (
+                        <div key={title}>
+                          <dt className="text-[11px] font-bold text-neutral-500">{title}</dt>
+                          <dd className="break-words text-[14px]">
+                            {kind === "tel" ? (
+                              <a href={`tel:${value.replace(/[^\d+]/g, "")}`} className="font-semibold underline underline-offset-2">
+                                {value}
+                              </a>
+                            ) : kind === "mail" ? (
+                              <a href={`mailto:${value}`} className="font-semibold underline underline-offset-2">
+                                {value}
+                              </a>
+                            ) : (
+                              value
+                            )}
+                          </dd>
+                        </div>
+                      ))}
+                    {filled.length === 0 ? null : (
                       filled.map((item) => (
                         <div key={item.id}>
                           <dt className="text-[11px] font-bold text-neutral-500">

@@ -45,6 +45,11 @@ export type ResponseRow = {
   first_name: string;
   last_name: string;
   teen_id: number | null;
+  birth_date: string | null;
+  phone: string | null;
+  email: string | null;
+  parent_name: string | null;
+  parent_phone: string | null;
   answers: Record<string, unknown>;
   attendance: "registered" | "came" | "absent";
   source: string;
@@ -138,13 +143,6 @@ export function templateQuestions(): FormQuestion[] {
   return [
     {
       id: newId(),
-      type: "phone",
-      label_ru: "Телефон родителей",
-      label_de: "Telefonnummer der Eltern",
-      required: true,
-    },
-    {
-      id: newId(),
       type: "yesno",
       label_ru: "Придёшь с другом или подругой?",
       label_de: "Kommst du mit einem Freund / einer Freundin?",
@@ -194,3 +192,36 @@ export function isLatinName(value: string) {
 export function hasCyrillic(value: string) {
   return /[\u0400-\u04FF]/.test(value);
 }
+
+export function isPhone(value: string) {
+  return /^[+\d][\d\s()\-/.]{5,24}$/.test(value.trim());
+}
+
+export function isEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim());
+}
+
+/* Дата рождения "YYYY-MM-DD": настоящая дата, возраст от 5 до 30 лет */
+export function isPlausibleBirth(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return false;
+  if (d.toISOString().slice(0, 10) !== value) return false;
+  const age = calcAge(value);
+  return age >= 5 && age <= 30;
+}
+
+/* Поля, которые спрашиваются в КАЖДОЙ форме — они нужны для нашей базы подростков */
+export const STANDARD_FIELDS: {
+  key: string;
+  ru: string;
+  de: string;
+  required: boolean;
+}[] = [
+  { key: "name", ru: "Имя и фамилия (латиницей)", de: "Vor- und Nachname", required: true },
+  { key: "birth", ru: "Дата рождения", de: "Geburtsdatum", required: true },
+  { key: "phone", ru: "Телефон подростка", de: "Handynummer des Teens", required: true },
+  { key: "email", ru: "Почта подростка", de: "E-Mail des Teens", required: true },
+  { key: "parent_name", ru: "Имя родителя", de: "Name der Eltern", required: true },
+  { key: "parent_phone", ru: "Телефон родителя", de: "Handynummer der Eltern", required: true },
+];

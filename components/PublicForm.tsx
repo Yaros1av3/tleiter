@@ -6,7 +6,10 @@ import { CalendarDays, Check, Clock3, MapPin, Users } from "lucide-react";
 import {
   formatEventDate,
   hasCyrillic,
+  isEmail,
   isLatinName,
+  isPhone,
+  isPlausibleBirth,
   pickText,
   themeOf,
   type FormQuestion,
@@ -51,6 +54,22 @@ const TEXT = {
     errName: "Bitte gib Vor- und Nachnamen ein.",
     errLatin: "Bitte schreibe Vor- und Nachnamen mit lateinischen Buchstaben (auf Deutsch).",
     nameHint: "",
+    birth: "Geburtsdatum",
+    day: "Tag",
+    month: "Monat",
+    year: "Jahr",
+    phone: "Deine Handynummer",
+    optional: "optional",
+    parents: "Eltern",
+    parentName: "Name der Eltern (Vor- und Nachname)",
+    parentPhone: "Telefonnummer der Eltern",
+    email: "Deine E-Mail",
+    errBirth: "Bitte gib dein Geburtsdatum vollständig und richtig an.",
+    errPhone: "Bitte prüfe die Telefonnummer.",
+    errParentName: "Bitte gib den Namen der Eltern an.",
+    errParentPhone: "Bitte gib eine Telefonnummer der Eltern an.",
+    errEmail: "Bitte prüfe die E-Mail-Adresse.",
+    months: ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"],
     errReq: "Bitte fülle alle Pflichtfelder aus.",
     errDup: "Du bist schon angemeldet.",
     errMany: "Zu viele Versuche. Bitte warte kurz.",
@@ -81,6 +100,22 @@ const TEXT = {
     errName: "Пожалуйста, укажи имя и фамилию.",
     errLatin: "Имя и фамилию нужно писать латиницей, по-немецки (например: Anna Müller).",
     nameHint: "Имя и фамилию пиши латиницей, по-немецки — например: Anna Müller",
+    birth: "Дата рождения",
+    day: "День",
+    month: "Месяц",
+    year: "Год",
+    phone: "Твой номер телефона",
+    optional: "необязательно",
+    parents: "Родители",
+    parentName: "Имя родителя (имя и фамилия)",
+    parentPhone: "Телефон родителя",
+    email: "Твоя почта",
+    errBirth: "Укажи дату рождения полностью и правильно.",
+    errPhone: "Проверь номер телефона.",
+    errParentName: "Укажи имя родителя.",
+    errParentPhone: "Укажи телефон родителя.",
+    errEmail: "Проверь адрес электронной почты.",
+    months: ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"],
     errReq: "Пожалуйста, заполни все обязательные поля.",
     errDup: "Ты уже записан(а).",
     errMany: "Слишком много попыток. Подожди немного.",
@@ -106,6 +141,14 @@ export default function PublicForm({ slug }: { slug: string }) {
   const [lastName, setLastName] = useState("");
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [honeypot, setHoneypot] = useState("");
+
+  const [bDay, setBDay] = useState("");
+  const [bMonth, setBMonth] = useState("");
+  const [bYear, setBYear] = useState("");
+  const [phone, setPhone] = useState("");
+  const [parentName, setParentName] = useState("");
+  const [parentPhone, setParentPhone] = useState("");
+  const [email, setEmail] = useState("");
 
   const [match, setMatch] = useState<{ id: number; age: number | null } | null>(
     null,
@@ -181,6 +224,11 @@ export default function PublicForm({ slug }: { slug: string }) {
   // «Это ты?» — ищем подростка в базе, когда введены имя и фамилия
   const nameKey = `${firstName.trim().toLowerCase()}|${lastName.trim().toLowerCase()}`;
 
+  const birthForLookup =
+    bDay && bMonth && bYear
+      ? `${bYear}-${String(bMonth).padStart(2, "0")}-${String(bDay).padStart(2, "0")}`
+      : "";
+
   useEffect(() => {
     setMatch(null);
     setTeenId(null);
@@ -196,6 +244,7 @@ export default function PublicForm({ slug }: { slug: string }) {
           body: JSON.stringify({
             first_name: firstName,
             last_name: lastName,
+            birth_date: birthForLookup,
           }),
         });
 
@@ -213,7 +262,7 @@ export default function PublicForm({ slug }: { slug: string }) {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nameKey, slug]);
+  }, [nameKey, birthForLookup, slug]);
 
   const dateLabel = useMemo(
     () => (form ? formatEventDate(form.event_date, lang) : ""),
@@ -228,6 +277,13 @@ export default function PublicForm({ slug }: { slug: string }) {
     setFirstName("");
     setLastName("");
     setAnswers({});
+    setBDay("");
+    setBMonth("");
+    setBYear("");
+    setPhone("");
+    setParentName("");
+    setParentPhone("");
+    setEmail("");
     setMatch(null);
     setTeenId(null);
     setDeclinedKey("");
@@ -249,6 +305,41 @@ export default function PublicForm({ slug }: { slug: string }) {
 
     if (!isLatinName(firstName) || !isLatinName(lastName)) {
       setError(t.errLatin);
+      return;
+    }
+
+    const birthDate =
+      bDay && bMonth && bYear
+        ? `${bYear}-${String(bMonth).padStart(2, "0")}-${String(bDay).padStart(2, "0")}`
+        : "";
+
+    if (!isPlausibleBirth(birthDate)) {
+      setError(t.errBirth);
+      return;
+    }
+
+    if (!isPhone(phone)) {
+      setError(t.errPhone);
+      return;
+    }
+
+    if (parentName.trim().length < 2) {
+      setError(t.errParentName);
+      return;
+    }
+
+    if (!isLatinName(parentName)) {
+      setError(t.errLatin);
+      return;
+    }
+
+    if (!isPhone(parentPhone)) {
+      setError(t.errParentPhone);
+      return;
+    }
+
+    if (!isEmail(email)) {
+      setError(t.errEmail);
       return;
     }
 
@@ -277,6 +368,11 @@ export default function PublicForm({ slug }: { slug: string }) {
           last_name: lastName,
           answers,
           teen_id: teenId,
+          birth_date: birthDate,
+          phone,
+          parent_name: parentName,
+          parent_phone: parentPhone,
+          email,
           declined: declinedKey === nameKey,
           lang,
           website: honeypot,
@@ -290,6 +386,7 @@ export default function PublicForm({ slug }: { slug: string }) {
       } else {
         const data = (await response.json().catch(() => ({}))) as {
           error?: string;
+          field?: string;
         };
 
         if (data.error === "duplicate") setError(t.errDup);
@@ -299,6 +396,22 @@ export default function PublicForm({ slug }: { slug: string }) {
         else if (data.error === "required") setError(t.errReq);
         else if (data.error === "name") setError(t.errName);
         else if (data.error === "latin") setError(t.errLatin);
+        else if (data.error === "invalid") {
+          const field = (data as { field?: string }).field;
+          setError(
+            field === "birth"
+              ? t.errBirth
+              : field === "phone"
+                ? t.errPhone
+                : field === "parent_name"
+                  ? t.errParentName
+                  : field === "parent_phone"
+                    ? t.errParentPhone
+                    : field === "email"
+                      ? t.errEmail
+                      : t.errGeneric,
+          );
+        }
         else setError(t.errGeneric);
       }
     } catch {
@@ -540,6 +653,115 @@ export default function PublicForm({ slug }: { slug: string }) {
                       )}
                     </div>
                   )}
+
+                  {/* дата рождения */}
+                  <div>
+                    <label className="mb-1.5 block text-[14px] font-bold text-neutral-800">
+                      {t.birth} <span className={theme.text}>*</span>
+                    </label>
+                    <div className="grid grid-cols-[1fr_1.7fr_1.2fr] gap-2">
+                      {(
+                        [
+                          [bDay, setBDay, t.day, Array.from({ length: 31 }, (_, i) => ({ v: String(i + 1), l: String(i + 1) }))],
+                          [bMonth, setBMonth, t.month, t.months.map((name, i) => ({ v: String(i + 1), l: name }))],
+                          [
+                            bYear,
+                            setBYear,
+                            t.year,
+                            Array.from({ length: 21 }, (_, i) => {
+                              const y = new Date().getFullYear() - 5 - i;
+                              return { v: String(y), l: String(y) };
+                            }),
+                          ],
+                        ] as [string, (v: string) => void, string, { v: string; l: string }[]][]
+                      ).map(([value, setter, placeholder, options]) => (
+                        <select
+                          key={placeholder}
+                          value={value}
+                          onChange={(e) => setter(e.target.value)}
+                          aria-label={placeholder}
+                          className={`h-[54px] min-w-0 rounded-2xl border border-neutral-200 bg-white px-2.5 text-[16px] outline-none focus:ring-4 ${theme.ring} ${
+                            value ? "text-[#111820]" : "text-neutral-400"
+                          }`}
+                        >
+                          <option value="">{placeholder}</option>
+                          {options.map((option) => (
+                            <option key={option.v} value={option.v}>
+                              {option.l}
+                            </option>
+                          ))}
+                        </select>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* телефон подростка */}
+                  <div>
+                    <label className="mb-1.5 block text-[14px] font-bold text-neutral-800">
+                      {t.phone} <span className={theme.text}>*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      maxLength={30}
+                      placeholder="+49 …"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  {/* почта подростка */}
+                  <div>
+                    <label className="mb-1.5 block text-[14px] font-bold text-neutral-800">
+                      {t.email} <span className={theme.text}>*</span>
+                    </label>
+                    <input
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      maxLength={120}
+                      className={inputClass}
+                    />
+                  </div>
+
+                  {/* родители */}
+                  <div className={`space-y-4 rounded-2xl p-4 ${theme.soft}`}>
+                    <div className="text-[13px] font-extrabold uppercase tracking-wider">
+                      {t.parents}
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-[14px] font-bold text-neutral-800">
+                        {t.parentName} <span className={theme.text}>*</span>
+                      </label>
+                      <input
+                        value={parentName}
+                        onChange={(e) => setParentName(e.target.value)}
+                        autoCapitalize="words"
+                        maxLength={80}
+                        className={inputClass}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-[14px] font-bold text-neutral-800">
+                        {t.parentPhone} <span className={theme.text}>*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        inputMode="tel"
+                        value={parentPhone}
+                        onChange={(e) => setParentPhone(e.target.value)}
+                        maxLength={30}
+                        placeholder="+49 …"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
 
                   {form.questions.map((q) => {
                     const label = pickText(q.label_de, q.label_ru, lang);

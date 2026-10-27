@@ -134,7 +134,11 @@ export type TeenMatch = { id: number; age: number | null; score: number };
  * Ищет подростка в базе по имени и фамилии: терпимо к регистру, умлаутам,
  * дефисам, мелким опечаткам и перестановке имени с фамилией.
  */
-export async function findTeens(first: string, last: string): Promise<TeenMatch[]> {
+export async function findTeens(
+  first: string,
+  last: string,
+  birth?: string | null,
+): Promise<TeenMatch[]> {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("teens")
@@ -164,11 +168,17 @@ export async function findTeens(first: string, last: string): Promise<TeenMatch[
         ? distance(f, tl) + distance(l, tf) + 1
         : null;
 
-    const score = [direct, swapped]
+    const base = [direct, swapped]
       .filter((value): value is number => value !== null)
       .sort((a, b) => a - b)[0];
 
-    if (score === undefined) continue;
+    if (base === undefined) continue;
+
+    // совпала дата рождения — это почти наверняка он
+    const score =
+      birth && teen.birth_date && String(teen.birth_date).slice(0, 10) === birth
+        ? base - 1
+        : base;
 
     result.push({
       id: teen.id as number,

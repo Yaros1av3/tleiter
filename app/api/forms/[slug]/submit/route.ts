@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { isLatinName, type FormQuestion } from "@/lib/forms";
+import {
+  isEmail,
+  isLatinName,
+  isPhone,
+  isPlausibleBirth,
+  type FormQuestion,
+} from "@/lib/forms";
 import {
   countResponses,
   findTeens,
@@ -19,6 +25,11 @@ type Body = {
   last_name?: string;
   answers?: Record<string, unknown>;
   teen_id?: number | null;
+  birth_date?: string;
+  phone?: string;
+  parent_name?: string;
+  parent_phone?: string;
+  email?: string;
   declined?: boolean; // подросток нажал «Нет, это не я» — тогда не привязываем
   lang?: string;
   website?: string; // ловушка для ботов: настоящие люди её не видят и не заполняют
@@ -67,6 +78,25 @@ export async function POST(
   if (!isLatinName(first) || !isLatinName(last)) {
     return NextResponse.json({ error: "latin" }, { status: 422 });
   }
+
+  // стандартные поля: дата рождения, телефоны, родитель
+  const birth = clean(body.birth_date, 10);
+  const phone = clean(body.phone, 30);
+  const parentName = clean(body.parent_name, 80);
+  const parentPhone = clean(body.parent_phone, 30);
+  const email = clean(body.email, 120);
+
+  const invalid = (field: string) =>
+    NextResponse.json({ error: "invalid", field }, { status: 422 });
+
+  if (!isPlausibleBirth(birth)) return invalid("birth");
+  if (!isPhone(phone)) return invalid("phone");
+  if (parentName.length < 2) return invalid("parent_name");
+  if (!isLatinName(parentName)) {
+    return NextResponse.json({ error: "latin" }, { status: 422 });
+  }
+  if (!isPhone(parentPhone)) return invalid("parent_phone");
+  if (!isEmail(email)) return invalid("email");
 
   const admin = getSupabaseAdmin();
   const hash = ipHash(request);
@@ -159,7 +189,7 @@ export async function POST(
 
   if (!body.declined) {
     try {
-      const candidates = await findTeens(first, last);
+      const candidates = await findTeens(first, last, birth);
 
       if (typeof body.teen_id === "number") {
         // подросток сам подтвердил — проверяем, что это действительно подходящий вариант
@@ -182,6 +212,11 @@ export async function POST(
     first_name: first,
     last_name: last,
     teen_id: teenId,
+    birth_date: birth,
+    phone: phone || null,
+    parent_name: parentName,
+    parent_phone: parentPhone,
+    email: email || null,
     answers,
     source: "link",
     lang: body.lang === "ru" ? "ru" : "de",

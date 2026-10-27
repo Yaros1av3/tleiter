@@ -40,6 +40,7 @@ export async function POST(
     const body = (await request.json().catch(() => ({}))) as {
       first_name?: string;
       last_name?: string;
+      birth_date?: string;
     };
 
     const first = String(body.first_name ?? "").trim().slice(0, 60);
@@ -54,7 +55,11 @@ export async function POST(
       return NextResponse.json({ matches: [] });
     }
 
-    const matches = await findTeens(first, last);
+    const birth = /^\d{4}-\d{2}-\d{2}$/.test(String(body.birth_date ?? ""))
+      ? String(body.birth_date)
+      : null;
+
+    const matches = await findTeens(first, last, birth);
 
     return NextResponse.json({
       matches: matches.map((match) => ({ id: match.id, age: match.age })),
