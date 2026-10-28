@@ -1861,7 +1861,7 @@ export default function MaterialsPage() {
     !adminChecking;
 
   return (
-    <div className="min-h-screen bg-[#f3f4f6] text-neutral-900">
+    <div className="min-h-screen bg-[#f9f7ee] text-neutral-900">
       <main className="mx-auto w-full max-w-[1500px] px-3 pb-24 pt-3 sm:px-6 sm:pb-12 sm:pt-5 lg:px-8">
 
         {/* Home */}

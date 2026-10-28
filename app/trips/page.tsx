@@ -1,7 +1,5 @@
 "use client";
 
-import DatePicker from "@/components/DatePicker";
-
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -103,12 +101,12 @@ const STATUSES: Trip["status"][] = ["idea", "planned", "done", "cancelled"];
 const STATUS_STYLE: Record<Trip["status"], string> = {
   idea: "bg-amber-50 text-amber-800",
   planned: "bg-emerald-50 text-emerald-800",
-  done: "bg-[#eef0f2] text-[#475467]",
+  done: "bg-[#f4f3ea] text-[#4d575f]",
   cancelled: "bg-red-50 text-red-700",
 };
 
 const inputCls =
-  "w-full rounded-[12px] border border-[#e2e5e8] bg-white px-3 py-2.5 text-[14px] outline-none focus:border-[#111820]";
+  "w-full rounded-[12px] border border-[#e8e8e0] bg-white px-3 py-2.5 text-[14px] outline-none focus:border-[#1b2431]";
 
 function fullName(p: { first_name: string; last_name: string | null }) {
   const last = (p.last_name ?? "").trim();
@@ -458,8 +456,8 @@ export default function TripsPage() {
   /* ===================== RENDER ===================== */
 
   return (
-    <main className="min-h-screen bg-[#f7f7f6] pb-24 text-[#111820]">
-      <div className="sticky top-0 z-20 border-b border-[#e6e8ea] bg-[#f7f7f6]/95 backdrop-blur">
+    <main className="min-h-screen bg-[#faf8f3] pb-24 text-[#1b2431]">
+      <div className="sticky top-0 z-20 border-b border-[#ecebe2] bg-[#faf8f3]/95 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <button
             type="button"
@@ -471,7 +469,7 @@ export default function TripsPage() {
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="text-[18px] font-bold">{t("Поездки и выезды", "Fahrten & Freizeiten")}</h1>
-            <p className="text-[12px] text-[#8a939d]">
+            <p className="text-[12px] text-[#8f897a]">
               {canManage
                 ? t("Ты можешь управлять поездками", "Du kannst Fahrten verwalten")
                 : t("Голосуй и смотри планы", "Abstimmen und Pläne ansehen")}
@@ -491,7 +489,7 @@ export default function TripsPage() {
               type="button"
               onClick={() => setTab(key)}
               className={`flex flex-1 items-center justify-center gap-2 rounded-[14px] px-4 py-2.5 text-[14px] font-bold transition ${
-                tab === key ? "bg-[#111820] text-white" : "bg-white text-[#475467]"
+                tab === key ? "bg-[#1b2431] text-[#ffc93c]" : "bg-white text-[#4d575f]"
               }`}
             >
               <span className="relative">
@@ -516,7 +514,7 @@ export default function TripsPage() {
           </div>
         )}
 
-        {loading && <p className="py-10 text-center text-[14px] text-[#8a939d]">…</p>}
+        {loading && <p className="py-10 text-center text-[14px] text-[#8f897a]">…</p>}
 
         {/* ---------------- ГОЛОСОВАНИЯ ---------------- */}
         {!loading && tab === "polls" && (
@@ -525,7 +523,7 @@ export default function TripsPage() {
               <button
                 type="button"
                 onClick={() => setShowPollForm(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-[18px] bg-[#111820] px-4 py-3.5 text-[14px] font-bold text-white"
+                className="flex w-full items-center justify-center gap-2 rounded-[18px] bg-[#1b2431] px-4 py-3.5 text-[14px] font-bold text-[#ffc93c]"
               >
                 <Plus size={17} />
                 {t("Новое голосование", "Neue Abstimmung")}
@@ -537,7 +535,7 @@ export default function TripsPage() {
             )}
 
             {polls.length === 0 && (
-              <p className="py-10 text-center text-[14px] text-[#8a939d]">
+              <p className="py-10 text-center text-[14px] text-[#8f897a]">
                 {t("Голосований пока нет.", "Noch keine Abstimmungen.")}
               </p>
             )}
@@ -555,13 +553,13 @@ export default function TripsPage() {
               return (
                 <section
                   key={poll.id}
-                  className="rounded-[22px] border border-[#e6e8ea] bg-white p-4 shadow-[0_4px_18px_rgba(17,24,32,0.04)]"
+                  className="rounded-[22px] border border-[#ecebe2] bg-white p-4 shadow-[0_4px_18px_rgba(27,36,49,0.04)]"
                 >
                   <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
                       <h2 className="text-[16px] font-bold leading-snug">{poll.question}</h2>
                       {poll.description && (
-                        <p className="mt-1 text-[13px] text-[#65707d]">{poll.description}</p>
+                        <p className="mt-1 text-[13px] text-[#6f6a5c]">{poll.description}</p>
                       )}
                     </div>
                     {waitingPollIds.has(poll.id) && (
@@ -571,7 +569,7 @@ export default function TripsPage() {
                     )}
                     <span
                       className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                        open ? "bg-emerald-50 text-emerald-800" : "bg-[#eef0f2] text-[#475467]"
+                        open ? "bg-emerald-50 text-emerald-800" : "bg-[#f4f3ea] text-[#4d575f]"
                       }`}
                     >
                       {open ? t("Открыто", "Offen") : t("Закрыто", "Geschlossen")}
@@ -584,7 +582,7 @@ export default function TripsPage() {
                     </p>
                   )}
 
-                  <p className="mt-1.5 text-[12px] text-[#8a939d]">
+                  <p className="mt-1.5 text-[12px] text-[#8f897a]">
                     {t("Проголосовало", "Abgestimmt")}: {voters}
                     {poll.allow_multiple && ` · ${t("можно несколько вариантов", "Mehrfachauswahl")}`}
                     {poll.deadline && ` · ${t("до", "bis")} ${formatDate(poll.deadline)}`}
@@ -604,23 +602,23 @@ export default function TripsPage() {
                             disabled={!open}
                             onClick={() => toggleVote(poll, option.id)}
                             className={`relative w-full overflow-hidden rounded-[14px] border px-3.5 py-3 text-left transition active:scale-[0.99] ${
-                              mine ? "border-[#111820]" : "border-[#e6e8ea]"
+                              mine ? "border-[#1b2431]" : "border-[#ecebe2]"
                             } disabled:active:scale-100`}
                           >
                             <span
-                              className={`absolute inset-y-0 left-0 ${leading ? "bg-[#111820]/10" : "bg-[#f1f2f3]"}`}
+                              className={`absolute inset-y-0 left-0 ${leading ? "bg-[#1b2431]/10" : "bg-[#f3efe3]"}`}
                               style={{ width: `${percent}%` }}
                             />
                             <span className="relative flex items-center gap-2.5">
                               <span
                                 className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                                  mine ? "border-[#111820] bg-[#111820] text-white" : "border-[#c9ced4]"
+                                  mine ? "border-[#1b2431] bg-[#1b2431] text-[#ffc93c]" : "border-[#cfd1cc]"
                                 }`}
                               >
                                 {mine && <Check size={12} />}
                               </span>
                               <span className="min-w-0 flex-1 text-[14px] font-semibold">{option.label}</span>
-                              <span className="text-[13px] font-bold text-[#475467]">
+                              <span className="text-[13px] font-bold text-[#4d575f]">
                                 {count} · {percent}%
                               </span>
                             </span>
@@ -630,7 +628,7 @@ export default function TripsPage() {
                             <button
                               type="button"
                               onClick={() => createTripFromOption(poll, option)}
-                              className="ml-1 mt-1 text-[12px] font-semibold text-[#475467] underline"
+                              className="ml-1 mt-1 text-[12px] font-semibold text-[#4d575f] underline"
                             >
                               {t("Выбрать и создать поездку", "Wählen & Fahrt anlegen")}
                             </button>
@@ -641,11 +639,11 @@ export default function TripsPage() {
                   </div>
 
                   {canManage && (
-                    <div className="mt-3 flex gap-2 border-t border-[#eef0f2] pt-3">
+                    <div className="mt-3 flex gap-2 border-t border-[#f4f3ea] pt-3">
                       <button
                         type="button"
                         onClick={() => setPollStatus(poll, open ? "closed" : "open")}
-                        className="flex items-center gap-1.5 rounded-[12px] border border-[#e2e5e8] px-3 py-2 text-[12px] font-bold text-[#374353]"
+                        className="flex items-center gap-1.5 rounded-[12px] border border-[#e8e8e0] px-3 py-2 text-[12px] font-bold text-[#3a3a35]"
                       >
                         <Lock size={13} />
                         {open ? t("Закрыть", "Schließen") : t("Открыть снова", "Wieder öffnen")}
@@ -673,7 +671,7 @@ export default function TripsPage() {
               <button
                 type="button"
                 onClick={() => setShowTripForm(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-[18px] bg-[#111820] px-4 py-3.5 text-[14px] font-bold text-white"
+                className="flex w-full items-center justify-center gap-2 rounded-[18px] bg-[#1b2431] px-4 py-3.5 text-[14px] font-bold text-[#ffc93c]"
               >
                 <Plus size={17} />
                 {t("Новая поездка", "Neue Fahrt")}
@@ -685,7 +683,7 @@ export default function TripsPage() {
             )}
 
             {trips.length === 0 && (
-              <p className="py-10 text-center text-[14px] text-[#8a939d]">
+              <p className="py-10 text-center text-[14px] text-[#8f897a]">
                 {t("Поездок пока нет.", "Noch keine Fahrten.")}
               </p>
             )}
@@ -700,7 +698,7 @@ export default function TripsPage() {
                 <section
                   key={trip.id}
                   id={`trip-${trip.id}`}
-                  className="scroll-mt-20 rounded-[22px] border border-[#e6e8ea] bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]"
+                  className="scroll-mt-20 rounded-[22px] border border-[#ecebe2] bg-white shadow-[0_4px_18px_rgba(27,36,49,0.04)]"
                 >
                   <button
                     type="button"
@@ -714,13 +712,13 @@ export default function TripsPage() {
                           {statusLabel(trip.status)}
                         </span>
                       </div>
-                      <p className="mt-1 text-[13px] text-[#65707d]">
+                      <p className="mt-1 text-[13px] text-[#6f6a5c]">
                         {[datesOf(trip), trip.location, trip.price != null ? money(trip.price) : null]
                           .filter(Boolean)
                           .join(" · ") || t("Детали ещё не заполнены", "Details noch offen")}
                       </p>
                       {canManage && tripParts.length > 0 && (
-                        <p className="mt-1 text-[12px] text-[#8a939d]">
+                        <p className="mt-1 text-[12px] text-[#8f897a]">
                           <Users size={12} className="mr-1 inline" />
                           {t("Подростков", "Teens")}: {teenCount} · {t("лидеров", "Leiter")}: {leaderCount}
                           {trip.max_participants ? ` · ${t("лимит", "Limit")} ${trip.max_participants}` : ""}
@@ -729,12 +727,12 @@ export default function TripsPage() {
                     </div>
                     <ChevronDown
                       size={18}
-                      className={`mt-1 shrink-0 text-[#8a939d] transition ${isOpen ? "rotate-180" : ""}`}
+                      className={`mt-1 shrink-0 text-[#8f897a] transition ${isOpen ? "rotate-180" : ""}`}
                     />
                   </button>
 
                   {isOpen && (
-                    <div className="space-y-3 border-t border-[#eef0f2] p-4">
+                    <div className="space-y-3 border-t border-[#f4f3ea] p-4">
                       {!canManage && (
                         <PublicInfo t={t} trip={trip} dates={datesOf(trip)} deadline={formatDate(trip.signup_deadline)} />
                       )}
@@ -801,7 +799,7 @@ function Collapsible({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="rounded-[16px] border border-[#e6e8ea]">
+    <div className="rounded-[16px] border border-[#ecebe2]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -809,11 +807,11 @@ function Collapsible({
       >
         <div className="min-w-0 flex-1">
           <p className="text-[14px] font-bold">{title}</p>
-          {summary && <p className="text-[12px] text-[#8a939d]">{summary}</p>}
+          {summary && <p className="text-[12px] text-[#8f897a]">{summary}</p>}
         </div>
-        <ChevronDown size={17} className={`shrink-0 text-[#8a939d] transition ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={17} className={`shrink-0 text-[#8f897a] transition ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && <div className="space-y-3 border-t border-[#eef0f2] p-3.5">{children}</div>}
+      {open && <div className="space-y-3 border-t border-[#f4f3ea] p-3.5">{children}</div>}
     </div>
   );
 }
@@ -844,18 +842,9 @@ function Field({
     if (local !== value) onSave(local);
   };
 
-  if (type === "date") {
-    return (
-      <div className="block">
-        <span className="mb-1 block text-[12px] text-[#65707d]">{label}</span>
-        <DatePicker value={value} onChange={onSave} />
-      </div>
-    );
-  }
-
   return (
     <label className="block">
-      <span className="mb-1 block text-[12px] text-[#65707d]">{label}</span>
+      <span className="mb-1 block text-[12px] text-[#6f6a5c]">{label}</span>
       {multiline ? (
         <textarea
           rows={4}
@@ -909,14 +898,14 @@ function PublicInfo({
 
   return (
     <div className="space-y-2.5">
-      {trip.description && <p className="text-[13px] text-[#475467]">{trip.description}</p>}
+      {trip.description && <p className="text-[13px] text-[#4d575f]">{trip.description}</p>}
       {filled.map(([label, value]) => (
         <div key={label}>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-[#8a939d]">{label}</p>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-[#8f897a]">{label}</p>
           <p className="whitespace-pre-line text-[14px]">{value}</p>
         </div>
       ))}
-      <p className="text-[12px] text-[#8a939d]">
+      <p className="text-[12px] text-[#8f897a]">
         {t(
           "Список участников и оплата видны только организаторам.",
           "Teilnehmerliste und Zahlungen sehen nur die Organisatoren.",
@@ -979,7 +968,7 @@ function TripDetail({
       <button
         type="button"
         onClick={onPlan}
-        className="flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#111820] px-4 py-3.5 text-[14px] font-bold text-white"
+        className="flex w-full items-center justify-center gap-2 rounded-[16px] bg-[#1b2431] px-4 py-3.5 text-[14px] font-bold text-[#ffc93c]"
       >
         <FileText size={17} />
         {t("План поездки: отправить лидерам и родителям", "Fahrtplan für Leiter & Eltern")}
@@ -996,7 +985,7 @@ function TripDetail({
               type="button"
               onClick={() => onChange({ status: s })}
               className={`rounded-full px-3 py-1.5 text-[12px] font-bold ${
-                trip.status === s ? "bg-[#111820] text-white" : "bg-[#f1f2f3] text-[#475467]"
+                trip.status === s ? "bg-[#1b2431] text-[#ffc93c]" : "bg-[#f3efe3] text-[#4d575f]"
               }`}
             >
               {{
@@ -1067,7 +1056,7 @@ function TripDetail({
         <TeenPicker t={t} teens={teens} takenIds={new Set(teenParts.map((p) => p.teen_id as number))} onAdd={(ids) => onAdd("teen", ids)} />
 
         {teenParts.length === 0 && (
-          <p className="text-[13px] text-[#8a939d]">{t("Пока никого нет.", "Noch niemand.")}</p>
+          <p className="text-[13px] text-[#8f897a]">{t("Пока никого нет.", "Noch niemand.")}</p>
         )}
 
         <div className="space-y-2">
@@ -1076,10 +1065,10 @@ function TripDetail({
             const fullyPaid = trip.price != null && Number(p.paid_amount) >= trip.price;
 
             return (
-              <div key={p.id} className="rounded-[14px] bg-[#f6f7f7] p-3">
+              <div key={p.id} className="rounded-[14px] bg-[#f6f2e8] p-3">
                 <div className="flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{teen ? fullName(teen) : "—"}</span>
-                  <button type="button" onClick={() => onRemoveParticipant(p.id)} className="text-[#8a939d]" aria-label="remove">
+                  <button type="button" onClick={() => onRemoveParticipant(p.id)} className="text-[#8f897a]" aria-label="remove">
                     <X size={16} />
                   </button>
                 </div>
@@ -1093,7 +1082,7 @@ function TripDetail({
                       step="0.5"
                       value={p.paid_amount}
                       onChange={(e) => onUpdateParticipant(p.id, { paid_amount: Number(e.target.value) })}
-                      className="w-16 rounded border border-[#e2e5e8] px-1.5 py-0.5 text-[13px]"
+                      className="w-16 rounded border border-[#e8e8e0] px-1.5 py-0.5 text-[13px]"
                     />
                     €
                   </label>
@@ -1102,7 +1091,7 @@ function TripDetail({
                     <button
                       type="button"
                       onClick={() => onUpdateParticipant(p.id, { paid_amount: fullyPaid ? 0 : trip.price ?? 0 })}
-                      className={`rounded-[10px] px-2.5 py-1.5 text-[12px] font-bold ${fullyPaid ? "bg-emerald-600 text-white" : "bg-white text-[#374353]"}`}
+                      className={`rounded-[10px] px-2.5 py-1.5 text-[12px] font-bold ${fullyPaid ? "bg-emerald-600 text-white" : "bg-white text-[#3a3a35]"}`}
                     >
                       {fullyPaid ? t("✓ Оплатил полностью", "✓ Voll bezahlt") : t("Полностью", "Voll")}
                     </button>
@@ -1111,7 +1100,7 @@ function TripDetail({
                   <button
                     type="button"
                     onClick={() => onUpdateParticipant(p.id, { consent: !p.consent })}
-                    className={`rounded-[10px] px-2.5 py-1.5 text-[12px] font-bold ${p.consent ? "bg-emerald-600 text-white" : "bg-white text-[#374353]"}`}
+                    className={`rounded-[10px] px-2.5 py-1.5 text-[12px] font-bold ${p.consent ? "bg-emerald-600 text-white" : "bg-white text-[#3a3a35]"}`}
                   >
                     {p.consent ? t("✓ Разрешение родителей", "✓ Einverständnis") : t("Разрешение родителей", "Einverständnis")}
                   </button>
@@ -1133,7 +1122,7 @@ function TripDetail({
         <LeaderPicker t={t} members={members} takenIds={new Set(leaderParts.map((p) => p.team_member_id as number))} onAdd={(ids) => onAdd("member", ids)} />
 
         {leaderParts.length === 0 && (
-          <p className="text-[13px] text-[#8a939d]">{t("Пока никого нет.", "Noch niemand.")}</p>
+          <p className="text-[13px] text-[#8f897a]">{t("Пока никого нет.", "Noch niemand.")}</p>
         )}
 
         <div className="space-y-2">
@@ -1141,10 +1130,10 @@ function TripDetail({
             const m = memberById.get(p.team_member_id as number);
 
             return (
-              <div key={p.id} className="rounded-[14px] bg-[#f6f7f7] p-3">
+              <div key={p.id} className="rounded-[14px] bg-[#f6f2e8] p-3">
                 <div className="flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{m ? fullName(m) : "—"}</span>
-                  <button type="button" onClick={() => onRemoveParticipant(p.id)} className="text-[#8a939d]" aria-label="remove">
+                  <button type="button" onClick={() => onRemoveParticipant(p.id)} className="text-[#8f897a]" aria-label="remove">
                     <X size={16} />
                   </button>
                 </div>
@@ -1166,10 +1155,10 @@ function TripDetail({
       >
         <ExpenseForm t={t} onAdd={onAddExpense} />
         {expenses.map((x) => (
-          <div key={x.id} className="flex items-center gap-2 rounded-[12px] bg-[#f6f7f7] px-3 py-2 text-[13px]">
+          <div key={x.id} className="flex items-center gap-2 rounded-[12px] bg-[#f6f2e8] px-3 py-2 text-[13px]">
             <span className="min-w-0 flex-1 truncate">{x.title}</span>
             <span className="font-bold">{money(Number(x.amount))}</span>
-            <button type="button" onClick={() => onRemoveExpense(x.id)} className="text-[#8a939d]" aria-label="remove">
+            <button type="button" onClick={() => onRemoveExpense(x.id)} className="text-[#8f897a]" aria-label="remove">
               <X size={15} />
             </button>
           </div>
@@ -1201,7 +1190,7 @@ function NoteInput({
 
   return (
     <input
-      className="mt-2 w-full rounded-[10px] border border-[#e2e5e8] bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-[#111820]"
+      className="mt-2 w-full rounded-[10px] border border-[#e8e8e0] bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-[#1b2431]"
       placeholder={placeholder}
       value={local}
       onChange={(e) => setLocal(e.target.value)}
@@ -1227,7 +1216,7 @@ function ExpenseForm({ t, onAdd }: { t: TFn; onAdd: (title: string, amount: numb
             setTitle("");
             setAmount("");
           }}
-          className="flex shrink-0 items-center gap-1.5 rounded-[12px] bg-[#111820] px-4 text-[13px] font-bold text-white disabled:opacity-40"
+          className="flex shrink-0 items-center gap-1.5 rounded-[12px] bg-[#1b2431] px-4 text-[13px] font-bold text-[#ffc93c] disabled:opacity-40"
         >
           <Plus size={16} />
           {t("Добавить", "Hinzufügen")}
@@ -1283,7 +1272,7 @@ function PickerPanel({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-dashed border-[#c9ced4] px-3 py-2.5 text-[13px] font-bold text-[#374353]"
+        className="flex w-full items-center justify-center gap-2 rounded-[12px] border border-dashed border-[#cfd1cc] px-3 py-2.5 text-[13px] font-bold text-[#3a3a35]"
       >
         <Plus size={15} />
         {buttonLabel}
@@ -1292,28 +1281,28 @@ function PickerPanel({
   }
 
   return (
-    <div className="space-y-2 rounded-[14px] border border-[#e2e5e8] p-3">
+    <div className="space-y-2 rounded-[14px] border border-[#e8e8e0] p-3">
       <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8a939d]" />
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8f897a]" />
         <input className={`${inputCls} pl-9`} placeholder={t("Поиск", "Suchen")} value={query} onChange={(e) => setQuery(e.target.value)} />
       </div>
 
       <div className="flex items-center justify-between text-[12px]">
-        <button type="button" onClick={toggleAll} className="font-bold text-[#374353] underline">
+        <button type="button" onClick={toggleAll} className="font-bold text-[#3a3a35] underline">
           {allVisibleSelected ? t("Снять выбор", "Auswahl aufheben") : t("Выбрать всех", "Alle auswählen")} ({visible.length})
         </button>
-        <span className="text-[#8a939d]">
+        <span className="text-[#8f897a]">
           {t("Доступно", "Verfügbar")}: {available.length}
         </span>
       </div>
 
       <div className="max-h-64 space-y-1 overflow-y-auto">
-        {visible.length === 0 && <p className="py-3 text-center text-[13px] text-[#8a939d]">{t("Никого не найдено", "Niemand gefunden")}</p>}
+        {visible.length === 0 && <p className="py-3 text-center text-[13px] text-[#8f897a]">{t("Никого не найдено", "Niemand gefunden")}</p>}
         {visible.map((x) => (
-          <label key={x.id} className="flex cursor-pointer items-center gap-2.5 rounded-[10px] px-2 py-2 hover:bg-[#f6f7f7]">
+          <label key={x.id} className="flex cursor-pointer items-center gap-2.5 rounded-[10px] px-2 py-2 hover:bg-[#f6f2e8]">
             <input type="checkbox" checked={selected.has(x.id)} onChange={() => toggle(x.id)} className="h-4 w-4" />
-            <span className={`min-w-0 flex-1 truncate text-[14px] ${x.muted ? "text-[#8a939d]" : ""}`}>{x.name}</span>
-            {x.hint && <span className="text-[11px] text-[#8a939d]">{x.hint}</span>}
+            <span className={`min-w-0 flex-1 truncate text-[14px] ${x.muted ? "text-[#8f897a]" : ""}`}>{x.name}</span>
+            {x.hint && <span className="text-[11px] text-[#8f897a]">{x.hint}</span>}
           </label>
         ))}
       </div>
@@ -1327,11 +1316,11 @@ function PickerPanel({
             setSelected(new Set());
             setOpen(false);
           }}
-          className="flex-1 rounded-[12px] bg-[#111820] px-3 py-2.5 text-[13px] font-bold text-white disabled:opacity-40"
+          className="flex-1 rounded-[12px] bg-[#1b2431] px-3 py-2.5 text-[13px] font-bold text-[#ffc93c] disabled:opacity-40"
         >
           {t("Добавить", "Hinzufügen")} ({selected.size})
         </button>
-        <button type="button" onClick={() => setOpen(false)} className="rounded-[12px] border border-[#e2e5e8] px-3 py-2.5 text-[13px] font-bold">
+        <button type="button" onClick={() => setOpen(false)} className="rounded-[12px] border border-[#e8e8e0] px-3 py-2.5 text-[13px] font-bold">
           {t("Закрыть", "Schließen")}
         </button>
       </div>
@@ -1514,10 +1503,10 @@ function PlanModal({
 
     win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(heading)}</title>
 <style>
-  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111820;max-width:720px;margin:32px auto;padding:0 20px;line-height:1.5}
+  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1b2431;max-width:720px;margin:32px auto;padding:0 20px;line-height:1.5}
   h1{font-size:24px;margin:0 0 4px}
-  .sub{color:#65707d;margin-bottom:24px;font-size:14px}
-  h2{font-size:16px;margin:22px 0 6px;border-bottom:1px solid #e6e8ea;padding-bottom:4px}
+  .sub{color:#6f6a5c;margin-bottom:24px;font-size:14px}
+  h2{font-size:16px;margin:22px 0 6px;border-bottom:1px solid #ecebe2;padding-bottom:4px}
   p{margin:3px 0;font-size:14px}
   .block{margin-bottom:6px}
 </style></head><body>
@@ -1534,9 +1523,9 @@ function PlanModal({
         className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-t-[26px] bg-white sm:rounded-[26px]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 border-b border-[#eef0f2] px-4 py-3">
+        <div className="flex items-center gap-2 border-b border-[#f4f3ea] px-4 py-3">
           <h2 className="flex-1 text-[16px] font-bold">{t("План поездки", "Fahrtplan")}</h2>
-          <button type="button" onClick={onClose} className="rounded-full p-1.5 hover:bg-[#f1f2f3]" aria-label="close">
+          <button type="button" onClick={onClose} className="rounded-full p-1.5 hover:bg-[#f3efe3]" aria-label="close">
             <X size={18} />
           </button>
         </div>
@@ -1552,7 +1541,7 @@ function PlanModal({
               key={key}
               type="button"
               onClick={() => setAudience(key)}
-              className={`flex-1 rounded-[12px] px-3 py-2 text-[13px] font-bold ${audience === key ? "bg-[#111820] text-white" : "bg-[#f1f2f3] text-[#475467]"}`}
+              className={`flex-1 rounded-[12px] px-3 py-2 text-[13px] font-bold ${audience === key ? "bg-[#1b2431] text-[#ffc93c]" : "bg-[#f3efe3] text-[#4d575f]"}`}
             >
               {label}
             </button>
@@ -1567,10 +1556,10 @@ function PlanModal({
         )}
 
         <div className="mt-3 flex-1 overflow-y-auto px-4 pb-3">
-          <div className="rounded-[18px] bg-[#f6f7f7] p-4">
+          <div className="rounded-[18px] bg-[#f6f2e8] p-4">
             <h3 className="text-[17px] font-bold leading-snug">{heading}</h3>
             {sections.length === 0 && (
-              <p className="mt-3 text-[13px] text-[#8a939d]">
+              <p className="mt-3 text-[13px] text-[#8f897a]">
                 {t("Заполни даты, место встречи и другие данные поездки — они появятся здесь.", "Trage Datum, Treffpunkt usw. ein — sie erscheinen hier.")}
               </p>
             )}
@@ -1578,7 +1567,7 @@ function PlanModal({
               <div key={i} className="mt-3.5">
                 {s.title && <p className="mb-1 text-[14px] font-bold">{s.title}</p>}
                 {s.lines.map((line, j) => (
-                  <p key={j} className="text-[14px] leading-6 text-[#2b3440]">
+                  <p key={j} className="text-[14px] leading-6 text-[#313738]">
                     {line}
                   </p>
                 ))}
@@ -1587,8 +1576,8 @@ function PlanModal({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 border-t border-[#eef0f2] p-4">
-          <button type="button" onClick={copy} className="flex items-center justify-center gap-1.5 rounded-[12px] border border-[#e2e5e8] px-2 py-2.5 text-[13px] font-bold">
+        <div className="grid grid-cols-3 gap-2 border-t border-[#f4f3ea] p-4">
+          <button type="button" onClick={copy} className="flex items-center justify-center gap-1.5 rounded-[12px] border border-[#e8e8e0] px-2 py-2.5 text-[13px] font-bold">
             {copied ? <Check size={15} /> : <Copy size={15} />}
             {copied ? t("Готово", "Kopiert") : t("Копировать", "Kopieren")}
           </button>
@@ -1596,7 +1585,7 @@ function PlanModal({
             <MessageCircle size={15} />
             WhatsApp
           </a>
-          <button type="button" onClick={print} className="flex items-center justify-center gap-1.5 rounded-[12px] bg-[#111820] px-2 py-2.5 text-[13px] font-bold text-white">
+          <button type="button" onClick={print} className="flex items-center justify-center gap-1.5 rounded-[12px] bg-[#1b2431] px-2 py-2.5 text-[13px] font-bold text-[#ffc93c]">
             <Printer size={15} />
             {t("PDF / печать", "PDF / Druck")}
           </button>
@@ -1628,7 +1617,7 @@ function PollForm({
   const valid = question.trim().length > 0 && cleaned.length >= 2;
 
   return (
-    <div className="space-y-3 rounded-[22px] border border-[#e6e8ea] bg-white p-4">
+    <div className="space-y-3 rounded-[22px] border border-[#ecebe2] bg-white p-4">
       <h2 className="text-[15px] font-bold">{t("Новое голосование", "Neue Abstimmung")}</h2>
       <input className={inputCls} placeholder={t("Вопрос, например: Куда едем летом?", "Frage, z. B. Wohin fahren wir im Sommer?")} value={question} onChange={(e) => setQuestion(e.target.value)} />
       <input className={inputCls} placeholder={t("Описание (необязательно)", "Beschreibung (optional)")} value={description} onChange={(e) => setDescription(e.target.value)} />
@@ -1643,13 +1632,13 @@ function PollForm({
               onChange={(e) => setLabels((cur) => cur.map((x, j) => (j === i ? e.target.value : x)))}
             />
             {labels.length > 2 && (
-              <button type="button" onClick={() => setLabels((cur) => cur.filter((_, j) => j !== i))} className="px-2 text-[#8a939d]">
+              <button type="button" onClick={() => setLabels((cur) => cur.filter((_, j) => j !== i))} className="px-2 text-[#8f897a]">
                 <X size={16} />
               </button>
             )}
           </div>
         ))}
-        <button type="button" onClick={() => setLabels((cur) => [...cur, ""])} className="text-[13px] font-bold text-[#374353]">
+        <button type="button" onClick={() => setLabels((cur) => [...cur, ""])} className="text-[13px] font-bold text-[#3a3a35]">
           + {t("Добавить вариант", "Option hinzufügen")}
         </button>
       </div>
@@ -1660,8 +1649,8 @@ function PollForm({
       </label>
 
       <label className="block text-[13px]">
-        <span className="mb-1 block text-[#65707d]">{t("Крайний срок (необязательно)", "Frist (optional)")}</span>
-        <DatePicker value={deadline} onChange={(__value: string) => setDeadline(__value)} className={inputCls} />
+        <span className="mb-1 block text-[#6f6a5c]">{t("Крайний срок (необязательно)", "Frist (optional)")}</span>
+        <input type="date" className={inputCls} value={deadline} onChange={(e) => setDeadline(e.target.value)} />
       </label>
 
       <div className="flex gap-2">
@@ -1673,11 +1662,11 @@ function PollForm({
             await onSave(question.trim(), description.trim(), cleaned, multiple, deadline);
             setSaving(false);
           }}
-          className="flex-1 rounded-[12px] bg-[#111820] px-4 py-2.5 text-[14px] font-bold text-white disabled:opacity-40"
+          className="flex-1 rounded-[12px] bg-[#1b2431] px-4 py-2.5 text-[14px] font-bold text-[#ffc93c] disabled:opacity-40"
         >
           {t("Создать", "Erstellen")}
         </button>
-        <button type="button" onClick={onCancel} className="rounded-[12px] border border-[#e2e5e8] px-4 py-2.5 text-[14px] font-bold">
+        <button type="button" onClick={onCancel} className="rounded-[12px] border border-[#e8e8e0] px-4 py-2.5 text-[14px] font-bold">
           {t("Отмена", "Abbrechen")}
         </button>
       </div>
@@ -1698,10 +1687,10 @@ function TripForm({
   const [saving, setSaving] = useState(false);
 
   return (
-    <div className="space-y-3 rounded-[22px] border border-[#e6e8ea] bg-white p-4">
+    <div className="space-y-3 rounded-[22px] border border-[#ecebe2] bg-white p-4">
       <h2 className="text-[15px] font-bold">{t("Новая поездка", "Neue Fahrt")}</h2>
       <input className={inputCls} placeholder={t("Название, например: Лагерь 2027", "Titel, z. B. Freizeit 2027")} value={title} onChange={(e) => setTitle(e.target.value)} />
-      <p className="text-[12px] text-[#8a939d]">
+      <p className="text-[12px] text-[#8f897a]">
         {t("Даты, место, цену и всё остальное можно заполнить после создания.", "Datum, Ort, Preis und Weiteres kannst du danach ergänzen.")}
       </p>
       <div className="flex gap-2">
@@ -1713,11 +1702,11 @@ function TripForm({
             await onSave({ title: title.trim(), status: "idea" });
             setSaving(false);
           }}
-          className="flex-1 rounded-[12px] bg-[#111820] px-4 py-2.5 text-[14px] font-bold text-white disabled:opacity-40"
+          className="flex-1 rounded-[12px] bg-[#1b2431] px-4 py-2.5 text-[14px] font-bold text-[#ffc93c] disabled:opacity-40"
         >
           {t("Создать", "Erstellen")}
         </button>
-        <button type="button" onClick={onCancel} className="rounded-[12px] border border-[#e2e5e8] px-4 py-2.5 text-[14px] font-bold">
+        <button type="button" onClick={onCancel} className="rounded-[12px] border border-[#e8e8e0] px-4 py-2.5 text-[14px] font-bold">
           {t("Отмена", "Abbrechen")}
         </button>
       </div>

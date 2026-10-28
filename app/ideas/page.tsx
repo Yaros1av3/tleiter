@@ -325,10 +325,10 @@ export default function IdeasPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f7f6] pb-28 text-[#111820]">
+    <main className="min-h-screen bg-[#faf8f3] pb-28 text-[#1b2431]">
       <div className="mx-auto w-full max-w-[640px] px-4 pt-6 sm:px-6">
         <div className="mb-5 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-300 text-[#111820]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-300 text-[#1b2431]">
             <Lightbulb size={22} fill="currentColor" />
           </div>
 
@@ -345,7 +345,7 @@ export default function IdeasPage() {
         </div>
 
         {/* форма */}
-        <div className="rounded-[22px] border border-neutral-200 bg-white p-3 shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
+        <div className="rounded-[22px] border border-neutral-200 bg-white p-3 shadow-[0_4px_18px_rgba(27,36,49,0.04)]">
           <div className="mb-2 flex items-start gap-2 rounded-xl bg-sky-50 px-3 py-2 text-[12px] leading-snug text-sky-800">
             <Languages size={15} className="mt-0.5 shrink-0" />
             <span>
@@ -362,7 +362,7 @@ export default function IdeasPage() {
             placeholder={
               isRu ? "Какая у тебя идея?" : "Was ist deine Idee?"
             }
-            className="w-full resize-none rounded-xl bg-[#f7f7f6] px-3 py-2.5 text-[15px] outline-none placeholder:text-neutral-400"
+            className="w-full resize-none rounded-xl bg-[#faf8f3] px-3 py-2.5 text-[15px] outline-none placeholder:text-neutral-400"
           />
 
           <div className="mt-2 flex items-center justify-between gap-3">
@@ -374,7 +374,7 @@ export default function IdeasPage() {
               type="button"
               onClick={sendIdea}
               disabled={!text.trim() || sending}
-              className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#111820] px-5 text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-40"
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#1b2431] px-5 text-sm font-semibold text-[#ffc93c] transition active:scale-[0.98] disabled:opacity-40"
             >
               <Send size={15} />
               {sending
@@ -400,7 +400,7 @@ export default function IdeasPage() {
             ideas.map((idea) => (
               <article
                 key={idea.id}
-                className={`rounded-[20px] border bg-white p-4 shadow-[0_2px_10px_rgba(17,24,32,0.03)] ${
+                className={`rounded-[20px] border bg-white p-4 shadow-[0_2px_10px_rgba(27,36,49,0.03)] ${
                   isNew(idea) ? "border-amber-300" : "border-neutral-200"
                 }`}
               >
@@ -413,7 +413,7 @@ export default function IdeasPage() {
                       }
                       rows={4}
                       autoFocus
-                      className="w-full resize-none rounded-xl bg-[#f7f7f6] px-3 py-2.5 text-[15px] outline-none"
+                      className="w-full resize-none rounded-xl bg-[#faf8f3] px-3 py-2.5 text-[15px] outline-none"
                     />
                     <div className="mt-2 flex items-center justify-end gap-2">
                       <button
@@ -427,7 +427,7 @@ export default function IdeasPage() {
                         type="button"
                         onClick={() => saveEdit(idea)}
                         disabled={!editText.trim() || busyId === idea.id}
-                        className="inline-flex h-9 items-center rounded-lg bg-[#111820] px-4 text-xs font-semibold text-white disabled:opacity-40"
+                        className="inline-flex h-9 items-center rounded-lg bg-[#1b2431] px-4 text-xs font-semibold text-[#ffc93c] disabled:opacity-40"
                       >
                         {isRu ? "Сохранить" : "Speichern"}
                       </button>
@@ -444,7 +444,7 @@ export default function IdeasPage() {
                     src={idea.author_id ? avatars[idea.author_id] : null}
                     className="h-7 w-7 rounded-full"
                   />
-                  <span className="font-bold text-[#111820]">
+                  <span className="font-bold text-[#1b2431]">
                     {idea.author_name || (isRu ? "Без имени" : "Ohne Namen")}
                   </span>
                   <span className="text-neutral-400">{formatWhen(idea.created_at)}</span>
@@ -527,7 +527,7 @@ export default function IdeasPage() {
                           type="button"
                           onClick={() => createProject(idea)}
                           disabled={busyId === idea.id}
-                          className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#111820] px-3 text-xs font-semibold text-white disabled:opacity-40"
+                          className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#1b2431] px-3 text-xs font-semibold text-[#ffc93c] disabled:opacity-40"
                         >
                           <FolderPlus size={14} />
                           {isRu ? "Создать проект" : "Projekt erstellen"}

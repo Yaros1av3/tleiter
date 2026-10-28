@@ -72,7 +72,7 @@ type ChecklistItem = {
 
 const statusConfig = {
   open: {
-    dot: "bg-[#9ca3af]",
+    dot: "bg-[#a2a6a7]",
   },
   in_progress: {
     dot: "bg-[#f59e0b]",
@@ -85,7 +85,7 @@ const statusConfig = {
 const projectStatusConfig = {
   planned: {
     className:
-      "bg-[#f1f2f3] text-[#68727c]",
+      "bg-[#f3efe3] text-[#6e7574]",
   },
   active: {
     className:
@@ -93,20 +93,20 @@ const projectStatusConfig = {
   },
   completed: {
     className:
-      "bg-[#eef1f3] text-[#68727c]",
+      "bg-[#f4f4eb] text-[#6e7574]",
   },
   archived: {
     className:
-      "bg-[#f1f1f1] text-[#969da5]",
+      "bg-[#f7f4e9] text-[#9ca09d]",
   },
 };
 
 const priorityConfig = {
   low: {
-    className: "text-[#7a8490]",
+    className: "text-[#7f796a]",
   },
   normal: {
-    className: "text-[#59636f]",
+    className: "text-[#5f6667]",
   },
   high: {
     className: "text-[#d97706]",
@@ -1276,10 +1276,10 @@ export default function WorkProjectPage() {
       <main className="min-h-screen bg-[#f7f7f5] px-5 pb-32 pt-8">
         <div className="mx-auto max-w-[720px]">
           <div className="animate-pulse space-y-4">
-            <div className="h-12 w-32 rounded-2xl bg-[#e7e8e9]" />
-            <div className="h-36 rounded-[28px] bg-[#e7e8e9]" />
-            <div className="h-24 rounded-[24px] bg-[#e7e8e9]" />
-            <div className="h-24 rounded-[24px] bg-[#e7e8e9]" />
+            <div className="h-12 w-32 rounded-2xl bg-[#edebe1]" />
+            <div className="h-36 rounded-[28px] bg-[#edebe1]" />
+            <div className="h-24 rounded-[24px] bg-[#edebe1]" />
+            <div className="h-24 rounded-[24px] bg-[#edebe1]" />
           </div>
         </div>
       </main>
@@ -1296,29 +1296,29 @@ export default function WorkProjectPage() {
               onClick={() =>
                 router.push("/work")
               }
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#dedfe1] bg-white text-[#303841] active:scale-95"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4e2d9] bg-white text-[#363b39] active:scale-95"
               aria-label={text.close}
             >
               <ArrowLeft size={19} />
             </button>
 
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-[#969da5]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-[#9ca09d]">
                 {text.teamWork}
               </p>
 
-              <h1 className="text-[22px] font-bold text-[#111820]">
+              <h1 className="text-[22px] font-bold text-[#1b2431]">
                 {text.work}
               </h1>
             </div>
           </header>
 
-          <section className="rounded-[26px] border border-[#e0e1e3] bg-white p-7 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f0f1f2] text-[#7c858e]">
+          <section className="rounded-[26px] border border-[#e6e4db] bg-white p-7 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f3efe3] text-[#828886]">
               <FolderKanban size={21} />
             </div>
 
-            <p className="mt-3 text-sm font-bold text-[#3c454f]">
+            <p className="mt-3 text-sm font-bold text-[#424847]">
               {text.notFound}
             </p>
 
@@ -1327,7 +1327,7 @@ export default function WorkProjectPage() {
               onClick={() =>
                 router.push("/work")
               }
-              className="mt-5 rounded-[18px] bg-[#111820] px-5 py-3 text-sm font-bold text-white"
+              className="mt-5 rounded-[18px] bg-[#1b2431] px-5 py-3 text-sm font-bold text-[#ffc93c]"
             >
               {text.allWorks}
             </button>
@@ -1347,18 +1347,18 @@ export default function WorkProjectPage() {
               onClick={() =>
                 router.push("/work")
               }
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#dedfe1] bg-white text-[#303841] active:scale-95"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#e4e2d9] bg-white text-[#363b39] active:scale-95"
               aria-label={text.allWorks}
             >
               <ArrowLeft size={19} />
             </button>
 
             <div className="min-w-0 flex-1 px-2">
-              <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-[#969da5]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-[#9ca09d]">
                 {text.teamWork}
               </p>
 
-              <h1 className="truncate text-[19px] font-bold text-[#111820]">
+              <h1 className="truncate text-[19px] font-bold text-[#1b2431]">
                 {text.work}
               </h1>
             </div>
@@ -1368,14 +1368,14 @@ export default function WorkProjectPage() {
               onClick={() =>
                 setNewTaskOpen(true)
               }
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#111820] text-white shadow-[0_5px_18px_rgba(17,24,32,0.18)] active:scale-95"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#1b2431] text-[#ffc93c] shadow-[0_5px_18px_rgba(27,36,49,0.18)] active:scale-95"
               aria-label={text.addTask}
             >
               <Plus size={21} />
             </button>
           </header>
 
-          <section className="overflow-hidden rounded-[30px] bg-[#111820] p-6 text-white">
+          <section className="overflow-hidden rounded-[30px] bg-[#1b2431] p-6 text-[#ffc93c]">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10">
                 <FolderKanban size={23} />
@@ -1445,12 +1445,12 @@ export default function WorkProjectPage() {
               {
                 label: text.total,
                 value: stats.total,
-                color: "text-[#111820]",
+                color: "text-[#1b2431]",
               },
               {
                 label: text.open,
                 value: stats.open,
-                color: "text-[#111820]",
+                color: "text-[#1b2431]",
               },
               {
                 label: text.progress,
@@ -1465,9 +1465,9 @@ export default function WorkProjectPage() {
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-[20px] border border-[#e1e2e4] bg-white p-3"
+                className="rounded-[20px] border border-[#e7e5dc] bg-white p-3"
               >
-                <p className="text-[10px] font-bold uppercase tracking-wide text-[#9ba1a8]">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[#a1a4a0]">
                   {stat.label}
                 </p>
 
@@ -1480,7 +1480,7 @@ export default function WorkProjectPage() {
             ))}
           </section>
 
-          <div className="mt-6 flex rounded-2xl border border-[#dedfe1] bg-white p-1">
+          <div className="mt-6 flex rounded-2xl border border-[#e4e2d9] bg-white p-1">
             <button
               type="button"
               onClick={() =>
@@ -1488,8 +1488,8 @@ export default function WorkProjectPage() {
               }
               className={`flex h-10 flex-1 items-center justify-center rounded-xl text-sm font-bold ${
                 view === "overview"
-                  ? "bg-[#111820] text-white"
-                  : "text-[#737c86]"
+                  ? "bg-[#1b2431] text-[#ffc93c]"
+                  : "text-[#797f7e]"
               }`}
             >
               {text.overview}
@@ -1502,8 +1502,8 @@ export default function WorkProjectPage() {
               }
               className={`flex h-10 flex-1 items-center justify-center rounded-xl text-sm font-bold ${
                 view === "board"
-                  ? "bg-[#111820] text-white"
-                  : "text-[#737c86]"
+                  ? "bg-[#1b2431] text-[#ffc93c]"
+                  : "text-[#797f7e]"
               }`}
             >
               {text.board}
@@ -1514,18 +1514,18 @@ export default function WorkProjectPage() {
             <section className="mt-6">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#9ba1a8]">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#a1a4a0]">
                     {text.nextSteps}
                   </p>
 
-                  <h3 className="mt-1 text-lg font-bold text-[#111820]">
+                  <h3 className="mt-1 text-lg font-bold text-[#1b2431]">
                     {text.tasks}
                   </h3>
                 </div>
 
                 <ListTodo
                   size={20}
-                  className="text-[#8b939c]"
+                  className="text-[#919694]"
                 />
               </div>
 
@@ -1564,7 +1564,7 @@ export default function WorkProjectPage() {
                           item
                         )
                       }
-                      className="w-full rounded-[24px] border border-[#e0e1e3] bg-white p-4 text-left active:scale-[0.99]"
+                      className="w-full rounded-[24px] border border-[#e6e4db] bg-white p-4 text-left active:scale-[0.99]"
                     >
                       <div className="flex items-start gap-3">
                         <div
@@ -1579,7 +1579,7 @@ export default function WorkProjectPage() {
 
                             <ChevronRight
                               size={18}
-                              className="mt-0.5 shrink-0 text-[#b0b5bb]"
+                              className="mt-0.5 shrink-0 text-[#b6b8b3]"
                             />
                           </div>
 
@@ -1603,7 +1603,7 @@ export default function WorkProjectPage() {
                                 className={`flex items-center gap-1 text-[11px] font-semibold ${
                                   overdue
                                     ? "text-[#dc2626]"
-                                    : "text-[#7c858e]"
+                                    : "text-[#828886]"
                                 }`}
                               >
                                 <Clock3 size={12} />
@@ -1616,7 +1616,7 @@ export default function WorkProjectPage() {
                             )}
 
                             {member && (
-                              <span className="flex items-center gap-1 text-[11px] font-semibold text-[#7c858e]">
+                              <span className="flex items-center gap-1 text-[11px] font-semibold text-[#828886]">
                                 <UserRound
                                   size={12}
                                 />
@@ -1630,9 +1630,9 @@ export default function WorkProjectPage() {
                           {itemChecklist.length >
                             0 && (
                             <div className="mt-3 flex items-center gap-2">
-                              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#eceef0]">
+                              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#ece6d6]">
                                 <div
-                                  className="h-full rounded-full bg-[#111820]"
+                                  className="h-full rounded-full bg-[#1b2431]"
                                   style={{
                                     width: `${
                                       (completedChecklist /
@@ -1643,7 +1643,7 @@ export default function WorkProjectPage() {
                                 />
                               </div>
 
-                              <span className="text-[10px] font-bold text-[#858d96]">
+                              <span className="text-[10px] font-bold text-[#8b908e]">
                                 {
                                   completedChecklist
                                 }
@@ -1662,13 +1662,13 @@ export default function WorkProjectPage() {
               </div>
 
               {items.length === 0 && (
-                <div className="rounded-[24px] border border-dashed border-[#cfd2d5] bg-white p-7 text-center">
+                <div className="rounded-[24px] border border-dashed border-[#d5d5cd] bg-white p-7 text-center">
                   <ListTodo
                     size={21}
-                    className="mx-auto text-[#7c858e]"
+                    className="mx-auto text-[#828886]"
                   />
 
-                  <p className="mt-3 text-sm font-bold text-[#3c454f]">
+                  <p className="mt-3 text-sm font-bold text-[#424847]">
                     {text.noTasks}
                   </p>
                 </div>
@@ -1679,7 +1679,7 @@ export default function WorkProjectPage() {
                 onClick={() =>
                   setNewTaskOpen(true)
                 }
-                className="mt-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-[22px] border border-dashed border-[#cfd2d5] bg-white text-sm font-bold text-[#59636f]"
+                className="mt-4 flex min-h-14 w-full items-center justify-center gap-2 rounded-[22px] border border-dashed border-[#d5d5cd] bg-white text-sm font-bold text-[#5f6667]"
               >
                 <Plus size={18} />
                 {text.addTaskButton}
@@ -1690,7 +1690,7 @@ export default function WorkProjectPage() {
           {view === "board" && (
             <section className="mt-6">
               <div className="mb-3">
-                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#9ba1a8]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#a1a4a0]">
                   {text.workStatus}
                 </p>
 
@@ -1729,7 +1729,7 @@ export default function WorkProjectPage() {
                         key={
                           column.key
                         }
-                        className="w-[285px] rounded-[26px] bg-[#eceeed] p-3"
+                        className="w-[285px] rounded-[26px] bg-[#f2f1e5] p-3"
                       >
                         <div className="mb-3 flex items-center justify-between px-1">
                           <div className="flex items-center gap-2">
@@ -1737,14 +1737,14 @@ export default function WorkProjectPage() {
                               className={`h-2.5 w-2.5 rounded-full ${statusConfig[column.key].dot}`}
                             />
 
-                            <span className="text-sm font-bold text-[#3c454f]">
+                            <span className="text-sm font-bold text-[#424847]">
                               {
                                 column.title
                               }
                             </span>
                           </div>
 
-                          <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-[#818991]">
+                          <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-[#878c89]">
                             {
                               column.items
                                 .length
@@ -1765,7 +1765,7 @@ export default function WorkProjectPage() {
                                     item
                                   )
                                 }
-                                className="w-full rounded-[20px] border border-[#e1e2e4] bg-white p-4 text-left"
+                                className="w-full rounded-[20px] border border-[#e7e5dc] bg-white p-4 text-left"
                               >
                                 <p className="text-sm font-bold leading-5">
                                   {
@@ -1787,7 +1787,7 @@ export default function WorkProjectPage() {
                                   {getMember(
                                     item.assigned_to
                                   ) && (
-                                    <span className="text-[10px] font-semibold text-[#7e8790]">
+                                    <span className="text-[10px] font-semibold text-[#848a88]">
                                       {
                                         getMember(
                                           item.assigned_to
@@ -1799,7 +1799,7 @@ export default function WorkProjectPage() {
                                 </div>
 
                                 {item.deadline && (
-                                  <div className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-[#858d95]">
+                                  <div className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-[#8b908d]">
                                     <Clock3 size={11} />
                                     {formatDate(
                                       item.deadline,
@@ -1815,7 +1815,7 @@ export default function WorkProjectPage() {
                           {column.items
                             .length ===
                             0 && (
-                            <div className="rounded-[20px] border border-dashed border-[#cdd0d3] px-4 py-7 text-center text-xs font-semibold text-[#9299a1]">
+                            <div className="rounded-[20px] border border-dashed border-[#d3d3cb] px-4 py-7 text-center text-xs font-semibold text-[#989c99]">
                               {
                                 text.noTasksColumn
                               }
@@ -1846,17 +1846,17 @@ export default function WorkProjectPage() {
 
           <section className="absolute inset-x-0 bottom-0 flex max-h-[calc(100dvh-12px)] flex-col overflow-hidden rounded-t-[30px] bg-[#f7f7f5] shadow-[0_-10px_45px_rgba(0,0,0,0.16)] sm:left-1/2 sm:max-w-[620px] sm:-translate-x-1/2">
             <div className="px-5 pt-4">
-              <div className="mx-auto h-1.5 w-12 rounded-full bg-[#d4d6d8]" />
+              <div className="mx-auto h-1.5 w-12 rounded-full bg-[#dad9d0]" />
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9299a1]">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#989c99]">
                     {text.task}
                   </p>
 
-                  <h2 className="text-[22px] font-bold leading-tight text-[#111820]">
+                  <h2 className="text-[22px] font-bold leading-tight text-[#1b2431]">
                     {selectedItem.title}
                   </h2>
                 </div>
@@ -1868,7 +1868,7 @@ export default function WorkProjectPage() {
                       null
                     )
                   }
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#dedfe1] bg-white text-[#555f69]"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#e4e2d9] bg-white text-[#5b6261]"
                   aria-label={text.close}
                 >
                   <X size={18} />
@@ -1876,7 +1876,7 @@ export default function WorkProjectPage() {
               </div>
 
               {selectedItem.description && (
-                <p className="mt-4 text-sm leading-6 text-[#68727c]">
+                <p className="mt-4 text-sm leading-6 text-[#6e7574]">
                   {
                     selectedItem.description
                   }
@@ -1884,8 +1884,8 @@ export default function WorkProjectPage() {
               )}
 
               <div className="mt-5 grid grid-cols-2 gap-2">
-                <div className="rounded-[18px] border border-[#e0e1e3] bg-white p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#9ba1a8]">
+                <div className="rounded-[18px] border border-[#e6e4db] bg-white p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#a1a4a0]">
                     {text.status}
                   </p>
 
@@ -1916,8 +1916,8 @@ export default function WorkProjectPage() {
                   </select>
                 </div>
 
-                <div className="rounded-[18px] border border-[#e0e1e3] bg-white p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#9ba1a8]">
+                <div className="rounded-[18px] border border-[#e6e4db] bg-white p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#a1a4a0]">
                     {text.priority}
                   </p>
 
@@ -1934,8 +1934,8 @@ export default function WorkProjectPage() {
               </div>
 
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <div className="rounded-[18px] border border-[#e0e1e3] bg-white p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#9ba1a8]">
+                <div className="rounded-[18px] border border-[#e6e4db] bg-white p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#a1a4a0]">
                     {text.deadline}
                   </p>
 
@@ -1950,8 +1950,8 @@ export default function WorkProjectPage() {
                   </p>
                 </div>
 
-                <div className="rounded-[18px] border border-[#e0e1e3] bg-white p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#9ba1a8]">
+                <div className="rounded-[18px] border border-[#e6e4db] bg-white p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#a1a4a0]">
                     {text.responsible}
                   </p>
 
@@ -1972,7 +1972,7 @@ export default function WorkProjectPage() {
               <div className="mt-6">
                 <div className="mb-3 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9299a1]">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#989c99]">
                       {text.checklist}
                     </p>
 
@@ -1985,7 +1985,7 @@ export default function WorkProjectPage() {
 
                   <CheckCircle2
                     size={20}
-                    className="text-[#818991]"
+                    className="text-[#878c89]"
                   />
                 </div>
 
@@ -2000,14 +2000,14 @@ export default function WorkProjectPage() {
                             item
                           )
                         }
-                        className="flex w-full items-center gap-3 rounded-[18px] border border-[#e0e1e3] bg-white p-3 text-left"
+                        className="flex w-full items-center gap-3 rounded-[18px] border border-[#e6e4db] bg-white p-3 text-left"
                       >
                         {item.is_completed ? (
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#111820] text-white">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1b2431] text-[#ffc93c]">
                             <Check size={14} />
                           </span>
                         ) : (
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#c9cdd1]">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#cfd0c9]">
                             <Circle
                               size={12}
                               className="text-transparent"
@@ -2018,8 +2018,8 @@ export default function WorkProjectPage() {
                         <span
                           className={`text-sm font-semibold ${
                             item.is_completed
-                              ? "text-[#9aa0a6] line-through"
-                              : "text-[#3b444d]"
+                              ? "text-[#a0a39e] line-through"
+                              : "text-[#414745]"
                           }`}
                         >
                           {item.title}
@@ -2049,7 +2049,7 @@ export default function WorkProjectPage() {
                     placeholder={
                       text.addChecklist
                     }
-                    className="min-w-0 flex-1 rounded-[18px] border border-[#dedfe1] bg-white px-4 py-3 text-sm outline-none focus:border-[#111820]"
+                    className="min-w-0 flex-1 rounded-[18px] border border-[#e4e2d9] bg-white px-4 py-3 text-sm outline-none focus:border-[#1b2431]"
                   />
 
                   <button
@@ -2057,7 +2057,7 @@ export default function WorkProjectPage() {
                     onClick={
                       addChecklistItem
                     }
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#111820] text-white"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#1b2431] text-[#ffc93c]"
                     aria-label={
                       text.addChecklist
                     }
@@ -2075,7 +2075,7 @@ export default function WorkProjectPage() {
                       selectedItem
                     )
                   }
-                  className="flex h-13 items-center justify-center gap-2 rounded-[20px] border border-[#dedfe1] bg-white text-sm font-bold text-[#3d4650]"
+                  className="flex h-13 items-center justify-center gap-2 rounded-[20px] border border-[#e4e2d9] bg-white text-sm font-bold text-[#434948]"
                 >
                   <Pencil size={16} />
                   {text.edit}
@@ -2104,7 +2104,7 @@ export default function WorkProjectPage() {
                       : "completed"
                   )
                 }
-                className="mt-3 flex min-h-13 w-full items-center justify-center gap-2 rounded-[20px] bg-[#111820] text-sm font-bold text-white"
+                className="mt-3 flex min-h-13 w-full items-center justify-center gap-2 rounded-[20px] bg-[#1b2431] text-sm font-bold text-[#ffc93c]"
               >
                 {selectedItem.status ===
                 "completed" ? (
@@ -2143,11 +2143,11 @@ export default function WorkProjectPage() {
 
           <section className="absolute inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-12px)] max-w-[620px] overflow-hidden rounded-t-[30px] bg-[#f7f7f5]">
             <div className="max-h-[calc(100dvh-12px)] overflow-y-auto px-5 pb-8 pt-5">
-              <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-[#d4d6d8]" />
+              <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-[#dad9d0]" />
 
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9299a1]">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#989c99]">
                     {text.editTask}
                   </p>
 
@@ -2163,7 +2163,7 @@ export default function WorkProjectPage() {
                       false
                     )
                   }
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#555f69]"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#5b6261]"
                   aria-label={text.close}
                 >
                   <X size={18} />
@@ -2172,7 +2172,7 @@ export default function WorkProjectPage() {
 
               <div className="mt-6 space-y-4">
                 <div>
-                  <label className="mb-2 block text-xs font-bold text-[#59636f]">
+                  <label className="mb-2 block text-xs font-bold text-[#5f6667]">
                     {text.taskLabel}
                   </label>
 
@@ -2183,12 +2183,12 @@ export default function WorkProjectPage() {
                         event.target.value
                       )
                     }
-                    className="h-13 w-full rounded-[18px] border border-[#dedfe1] bg-white px-4 text-sm outline-none focus:border-[#111820]"
+                    className="h-13 w-full rounded-[18px] border border-[#e4e2d9] bg-white px-4 text-sm outline-none focus:border-[#1b2431]"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-bold text-[#59636f]">
+                  <label className="mb-2 block text-xs font-bold text-[#5f6667]">
                     {text.description}
                   </label>
 
@@ -2200,13 +2200,13 @@ export default function WorkProjectPage() {
                       )
                     }
                     rows={4}
-                    className="w-full resize-none rounded-[18px] border border-[#dedfe1] bg-white px-4 py-3 text-sm outline-none focus:border-[#111820]"
+                    className="w-full resize-none rounded-[18px] border border-[#e4e2d9] bg-white px-4 py-3 text-sm outline-none focus:border-[#1b2431]"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-2 block text-xs font-bold text-[#59636f]">
+                    <label className="mb-2 block text-xs font-bold text-[#5f6667]">
                       {text.status}
                     </label>
 
@@ -2217,7 +2217,7 @@ export default function WorkProjectPage() {
                           event.target.value as WorkItem["status"]
                         )
                       }
-                      className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none"
+                      className="h-12 w-full rounded-[18px] border border-[#e4e2d9] bg-white px-3 text-sm outline-none"
                     >
                       <option value="open">
                         {text.openStatus}
@@ -2234,7 +2234,7 @@ export default function WorkProjectPage() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-xs font-bold text-[#59636f]">
+                    <label className="mb-2 block text-xs font-bold text-[#5f6667]">
                       {text.priority}
                     </label>
 
@@ -2245,7 +2245,7 @@ export default function WorkProjectPage() {
                           event.target.value as WorkItem["priority"]
                         )
                       }
-                      className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none"
+                      className="h-12 w-full rounded-[18px] border border-[#e4e2d9] bg-white px-3 text-sm outline-none"
                     >
                       <option value="low">
                         {text.low}
@@ -2267,17 +2267,17 @@ export default function WorkProjectPage() {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-bold text-[#59636f]">
+                  <label className="mb-2 block text-xs font-bold text-[#5f6667]">
                     {text.deadline}
                   </label>
 
                   <DatePicker value={editDeadline} onChange={(__value: string) => setEditDeadline(
                         __value
-                      )} className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none" />
+                      )} className="h-12 w-full rounded-[18px] border border-[#e4e2d9] bg-white px-3 text-sm outline-none" />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-bold text-[#59636f]">
+                  <label className="mb-2 block text-xs font-bold text-[#5f6667]">
                     {text.responsible}
                   </label>
 
@@ -2288,7 +2288,7 @@ export default function WorkProjectPage() {
                         event.target.value
                       )
                     }
-                    className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none"
+                    className="h-12 w-full rounded-[18px] border border-[#e4e2d9] bg-white px-3 text-sm outline-none"
                   >
                     <option value="">
                       {text.stillOpen}
@@ -2321,7 +2321,7 @@ export default function WorkProjectPage() {
                     saving
                   }
                   onClick={updateTask}
-                  className="flex h-13 w-full items-center justify-center gap-2 rounded-[20px] bg-[#111820] text-sm font-bold text-white disabled:opacity-40"
+                  className="flex h-13 w-full items-center justify-center gap-2 rounded-[20px] bg-[#1b2431] text-sm font-bold text-[#ffc93c] disabled:opacity-40"
                 >
                   <Pencil size={17} />
 
@@ -2352,11 +2352,11 @@ export default function WorkProjectPage() {
 
           <section className="absolute inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-12px)] max-w-[620px] overflow-hidden rounded-t-[30px] bg-[#f7f7f5]">
             <div className="max-h-[calc(100dvh-12px)] overflow-y-auto px-5 pb-8 pt-5">
-              <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-[#d4d6d8]" />
+              <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-[#dad9d0]" />
 
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#9299a1]">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#989c99]">
                     {text.teamWork}
                   </p>
 
@@ -2372,7 +2372,7 @@ export default function WorkProjectPage() {
                       false
                     )
                   }
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#555f69]"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#5b6261]"
                   aria-label={text.close}
                 >
                   <X size={18} />
@@ -2381,7 +2381,7 @@ export default function WorkProjectPage() {
 
               <div className="mt-6 space-y-4">
                 <div>
-                  <label className="mb-2 block text-xs font-bold text-[#59636f]">
+                  <label className="mb-2 block text-xs font-bold text-[#5f6667]">
                     {text.taskLabel}
                   </label>
 
@@ -2396,12 +2396,12 @@ export default function WorkProjectPage() {
                       text.titlePlaceholder
                     }
                     autoFocus
-                    className="h-13 w-full rounded-[18px] border border-[#dedfe1] bg-white px-4 text-sm outline-none focus:border-[#111820]"
+                    className="h-13 w-full rounded-[18px] border border-[#e4e2d9] bg-white px-4 text-sm outline-none focus:border-[#1b2431]"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-bold text-[#59636f]">
+                  <label className="mb-2 block text-xs font-bold text-[#5f6667]">
                     {text.description}
                   </label>
 
@@ -2418,23 +2418,23 @@ export default function WorkProjectPage() {
                       text.descriptionPlaceholder
                     }
                     rows={4}
-                    className="w-full resize-none rounded-[18px] border border-[#dedfe1] bg-white px-4 py-3 text-sm outline-none focus:border-[#111820]"
+                    className="w-full resize-none rounded-[18px] border border-[#e4e2d9] bg-white px-4 py-3 text-sm outline-none focus:border-[#1b2431]"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-2 block text-xs font-bold text-[#59636f]">
+                    <label className="mb-2 block text-xs font-bold text-[#5f6667]">
                       {text.deadline}
                     </label>
 
                     <DatePicker value={newDeadline} onChange={(__value: string) => setNewDeadline(
                           __value
-                        )} className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none" />
+                        )} className="h-12 w-full rounded-[18px] border border-[#e4e2d9] bg-white px-3 text-sm outline-none" />
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-xs font-bold text-[#59636f]">
+                    <label className="mb-2 block text-xs font-bold text-[#5f6667]">
                       {text.priority}
                     </label>
 
@@ -2448,7 +2448,7 @@ export default function WorkProjectPage() {
                             .value as WorkItem["priority"]
                         )
                       }
-                      className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none"
+                      className="h-12 w-full rounded-[18px] border border-[#e4e2d9] bg-white px-3 text-sm outline-none"
                     >
                       <option value="low">
                         {text.low}
@@ -2470,7 +2470,7 @@ export default function WorkProjectPage() {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-bold text-[#59636f]">
+                  <label className="mb-2 block text-xs font-bold text-[#5f6667]">
                     {text.responsible}
                   </label>
 
@@ -2484,7 +2484,7 @@ export default function WorkProjectPage() {
                           .value
                       )
                     }
-                    className="h-12 w-full rounded-[18px] border border-[#dedfe1] bg-white px-3 text-sm outline-none"
+                    className="h-12 w-full rounded-[18px] border border-[#e4e2d9] bg-white px-3 text-sm outline-none"
                   >
                     <option value="">
                       {text.stillOpen}
@@ -2521,7 +2521,7 @@ export default function WorkProjectPage() {
                   onClick={
                     createTask
                   }
-                  className="flex h-13 w-full items-center justify-center gap-2 rounded-[20px] bg-[#111820] text-sm font-bold text-white disabled:opacity-40"
+                  className="flex h-13 w-full items-center justify-center gap-2 rounded-[20px] bg-[#1b2431] text-sm font-bold text-[#ffc93c] disabled:opacity-40"
                 >
                   <Plus size={18} />
 
@@ -2558,7 +2558,7 @@ export default function WorkProjectPage() {
 
             <section className="absolute inset-x-0 bottom-0 mx-auto max-w-[620px] overflow-hidden rounded-t-[32px] bg-white">
               <div className="px-5 pb-6 pt-5">
-                <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-[#d8dadd]" />
+                <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-[#deddd5]" />
 
                 <div className="flex items-start justify-between">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
@@ -2575,7 +2575,7 @@ export default function WorkProjectPage() {
                         false
                       )
                     }
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f3] text-[#69727b]"
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f3] text-[#6f7573]"
                     aria-label={
                       text.close
                     }
@@ -2588,9 +2588,9 @@ export default function WorkProjectPage() {
                   {text.deleteTaskTitle}
                 </h2>
 
-                <p className="mt-2 text-[15px] leading-6 text-[#68727c]">
+                <p className="mt-2 text-[15px] leading-6 text-[#6e7574]">
                   {text.deleteTaskQuestion}{" "}
-                  <span className="font-bold text-[#303841]">
+                  <span className="font-bold text-[#363b39]">
                     „
                     {
                       selectedItem.title
@@ -2623,7 +2623,7 @@ export default function WorkProjectPage() {
                         false
                       )
                     }
-                    className="h-13 rounded-[19px] border border-[#dedfe1] bg-white text-sm font-bold text-[#59636f]"
+                    className="h-13 rounded-[19px] border border-[#e4e2d9] bg-white text-sm font-bold text-[#5f6667]"
                   >
                     {text.cancel}
                   </button>
@@ -2668,7 +2668,7 @@ export default function WorkProjectPage() {
 
           <section className="absolute inset-x-0 bottom-0 mx-auto max-w-[620px] overflow-hidden rounded-t-[32px] bg-white">
             <div className="px-5 pb-6 pt-5">
-              <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-[#d8dadd]" />
+              <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-[#deddd5]" />
 
               <div className="flex items-start justify-between">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
@@ -2683,7 +2683,7 @@ export default function WorkProjectPage() {
                       false
                     )
                   }
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f3] text-[#69727b]"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f3] text-[#6f7573]"
                   aria-label={
                     text.close
                   }
@@ -2696,9 +2696,9 @@ export default function WorkProjectPage() {
                 {text.deleteProjectTitle}
               </h2>
 
-              <p className="mt-2 text-[15px] leading-6 text-[#68727c]">
+              <p className="mt-2 text-[15px] leading-6 text-[#6e7574]">
                 {text.deleteProjectQuestion}{" "}
-                <span className="font-bold text-[#303841]">
+                <span className="font-bold text-[#363b39]">
                   „{project.title}“
                 </span>{" "}
                 wirklich löschen?
@@ -2727,7 +2727,7 @@ export default function WorkProjectPage() {
                       false
                     )
                   }
-                  className="h-13 rounded-[19px] border border-[#dedfe1] bg-white text-sm font-bold text-[#59636f]"
+                  className="h-13 rounded-[19px] border border-[#e4e2d9] bg-white text-sm font-bold text-[#5f6667]"
                 >
                   {text.cancel}
                 </button>

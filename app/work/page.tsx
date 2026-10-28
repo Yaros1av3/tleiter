@@ -682,7 +682,7 @@ export default function WorkPage() {
       project.total > 0;
 
     return (
-      <div className="group relative overflow-hidden rounded-[28px] bg-[#111820] text-white shadow-[0_12px_30px_rgba(17,24,32,0.12)]">
+      <div className="group relative overflow-hidden rounded-[28px] bg-[#1b2431] text-[#ffc93c] shadow-[0_12px_30px_rgba(27,36,49,0.12)]">
         <Link
           href={`/work/${project.id}`}
           className="block active:scale-[0.99]"
@@ -882,7 +882,7 @@ export default function WorkPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f7f5] text-[#111820]">
+    <main className="min-h-screen bg-[#f7f7f5] text-[#1b2431]">
       <div className="mx-auto min-h-screen w-full max-w-[720px] px-4 pb-28">
         <header className="flex items-center justify-between py-5">
           <div className="flex items-center gap-3">
@@ -902,7 +902,7 @@ export default function WorkPage() {
             onClick={() =>
               setNewProjectOpen(true)
             }
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#111820] text-white active:scale-95"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1b2431] text-[#ffc93c] active:scale-95"
             aria-label={text.newWork}
           >
             <Plus size={21} />
@@ -920,7 +920,7 @@ export default function WorkPage() {
             {[1, 2, 3].map((item) => (
               <div
                 key={item}
-                className="animate-pulse rounded-[28px] bg-[#111820] p-5"
+                className="animate-pulse rounded-[28px] bg-[#1b2431] p-5"
               >
                 <div className="flex gap-3">
                   <div className="h-12 w-12 rounded-[17px] bg-white/[0.08]" />
@@ -939,7 +939,7 @@ export default function WorkPage() {
           </div>
         ) : projects.length === 0 ? (
           <section className="rounded-[28px] bg-white px-6 py-10 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#111820] text-white">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1b2431] text-[#ffc93c]">
               <FolderKanban size={25} />
             </div>
 
@@ -956,7 +956,7 @@ export default function WorkPage() {
               onClick={() =>
                 setNewProjectOpen(true)
               }
-              className="mt-6 inline-flex h-11 items-center gap-2 rounded-full bg-[#111820] px-5 text-[13px] font-semibold text-white active:scale-[0.98]"
+              className="mt-6 inline-flex h-11 items-center gap-2 rounded-full bg-[#1b2431] px-5 text-[13px] font-semibold text-[#ffc93c] active:scale-[0.98]"
             >
               <Plus size={17} />
               {text.newWork}
@@ -1104,7 +1104,7 @@ export default function WorkPage() {
                       text.titlePlaceholder
                     }
                     autoFocus
-                    className="h-12 w-full rounded-2xl bg-[#f7f7f5] px-4 text-[14px] outline-none focus:ring-2 focus:ring-[#111820]/10"
+                    className="h-12 w-full rounded-2xl bg-[#f7f7f5] px-4 text-[14px] outline-none focus:ring-2 focus:ring-[#1b2431]/10"
                   />
                 </div>
 
@@ -1124,7 +1124,7 @@ export default function WorkPage() {
                       text.descriptionPlaceholder
                     }
                     rows={4}
-                    className="w-full resize-none rounded-2xl bg-[#f7f7f5] px-4 py-3 text-[14px] leading-5 outline-none focus:ring-2 focus:ring-[#111820]/10"
+                    className="w-full resize-none rounded-2xl bg-[#f7f7f5] px-4 py-3 text-[14px] leading-5 outline-none focus:ring-2 focus:ring-[#1b2431]/10"
                   />
                 </div>
 
@@ -1177,7 +1177,7 @@ export default function WorkPage() {
                     saving
                   }
                   onClick={createProject}
-                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#111820] text-[14px] font-semibold text-white disabled:opacity-40"
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#1b2431] text-[14px] font-semibold text-[#ffc93c] disabled:opacity-40"
                 >
                   <Plus size={18} />
 
@@ -1249,7 +1249,7 @@ export default function WorkPage() {
                           event.target.value
                         )
                       }
-                      className="h-12 w-full rounded-2xl bg-[#f7f7f5] px-4 text-[14px] outline-none focus:ring-2 focus:ring-[#111820]/10"
+                      className="h-12 w-full rounded-2xl bg-[#f7f7f5] px-4 text-[14px] outline-none focus:ring-2 focus:ring-[#1b2431]/10"
                     />
                   </div>
 
@@ -1266,7 +1266,7 @@ export default function WorkPage() {
                         )
                       }
                       rows={4}
-                      className="w-full resize-none rounded-2xl bg-[#f7f7f5] px-4 py-3 text-[14px] leading-5 outline-none focus:ring-2 focus:ring-[#111820]/10"
+                      className="w-full resize-none rounded-2xl bg-[#f7f7f5] px-4 py-3 text-[14px] leading-5 outline-none focus:ring-2 focus:ring-[#1b2431]/10"
                     />
                   </div>
 
@@ -1337,7 +1337,7 @@ export default function WorkPage() {
                       saving
                     }
                     onClick={updateProject}
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#111820] text-[14px] font-semibold text-white disabled:opacity-40"
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#1b2431] text-[14px] font-semibold text-[#ffc93c] disabled:opacity-40"
                   >
                     <Pencil size={17} />
 
@@ -1371,7 +1371,7 @@ export default function WorkPage() {
 
             <section className="absolute inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-12px)] max-w-[620px] overflow-hidden rounded-t-[32px] bg-white shadow-[0_-15px_60px_rgba(0,0,0,0.25)]">
               <div className="px-5 pb-5 pt-5">
-                <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-[#d8dadd]" />
+                <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-[#deddd5]" />
 
                 <div className="flex items-start justify-between">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
@@ -1386,7 +1386,7 @@ export default function WorkPage() {
                         false
                       )
                     }
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f3] text-[#69727b]"
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f5f3] text-[#6f7573]"
                   >
                     <X size={18} />
                   </button>
@@ -1396,11 +1396,11 @@ export default function WorkPage() {
                   {text.deleteWorkQuestion}
                 </h2>
 
-                <p className="mt-2 text-[15px] leading-6 text-[#68727c]">
+                <p className="mt-2 text-[15px] leading-6 text-[#6e7574]">
                   {isRu ? (
                     <>
                       {text.deleteQuestion}{" "}
-                      <span className="font-bold text-[#303841]">
+                      <span className="font-bold text-[#363b39]">
                         „{selectedProject.title}“
                       </span>
                       {text.deleteQuestionAfter}
@@ -1408,7 +1408,7 @@ export default function WorkPage() {
                   ) : (
                     <>
                       {text.deleteQuestion}{" "}
-                      <span className="font-bold text-[#303841]">
+                      <span className="font-bold text-[#363b39]">
                         „{selectedProject.title}“
                       </span>{" "}
                       {text.deleteQuestionAfter}
@@ -1435,7 +1435,7 @@ export default function WorkPage() {
                         false
                       )
                     }
-                    className="h-13 rounded-[19px] border border-[#dedfe1] bg-white text-sm font-bold text-[#59636f]"
+                    className="h-13 rounded-[19px] border border-[#e4e2d9] bg-white text-sm font-bold text-[#5f6667]"
                   >
                     {text.cancel}
                   </button>

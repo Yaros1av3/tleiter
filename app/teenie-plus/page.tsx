@@ -251,14 +251,14 @@ async function renderShoppingImage(
   ctx.textBaseline = "top";
 
   /* фон и карточка */
-  ctx.fillStyle = "#f1f2f3";
+  ctx.fillStyle = "#f3efe3";
   ctx.fillRect(0, 0, W, H);
 
   ctx.save();
-  ctx.shadowColor = "rgba(17,24,32,0.10)";
+  ctx.shadowColor = "rgba(27,36,49,0.10)";
   ctx.shadowBlur = 40;
   ctx.shadowOffsetY = 12;
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "#fffff7";
   roundRectPath(ctx, CARD_X, OUTER, CARD_W, cardH, 48);
   ctx.fill();
   ctx.restore();
@@ -269,7 +269,7 @@ async function renderShoppingImage(
   const hw = CARD_W - 48;
   const hh = 200;
 
-  ctx.fillStyle = "#111820";
+  ctx.fillStyle = "#1b2431";
   roundRectPath(ctx, hx, hy, hw, hh, 36);
   ctx.fill();
 
@@ -291,7 +291,7 @@ async function renderShoppingImage(
   if (logo) {
     ctx.drawImage(logo, logoX, logoY, 100, 100);
   } else {
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = "#fffff7";
     ctx.fillRect(logoX, logoY, 100, 100);
   }
 
@@ -299,11 +299,11 @@ async function renderShoppingImage(
 
   const headTextX = logoX + 100 + 32;
 
-  ctx.fillStyle = "#8a939d";
+  ctx.fillStyle = "#8f897a";
   ctx.font = `700 24px ${CANVAS_FONT}`;
   ctx.fillText("TEENIE+  ·  TLIGHT", headTextX, hy + 46);
 
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "#fffff7";
   ctx.font = `800 56px ${CANVAS_FONT}`;
   ctx.fillText(
     isRu ? "Список покупок" : "Einkaufsliste",
@@ -311,7 +311,7 @@ async function renderShoppingImage(
     hy + 80,
   );
 
-  ctx.fillStyle = "#9aa5b1";
+  ctx.fillStyle = "#a0a8a9";
   ctx.font = `500 28px ${CANVAS_FONT}`;
   ctx.fillText(
     new Date().toLocaleDateString(isRu ? "ru-RU" : "de-DE", {
@@ -327,7 +327,7 @@ async function renderShoppingImage(
   let cursor = OUTER + HEADER_H;
 
   if (rows.length === 0) {
-    ctx.fillStyle = "#9aa2ad";
+    ctx.fillStyle = "#a0a5a5";
     ctx.font = `500 34px ${CANVAS_FONT}`;
     ctx.textAlign = "center";
     ctx.fillText(
@@ -340,18 +340,18 @@ async function renderShoppingImage(
 
   rows.forEach((row, index) => {
     if (index > 0) {
-      ctx.fillStyle = "#eceef0";
+      ctx.fillStyle = "#ece6d6";
       ctx.fillRect(CARD_X + PAD, cursor, CARD_W - PAD * 2, 2);
     }
 
     /* чекбокс */
-    ctx.strokeStyle = "#c9ced4";
+    ctx.strokeStyle = "#cfd1cc";
     ctx.lineWidth = 3;
     roundRectPath(ctx, CARD_X + PAD, cursor + 35, 44, 44, 12);
     ctx.stroke();
 
     /* название */
-    ctx.fillStyle = "#111820";
+    ctx.fillStyle = "#1b2431";
     ctx.font = `600 40px ${CANVAS_FONT}`;
 
     row.titleLines.forEach((line, lineIndex) => {
@@ -360,7 +360,7 @@ async function renderShoppingImage(
 
     /* заметка */
     if (row.noteLines.length > 0) {
-      ctx.fillStyle = "#8a939d";
+      ctx.fillStyle = "#8f897a";
       ctx.font = `400 30px ${CANVAS_FONT}`;
 
       row.noteLines.forEach((line, lineIndex) => {
@@ -378,10 +378,10 @@ async function renderShoppingImage(
   /* подвал */
   const footerY = OUTER + HEADER_H + bodyH;
 
-  ctx.fillStyle = "#eceef0";
+  ctx.fillStyle = "#ece6d6";
   ctx.fillRect(CARD_X + PAD, footerY + 10, CARD_W - PAD * 2, 2);
 
-  ctx.fillStyle = "#65707d";
+  ctx.fillStyle = "#6f6a5c";
   ctx.font = `600 30px ${CANVAS_FONT}`;
   ctx.fillText(
     isRu ? `Всего пунктов: ${items.length}` : `Punkte gesamt: ${items.length}`,
@@ -389,7 +389,7 @@ async function renderShoppingImage(
     footerY + 44,
   );
 
-  ctx.fillStyle = "#b1b7bf";
+  ctx.fillStyle = "#b7bab7";
   ctx.font = `500 26px ${CANVAS_FONT}`;
   ctx.textAlign = "right";
   ctx.fillText("tlight-workspace.vercel.app", CARD_X + CARD_W - PAD, footerY + 47);
@@ -1091,15 +1091,15 @@ export default function TeeniePlusPage() {
   /* ================= РЕНДЕР ================= */
 
   return (
-    <main className="min-h-screen bg-[#f7f7f6] text-neutral-900">
-      <header className="sticky top-0 z-30 border-b border-[#e6e7e8] bg-[#f7f7f6]/95 px-4 py-3 backdrop-blur-xl">
+    <main className="min-h-screen bg-[#faf8f3] text-neutral-900">
+      <header className="sticky top-0 z-30 border-b border-[#eceae0] bg-[#faf8f3]/95 px-4 py-3 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-[760px] items-center gap-3">
           <div className="min-w-0">
-            <div className="text-[19px] font-bold leading-none tracking-[-0.03em] text-[#111820]">
+            <div className="text-[19px] font-bold leading-none tracking-[-0.03em] text-[#1b2431]">
               Teenie+
             </div>
 
-            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8a939d]">
+            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8f897a]">
               {isRu ? "Посещаемость и покупки" : "Anwesenheit und Einkauf"}
             </div>
           </div>
@@ -1111,7 +1111,7 @@ export default function TeeniePlusPage() {
         {teenInfo.needChat.length > 0 && (
           <section className="mb-5 overflow-hidden rounded-[20px] border border-amber-200 bg-amber-50/60">
             <div className="flex items-center gap-3 px-4 pb-1 pt-3.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-amber-300 text-[#111820]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-amber-300 text-[#1b2431]">
                 <MessageCircle size={17} />
               </span>
 
@@ -1165,7 +1165,7 @@ export default function TeeniePlusPage() {
                     </button>
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[14px] font-semibold text-[#111820]">
+                      <p className="truncate text-[14px] font-semibold text-[#1b2431]">
                         {teen.first_name} {teen.last_name}
                       </p>
 
@@ -1182,14 +1182,14 @@ export default function TeeniePlusPage() {
         )}
 
         {/* TABS */}
-        <div className="mb-5 flex gap-2 rounded-[16px] border border-[#e2e5e8] bg-white p-1.5">
+        <div className="mb-5 flex gap-2 rounded-[16px] border border-[#e8e8e0] bg-white p-1.5">
           <button
             type="button"
             onClick={() => setTab("attendance")}
             className={`flex flex-1 items-center justify-center gap-1.5 rounded-[12px] py-2.5 text-[13px] font-semibold transition ${
               tab === "attendance"
-                ? "bg-[#111820] text-white"
-                : "text-[#65707d]"
+                ? "bg-[#1b2431] text-[#ffc93c]"
+                : "text-[#6f6a5c]"
             }`}
           >
             <Calendar size={15} />
@@ -1201,8 +1201,8 @@ export default function TeeniePlusPage() {
             onClick={() => setTab("plans")}
             className={`flex flex-1 items-center justify-center gap-1.5 rounded-[12px] py-2.5 text-[13px] font-semibold transition ${
               tab === "plans"
-                ? "bg-[#111820] text-white"
-                : "text-[#65707d]"
+                ? "bg-[#1b2431] text-[#ffc93c]"
+                : "text-[#6f6a5c]"
             }`}
           >
             <Sparkles size={15} />
@@ -1214,8 +1214,8 @@ export default function TeeniePlusPage() {
             onClick={() => setTab("shopping")}
             className={`flex flex-1 items-center justify-center gap-1.5 rounded-[12px] py-2.5 text-[13px] font-semibold transition ${
               tab === "shopping"
-                ? "bg-[#111820] text-white"
-                : "text-[#65707d]"
+                ? "bg-[#1b2431] text-[#ffc93c]"
+                : "text-[#6f6a5c]"
             }`}
           >
             <ShoppingCart size={15} />
@@ -1225,7 +1225,7 @@ export default function TeeniePlusPage() {
                 className={`rounded-full px-1.5 text-[10px] ${
                   tab === "shopping"
                     ? "bg-white/20 text-white"
-                    : "bg-[#eceef0] text-[#65707d]"
+                    : "bg-[#ece6d6] text-[#6f6a5c]"
                 }`}
               >
                 {pendingItems.length}
@@ -1238,18 +1238,18 @@ export default function TeeniePlusPage() {
         {tab === "attendance" && (
           <div>
             {/* MONTH NAV */}
-            <div className="mb-3 flex items-center justify-between rounded-[20px] border border-[#e6e8ea] bg-white p-1.5">
+            <div className="mb-3 flex items-center justify-between rounded-[20px] border border-[#ecebe2] bg-white p-1.5">
               <button
                 type="button"
                 onClick={() => shiftMonth(-1)}
-                className="flex h-11 w-11 items-center justify-center rounded-[14px] text-[#374353] active:bg-[#f1f2f3]"
+                className="flex h-11 w-11 items-center justify-center rounded-[14px] text-[#3a3a35] active:bg-[#f3efe3]"
                 aria-label={isRu ? "Предыдущий месяц" : "Vorheriger Monat"}
               >
                 <ChevronLeft size={21} />
               </button>
 
               <div className="text-center">
-                <div className="text-[17px] font-bold capitalize tracking-[-0.02em] text-[#111820]">
+                <div className="text-[17px] font-bold capitalize tracking-[-0.02em] text-[#1b2431]">
                   {monthLabel}
                 </div>
 
@@ -1257,7 +1257,7 @@ export default function TeeniePlusPage() {
                   <button
                     type="button"
                     onClick={goToCurrentMonth}
-                    className="text-[11px] font-semibold text-[#8a939d] underline"
+                    className="text-[11px] font-semibold text-[#8f897a] underline"
                   >
                     {isRu ? "К текущему месяцу" : "Zum aktuellen Monat"}
                   </button>
@@ -1267,7 +1267,7 @@ export default function TeeniePlusPage() {
               <button
                 type="button"
                 onClick={() => shiftMonth(1)}
-                className="flex h-11 w-11 items-center justify-center rounded-[14px] text-[#374353] active:bg-[#f1f2f3]"
+                className="flex h-11 w-11 items-center justify-center rounded-[14px] text-[#3a3a35] active:bg-[#f3efe3]"
                 aria-label={isRu ? "Следующий месяц" : "Nächster Monat"}
               >
                 <ChevronRight size={21} />
@@ -1282,27 +1282,27 @@ export default function TeeniePlusPage() {
                   setDraftWeekdays(weekdays);
                   setSettingsOpen((value) => !value);
                 }}
-                className="flex w-full items-center justify-between rounded-[14px] border border-[#e6e8ea] bg-white px-3.5 py-2.5 text-left"
+                className="flex w-full items-center justify-between rounded-[14px] border border-[#ecebe2] bg-white px-3.5 py-2.5 text-left"
               >
                 <div className="flex items-center gap-2">
-                  <Settings2 size={14} className="text-[#8a939d]" />
+                  <Settings2 size={14} className="text-[#8f897a]" />
 
-                  <span className="text-[12px] font-semibold text-[#65707d]">
+                  <span className="text-[12px] font-semibold text-[#6f6a5c]">
                     {isRu ? "Дни занятий:" : "Tage der Treffen:"}{" "}
-                    <span className="text-[#111820]">
+                    <span className="text-[#1b2431]">
                       {weekdays.map((day) => weekdayLabels[day]).join(", ")}
                     </span>
                   </span>
                 </div>
 
-                <span className="text-[11px] font-semibold text-[#9aa2ad]">
+                <span className="text-[11px] font-semibold text-[#a0a5a5]">
                   {isRu ? "Изменить" : "Ändern"}
                 </span>
               </button>
 
               {settingsOpen && (
-                <div className="mt-2 rounded-[14px] border border-[#e6e8ea] bg-white p-3.5">
-                  <p className="mb-3 text-[11px] text-[#9aa2ad]">
+                <div className="mt-2 rounded-[14px] border border-[#ecebe2] bg-white p-3.5">
+                  <p className="mb-3 text-[11px] text-[#a0a5a5]">
                     {isRu
                       ? "Выбери один или несколько дней недели — по ним строки создаются автоматически. Уже созданные строки не меняются, а лишние можно удалить корзиной."
                       : "Wähle einen oder mehrere Wochentage — dafür werden Zeilen automatisch angelegt. Vorhandene Zeilen bleiben unverändert, überflüssige kannst du löschen."}
@@ -1316,8 +1316,8 @@ export default function TeeniePlusPage() {
                         onClick={() => toggleDraftWeekday(day)}
                         className={`rounded-[10px] px-3 py-1.5 text-[12px] font-semibold transition ${
                           draftWeekdays.includes(day)
-                            ? "bg-[#111820] text-white"
-                            : "bg-[#f1f2f3] text-[#65707d]"
+                            ? "bg-[#1b2431] text-[#ffc93c]"
+                            : "bg-[#f3efe3] text-[#6f6a5c]"
                         }`}
                       >
                         {label}
@@ -1329,7 +1329,7 @@ export default function TeeniePlusPage() {
                     <button
                       type="button"
                       onClick={() => setSettingsOpen(false)}
-                      className="rounded-[10px] px-3 py-1.5 text-[12px] font-semibold text-[#9aa2ad]"
+                      className="rounded-[10px] px-3 py-1.5 text-[12px] font-semibold text-[#a0a5a5]"
                     >
                       {isRu ? "Отмена" : "Abbrechen"}
                     </button>
@@ -1338,7 +1338,7 @@ export default function TeeniePlusPage() {
                       type="button"
                       disabled={savingSettings || draftWeekdays.length === 0}
                       onClick={saveWeekdaySettings}
-                      className="rounded-[10px] bg-[#111820] px-3.5 py-1.5 text-[12px] font-semibold text-white disabled:opacity-50"
+                      className="rounded-[10px] bg-[#1b2431] px-3.5 py-1.5 text-[12px] font-semibold text-[#ffc93c] disabled:opacity-50"
                     >
                       {savingSettings
                         ? isRu
@@ -1354,8 +1354,8 @@ export default function TeeniePlusPage() {
             </div>
 
             {/* TABLE */}
-            <div className="overflow-hidden rounded-[20px] border border-[#e6e8ea] bg-white">
-              <div className="flex items-center gap-2 border-b border-[#eceef0] bg-[#fafafa] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.06em] text-[#9aa2ad]">
+            <div className="overflow-hidden rounded-[20px] border border-[#ecebe2] bg-white">
+              <div className="flex items-center gap-2 border-b border-[#ece6d6] bg-[#fffdf8] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.06em] text-[#a0a5a5]">
                 <div className="w-[70px] shrink-0">
                   {isRu ? "Дата" : "Datum"}
                 </div>
@@ -1371,7 +1371,7 @@ export default function TeeniePlusPage() {
                   {[0, 1, 2, 3].map((item) => (
                     <div
                       key={item}
-                      className="h-10 animate-pulse rounded-[10px] bg-[#f4f5f5]"
+                      className="h-10 animate-pulse rounded-[10px] bg-[#faf8ed]"
                     />
                   ))}
                 </div>
@@ -1382,7 +1382,7 @@ export default function TeeniePlusPage() {
                     : "Die Tabelle konnte nicht geladen werden. Prüfe, ob die SQL-Migration in Supabase ausgeführt wurde."}
                 </div>
               ) : visibleEntries.length === 0 ? (
-                <div className="px-5 py-10 text-center text-[12px] text-[#9aa2ad]">
+                <div className="px-5 py-10 text-center text-[12px] text-[#a0a5a5]">
                   {isRu
                     ? "В этом месяце нет занятий в выбранные дни."
                     : "In diesem Monat gibt es keine Treffen an den gewählten Tagen."}
@@ -1392,10 +1392,10 @@ export default function TeeniePlusPage() {
                   <div
                     key={entry.id}
                     className={`flex items-center gap-2 px-3 py-2 ${
-                      index > 0 ? "border-t border-[#f0f1f2]" : ""
+                      index > 0 ? "border-t border-[#f3efe3]" : ""
                     } ${entry.entry_date === todayString ? "bg-amber-50" : ""}`}
                   >
-                    <label className="relative flex h-9 w-[70px] shrink-0 cursor-pointer items-center rounded-[10px] bg-[#f4f5f5] px-2 text-[12px] font-semibold text-[#374353]">
+                    <label className="relative flex h-9 w-[70px] shrink-0 cursor-pointer items-center rounded-[10px] bg-[#faf8ed] px-2 text-[12px] font-semibold text-[#3a3a35]">
                       {formatRowDate(entry.entry_date, weekdayLabels)}
 
                       <input
@@ -1430,7 +1430,7 @@ export default function TeeniePlusPage() {
                           updateEntry(entry.id, { topic: value || null });
                         }
                       }}
-                      className="min-w-0 flex-1 rounded-[8px] border border-transparent bg-transparent px-1.5 py-1.5 text-[13px] text-[#111820] outline-none placeholder:text-[#c7cbd1] focus:border-[#dfe1e4] focus:bg-[#fafafa]"
+                      className="min-w-0 flex-1 rounded-[8px] border border-transparent bg-transparent px-1.5 py-1.5 text-[13px] text-[#1b2431] outline-none placeholder:text-[#cdcec9] focus:border-[#e5e4dc] focus:bg-[#fffdf8]"
                     />
 
                     <input
@@ -1446,13 +1446,13 @@ export default function TeeniePlusPage() {
                           updateEntry(entry.id, { attendee_count: value });
                         }
                       }}
-                      className="w-[52px] shrink-0 rounded-[8px] border border-transparent bg-transparent px-1 py-1.5 text-right text-[13px] font-semibold text-[#111820] outline-none placeholder:text-[#c7cbd1] focus:border-[#dfe1e4] focus:bg-[#fafafa]"
+                      className="w-[52px] shrink-0 rounded-[8px] border border-transparent bg-transparent px-1 py-1.5 text-right text-[13px] font-semibold text-[#1b2431] outline-none placeholder:text-[#cdcec9] focus:border-[#e5e4dc] focus:bg-[#fffdf8]"
                     />
 
                     <button
                       type="button"
                       onClick={() => deleteEntry(entry.id)}
-                      className="flex h-7 w-[28px] shrink-0 items-center justify-center rounded-[8px] text-[#d0d4d9] active:bg-[#f1f2f3]"
+                      className="flex h-7 w-[28px] shrink-0 items-center justify-center rounded-[8px] text-[#d6d7d1] active:bg-[#f3efe3]"
                       aria-label={isRu ? "Удалить строку" : "Zeile löschen"}
                     >
                       <Trash2 size={14} />
@@ -1465,7 +1465,7 @@ export default function TeeniePlusPage() {
               {!loadingAttendance &&
                 !attendanceError &&
                 visibleEntries.length > 0 && (
-                <div className="flex items-center justify-between gap-2 border-t border-[#eceef0] bg-[#fafafa] px-3 py-2.5 text-[11px] font-semibold text-[#65707d]">
+                <div className="flex items-center justify-between gap-2 border-t border-[#ece6d6] bg-[#fffdf8] px-3 py-2.5 text-[11px] font-semibold text-[#6f6a5c]">
                   <span>
                     {isRu ? "Занятий" : "Treffen"}: {stats.sessions}
                   </span>
@@ -1483,7 +1483,7 @@ export default function TeeniePlusPage() {
               <button
                 type="button"
                 onClick={() => setShowAllDays((value) => !value)}
-                className="mt-2.5 w-full text-center text-[11px] font-semibold text-[#8a939d] underline"
+                className="mt-2.5 w-full text-center text-[11px] font-semibold text-[#8f897a] underline"
               >
                 {showAllDays
                   ? isRu
@@ -1498,40 +1498,40 @@ export default function TeeniePlusPage() {
             <button
               type="button"
               onClick={addRow}
-              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-[14px] border border-dashed border-[#d3d7dc] py-2.5 text-[12px] font-semibold text-[#8a939d] active:bg-white"
+              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-[14px] border border-dashed border-[#d9dad4] py-2.5 text-[12px] font-semibold text-[#8f897a] active:bg-white"
             >
               <Plus size={14} />
               {isRu ? "Добавить день" : "Tag hinzufügen"}
             </button>
 
             {/* TEENS: BIRTHDAYS + AGE */}
-            <div className="mt-6 overflow-hidden rounded-[22px] border border-[#e6e8ea] bg-white">
-              <div className="flex items-center gap-3 border-b border-[#f0f1f2] px-4 py-3.5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[#111820] text-white">
+            <div className="mt-6 overflow-hidden rounded-[22px] border border-[#ecebe2] bg-white">
+              <div className="flex items-center gap-3 border-b border-[#f3efe3] px-4 py-3.5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[#1b2431] text-[#ffc93c]">
                   <Cake size={18} strokeWidth={1.8} />
                 </div>
 
                 <div className="min-w-0">
-                  <p className="text-[14px] font-bold text-[#111820]">
+                  <p className="text-[14px] font-bold text-[#1b2431]">
                     {isRu
                       ? "Дни рождения в этом месяце"
                       : "Geburtstage in diesem Monat"}
                   </p>
 
-                  <p className="mt-0.5 text-[11px] capitalize text-[#9aa2ad]">
+                  <p className="mt-0.5 text-[11px] capitalize text-[#a0a5a5]">
                     {teenInfo.monthName}
                   </p>
                 </div>
               </div>
 
               {teenInfo.thisMonth.length === 0 ? (
-                <div className="px-4 py-6 text-center text-[12px] text-[#9aa2ad]">
+                <div className="px-4 py-6 text-center text-[12px] text-[#a0a5a5]">
                   {isRu
                     ? "В этом месяце дней рождения нет."
                     : "In diesem Monat gibt es keine Geburtstage."}
                 </div>
               ) : (
-                <div className="divide-y divide-[#f0f1f2]">
+                <div className="divide-y divide-[#f3efe3]">
                   {teenInfo.thisMonth.map(({ teen, day, turning }) => {
                     const highlight = turning === 14 || turning === 15;
                     const diff = day - teenInfo.today;
@@ -1565,17 +1565,17 @@ export default function TeeniePlusPage() {
                           highlight ? "bg-amber-50/70" : ""
                         }`}
                       >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f1f2f3] text-[13px] font-bold text-[#374353]">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f3efe3] text-[13px] font-bold text-[#3a3a35]">
                           {teen.first_name.charAt(0)}
                           {teen.last_name.charAt(0)}
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[13px] font-semibold text-[#111820]">
+                          <p className="truncate text-[13px] font-semibold text-[#1b2431]">
                             {teen.first_name} {teen.last_name}
                           </p>
 
-                          <p className="mt-0.5 text-[11px] text-[#9aa2ad]">
+                          <p className="mt-0.5 text-[11px] text-[#a0a5a5]">
                             {dateLabel} ·{" "}
                             {diff < 0
                               ? isRu
@@ -1599,8 +1599,8 @@ export default function TeeniePlusPage() {
                               diff === 0
                                 ? "text-emerald-600"
                                 : diff < 0
-                                  ? "text-[#c7cbd1]"
-                                  : "text-[#65707d]"
+                                  ? "text-[#cdcec9]"
+                                  : "text-[#6f6a5c]"
                             }`}
                           >
                             {status}
@@ -1613,13 +1613,13 @@ export default function TeeniePlusPage() {
               )}
 
               {/* СЕЙЧАС 14–15 ЛЕТ */}
-              <div className="border-t border-[#eceef0] bg-[#fafafa] px-4 py-3.5">
-                <p className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-[#9aa2ad]">
+              <div className="border-t border-[#ece6d6] bg-[#fffdf8] px-4 py-3.5">
+                <p className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-[#a0a5a5]">
                   {isRu ? "Сейчас 14–15 лет" : "Aktuell 14–15 Jahre"}
                 </p>
 
                 {teenInfo.aged.length === 0 ? (
-                  <p className="text-[12px] text-[#9aa2ad]">
+                  <p className="text-[12px] text-[#a0a5a5]">
                     {isRu
                       ? "Сейчас нет подростков в этом возрасте."
                       : "Aktuell gibt es keine Teens in diesem Alter."}
@@ -1634,7 +1634,7 @@ export default function TeeniePlusPage() {
 
                     return (
                       <div key={age} className="mb-2.5 last:mb-0">
-                        <p className="mb-1.5 text-[12px] font-bold text-[#111820]">
+                        <p className="mb-1.5 text-[12px] font-bold text-[#1b2431]">
                           {age} {isRu ? "лет" : "Jahre"} · {group.length}
                         </p>
 
@@ -1642,7 +1642,7 @@ export default function TeeniePlusPage() {
                           {group.map(({ teen }) => (
                             <span
                               key={teen.id}
-                              className="rounded-full border border-[#e2e5e8] bg-white px-2.5 py-1 text-[11px] font-medium text-[#374353]"
+                              className="rounded-full border border-[#e8e8e0] bg-white px-2.5 py-1 text-[11px] font-medium text-[#3a3a35]"
                             >
                               {teen.first_name} {teen.last_name}
                             </span>
@@ -1669,7 +1669,7 @@ export default function TeeniePlusPage() {
         {tab === "shopping" && (
           <div>
             {/* SUMMARY */}
-            <div className="mb-4 overflow-hidden rounded-[24px] bg-[#111820] p-5 text-white shadow-[0_8px_24px_rgba(17,24,32,0.14)]">
+            <div className="mb-4 overflow-hidden rounded-[24px] bg-[#1b2431] p-5 text-[#ffc93c] shadow-[0_8px_24px_rgba(27,36,49,0.14)]">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
@@ -1702,7 +1702,7 @@ export default function TeeniePlusPage() {
                 type="button"
                 onClick={openListModal}
                 disabled={pendingItems.length === 0}
-                className="mt-5 flex w-full items-center justify-center gap-2 rounded-[16px] bg-white py-3.5 text-[14px] font-bold text-[#111820] transition active:scale-[0.99] disabled:opacity-40"
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-[16px] bg-white py-3.5 text-[14px] font-bold text-[#1b2431] transition active:scale-[0.99] disabled:opacity-40"
               >
                 <Sparkles size={16} />
                 {isRu
@@ -1712,7 +1712,7 @@ export default function TeeniePlusPage() {
             </div>
 
             {/* ADD FORM */}
-            <div className="mb-4 rounded-[20px] border border-[#e6e8ea] bg-white p-3.5">
+            <div className="mb-4 rounded-[20px] border border-[#ecebe2] bg-white p-3.5">
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input
                   type="text"
@@ -1722,7 +1722,7 @@ export default function TeeniePlusPage() {
                     if (event.key === "Enter") addItem();
                   }}
                   placeholder={isRu ? "Что купить?" : "Was einkaufen?"}
-                  className="h-[52px] w-full min-w-0 rounded-[14px] border border-[#e2e5e8] bg-[#fafafa] px-4 text-[15px] outline-none placeholder:text-[#b1b7bf] focus:border-[#111820] focus:bg-white sm:w-auto sm:flex-1"
+                  className="h-[52px] w-full min-w-0 rounded-[14px] border border-[#e8e8e0] bg-[#fffdf8] px-4 text-[15px] outline-none placeholder:text-[#b7bab7] focus:border-[#1b2431] focus:bg-white sm:w-auto sm:flex-1"
                 />
 
                 <div className="flex gap-2">
@@ -1734,13 +1734,13 @@ export default function TeeniePlusPage() {
                       if (event.key === "Enter") addItem();
                     }}
                     placeholder={isRu ? "Кол-во / заметка" : "Menge / Notiz"}
-                    className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-[#e2e5e8] bg-[#fafafa] px-4 text-[15px] outline-none placeholder:text-[#b1b7bf] focus:border-[#111820] focus:bg-white sm:w-[150px] sm:flex-none"
+                    className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-[#e8e8e0] bg-[#fffdf8] px-4 text-[15px] outline-none placeholder:text-[#b7bab7] focus:border-[#1b2431] focus:bg-white sm:w-[150px] sm:flex-none"
                   />
 
                   <button
                     type="button"
                     onClick={addItem}
-                    className="flex h-[52px] shrink-0 items-center gap-1.5 rounded-[14px] bg-[#111820] px-5 text-[14px] font-semibold text-white active:scale-95"
+                    className="flex h-[52px] shrink-0 items-center gap-1.5 rounded-[14px] bg-[#1b2431] px-5 text-[14px] font-semibold text-[#ffc93c] active:scale-95"
                   >
                     <Plus size={16} />
                     {isRu ? "Добавить" : "Hinzufügen"}
@@ -1752,7 +1752,7 @@ export default function TeeniePlusPage() {
             {loadingShopping ? (
               <div className="h-[200px] animate-pulse rounded-[20px] bg-white" />
             ) : items.length === 0 ? (
-              <div className="rounded-[20px] border border-[#e6e8ea] bg-white px-6 py-12 text-center">
+              <div className="rounded-[20px] border border-[#ecebe2] bg-white px-6 py-12 text-center">
                 <ListChecks size={28} className="mx-auto text-neutral-300" />
 
                 <p className="mt-3 text-[13px] text-neutral-400">
@@ -1764,18 +1764,18 @@ export default function TeeniePlusPage() {
             ) : (
               <div className="space-y-4">
                 {pendingItems.length > 0 && (
-                  <div className="overflow-hidden rounded-[20px] border border-[#e6e8ea] bg-white">
+                  <div className="overflow-hidden rounded-[20px] border border-[#ecebe2] bg-white">
                     {pendingItems.map((item, index) => (
                       <div
                         key={item.id}
                         className={`flex items-center gap-3 px-3.5 py-3.5 ${
-                          index > 0 ? "border-t border-[#f0f1f2]" : ""
+                          index > 0 ? "border-t border-[#f3efe3]" : ""
                         }`}
                       >
                         <button
                           type="button"
                           onClick={() => togglePurchased(item)}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-[#d3d7dc] text-transparent transition active:scale-90 active:border-[#111820] active:bg-[#111820] active:text-white"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-[#d9dad4] text-transparent transition active:scale-90 active:border-[#1b2431] active:bg-[#1b2431] active:text-[#ffc93c]"
                           aria-label={
                             isRu ? "Отметить купленным" : "Als gekauft markieren"
                           }
@@ -1784,13 +1784,13 @@ export default function TeeniePlusPage() {
                         </button>
 
                         <div className="min-w-0 flex-1">
-                          <div className="break-words text-[15px] font-semibold leading-tight text-[#111820]">
+                          <div className="break-words text-[15px] font-semibold leading-tight text-[#1b2431]">
                             {item.title}
                           </div>
                         </div>
 
                         {item.note && (
-                          <span className="max-w-[40%] shrink-0 truncate rounded-full bg-[#f1f2f3] px-2.5 py-1 text-[11px] font-semibold text-[#65707d]">
+                          <span className="max-w-[40%] shrink-0 truncate rounded-full bg-[#f3efe3] px-2.5 py-1 text-[11px] font-semibold text-[#6f6a5c]">
                             {item.note}
                           </span>
                         )}
@@ -1798,7 +1798,7 @@ export default function TeeniePlusPage() {
                         <button
                           type="button"
                           onClick={() => deleteItem(item.id)}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-[#d0d4d9] active:bg-[#f4f5f5]"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-[#d6d7d1] active:bg-[#faf8ed]"
                           aria-label={isRu ? "Удалить" : "Löschen"}
                         >
                           <Trash2 size={15} />
@@ -1814,7 +1814,7 @@ export default function TeeniePlusPage() {
                       <button
                         type="button"
                         onClick={() => setShowPurchased((value) => !value)}
-                        className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#9aa2ad]"
+                        className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#a0a5a5]"
                       >
                         {isRu ? "Уже куплено" : "Schon gekauft"} ·{" "}
                         {purchasedItems.length} {showPurchased ? "▴" : "▾"}
@@ -1823,25 +1823,25 @@ export default function TeeniePlusPage() {
                       <button
                         type="button"
                         onClick={clearPurchased}
-                        className="text-[11px] font-semibold text-[#b1b7bf] underline"
+                        className="text-[11px] font-semibold text-[#b7bab7] underline"
                       >
                         {isRu ? "Очистить" : "Leeren"}
                       </button>
                     </div>
 
                     {showPurchased && (
-                      <div className="overflow-hidden rounded-[20px] border border-[#e6e8ea] bg-[#fafafa]">
+                      <div className="overflow-hidden rounded-[20px] border border-[#ecebe2] bg-[#fffdf8]">
                         {purchasedItems.map((item, index) => (
                           <div
                             key={item.id}
                             className={`flex items-center gap-3 px-3.5 py-3 ${
-                              index > 0 ? "border-t border-[#eceef0]" : ""
+                              index > 0 ? "border-t border-[#ece6d6]" : ""
                             }`}
                           >
                             <button
                               type="button"
                               onClick={() => togglePurchased(item)}
-                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#111820] text-white active:scale-90"
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1b2431] text-[#ffc93c] active:scale-90"
                               aria-label={
                                 isRu ? "Вернуть в список" : "Zurück in die Liste"
                               }
@@ -1849,14 +1849,14 @@ export default function TeeniePlusPage() {
                               <Check size={15} />
                             </button>
 
-                            <div className="min-w-0 flex-1 truncate text-[14px] font-medium text-[#9aa2ad] line-through">
+                            <div className="min-w-0 flex-1 truncate text-[14px] font-medium text-[#a0a5a5] line-through">
                               {item.title}
                             </div>
 
                             <button
                               type="button"
                               onClick={() => deleteItem(item.id)}
-                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-[#d0d4d9] active:bg-[#f0f1f2]"
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-[#d6d7d1] active:bg-[#f3efe3]"
                               aria-label={isRu ? "Удалить" : "Löschen"}
                             >
                               <Trash2 size={15} />
@@ -1884,13 +1884,13 @@ export default function TeeniePlusPage() {
           />
 
           <div className="relative z-10 flex max-h-[92vh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]">
-            <div className="flex items-center justify-between border-b border-[#eceef0] px-5 py-4">
+            <div className="flex items-center justify-between border-b border-[#ece6d6] px-5 py-4">
               <div>
-                <p className="text-[17px] font-bold tracking-[-0.02em] text-[#111820]">
+                <p className="text-[17px] font-bold tracking-[-0.02em] text-[#1b2431]">
                   {isRu ? "Список для лидеров" : "Liste für die Leiter"}
                 </p>
 
-                <p className="mt-0.5 text-[12px] text-[#9aa2ad]">
+                <p className="mt-0.5 text-[12px] text-[#a0a5a5]">
                   {isRu
                     ? "Скачай картинку или отправь в WhatsApp"
                     : "Bild herunterladen oder per WhatsApp senden"}
@@ -1900,16 +1900,16 @@ export default function TeeniePlusPage() {
               <button
                 type="button"
                 onClick={closeListModal}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f3f4f5] text-[#4e5966]"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f3efe3] text-[#545c5e]"
                 aria-label={isRu ? "Закрыть" : "Schließen"}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto bg-[#f1f2f3] p-4">
+            <div className="flex-1 overflow-y-auto bg-[#f3efe3] p-4">
               {listBusy ? (
-                <div className="flex h-[280px] items-center justify-center text-[13px] text-[#9aa2ad]">
+                <div className="flex h-[280px] items-center justify-center text-[13px] text-[#a0a5a5]">
                   {isRu ? "Собираю список..." : "Liste wird erstellt..."}
                 </div>
               ) : listUrl ? (
@@ -1917,7 +1917,7 @@ export default function TeeniePlusPage() {
                 <img
                   src={listUrl}
                   alt={isRu ? "Список покупок" : "Einkaufsliste"}
-                  className="mx-auto w-full rounded-[18px] shadow-[0_6px_24px_rgba(17,24,32,0.10)]"
+                  className="mx-auto w-full rounded-[18px] shadow-[0_6px_24px_rgba(27,36,49,0.10)]"
                 />
               ) : (
                 <div className="flex h-[200px] items-center justify-center text-[13px] text-red-500">
@@ -1928,7 +1928,7 @@ export default function TeeniePlusPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2 border-t border-[#eceef0] bg-white p-4 pb-[max(16px,env(safe-area-inset-bottom))]">
+            <div className="grid grid-cols-2 gap-2 border-t border-[#ece6d6] bg-white p-4 pb-[max(16px,env(safe-area-inset-bottom))]">
               <button
                 type="button"
                 onClick={openWhatsApp}
@@ -1942,7 +1942,7 @@ export default function TeeniePlusPage() {
                 type="button"
                 onClick={shareList}
                 disabled={listBusy}
-                className="flex items-center justify-center gap-2 rounded-[14px] bg-[#111820] py-3 text-[13px] font-bold text-white active:scale-[0.98] disabled:opacity-40"
+                className="flex items-center justify-center gap-2 rounded-[14px] bg-[#1b2431] py-3 text-[13px] font-bold text-[#ffc93c] active:scale-[0.98] disabled:opacity-40"
               >
                 <Share2 size={16} />
                 {isRu ? "Поделиться" : "Teilen"}
@@ -1952,7 +1952,7 @@ export default function TeeniePlusPage() {
                 type="button"
                 onClick={downloadList}
                 disabled={!listBlob}
-                className="flex items-center justify-center gap-2 rounded-[14px] border border-[#e2e5e8] py-3 text-[13px] font-bold text-[#374353] active:bg-[#f4f5f5] disabled:opacity-40"
+                className="flex items-center justify-center gap-2 rounded-[14px] border border-[#e8e8e0] py-3 text-[13px] font-bold text-[#3a3a35] active:bg-[#faf8ed] disabled:opacity-40"
               >
                 <Download size={16} />
                 {isRu ? "Скачать" : "Herunterladen"}
@@ -1961,7 +1961,7 @@ export default function TeeniePlusPage() {
               <button
                 type="button"
                 onClick={copyListText}
-                className="flex items-center justify-center gap-2 rounded-[14px] border border-[#e2e5e8] py-3 text-[13px] font-bold text-[#374353] active:bg-[#f4f5f5]"
+                className="flex items-center justify-center gap-2 rounded-[14px] border border-[#e8e8e0] py-3 text-[13px] font-bold text-[#3a3a35] active:bg-[#faf8ed]"
               >
                 {copied ? <Check size={16} /> : <Copy size={16} />}
                 {copied

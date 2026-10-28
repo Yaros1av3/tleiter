@@ -1537,7 +1537,7 @@ export default function CalendarPage() {
       <button
         type="button"
         onClick={openCreate}
-        className="fixed bottom-[96px] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-neutral-950 text-white shadow-[0_10px_30px_rgba(17,24,32,0.35)] transition active:scale-95 md:hidden"
+        className="fixed bottom-[96px] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-neutral-950 text-white shadow-[0_10px_30px_rgba(27,36,49,0.35)] transition active:scale-95 md:hidden"
         aria-label={language === "ru" ? "Новое событие" : "Neues Ereignis"}
       >
         <Plus size={24} />
