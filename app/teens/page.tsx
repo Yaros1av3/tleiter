@@ -7,6 +7,7 @@ import {
   ChevronDown,
   GraduationCap,
   MessageCircle,
+  PartyPopper,
   Pencil,
   Phone,
   Plus,
@@ -226,9 +227,7 @@ function TeenEvents({
 
           return (
             <div key={index} className="flex items-center gap-2.5">
-              <span className="text-[18px] leading-none">
-                {item.forms?.emoji ?? "🎉"}
-              </span>
+              <PartyPopper size={18} className="shrink-0 text-neutral-400" />
 
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13px] font-semibold text-neutral-800">

@@ -294,16 +294,16 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#f7f7f6] px-4 py-6">
+      <main className="min-h-screen bg-[#faf8f3] px-4 py-6">
         <div className="mx-auto flex min-h-[70vh] max-w-[430px] items-center justify-center">
           <div className="flex flex-col items-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-[16px] bg-[#111820]">
-              <span className="text-xl font-bold text-white">
+            <div className="flex h-12 w-12 items-center justify-center rounded-[16px] bg-[#1b2431]">
+              <span className="text-xl font-bold text-[#ffc93c]">
                 T
               </span>
             </div>
 
-            <p className="mt-4 text-sm font-medium text-[#7a8490]">
+            <p className="mt-4 text-sm font-medium text-[#7f796a]">
               TLight
             </p>
           </div>
@@ -313,7 +313,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f7f6] px-4 pb-28 pt-5 md:px-8 md:pb-8">
+    <main className="min-h-screen bg-[#faf8f3] px-4 pb-28 pt-5 md:px-8 md:pb-8">
       <div className="mx-auto w-full max-w-[760px]">
 
         {/* Mobile header */}
@@ -321,11 +321,11 @@ export default function SettingsPage() {
           
 
           <div>
-            <h1 className="text-[24px] font-bold tracking-[-0.04em] text-[#111820]">
+            <h1 className="text-[24px] font-bold tracking-[-0.04em] text-[#1b2431]">
               {t.settings.title}
             </h1>
 
-            <p className="mt-0.5 text-[13px] text-[#7a8490]">
+            <p className="mt-0.5 text-[13px] text-[#7f796a]">
               {t.settings.subtitle}
             </p>
           </div>
@@ -333,19 +333,20 @@ export default function SettingsPage() {
 
         {/* Desktop header */}
         <div className="mb-8 hidden md:block">
-          <h1 className="text-[34px] font-bold tracking-[-0.045em] text-[#111820]">
+          <h1 className="text-[34px] font-bold tracking-[-0.045em] text-[#1b2431]">
             {t.settings.title}
           </h1>
 
-          <p className="mt-2 text-[15px] text-[#687585]">
+          <p className="mt-2 text-[15px] text-[#6f6a5c]">
             {t.settings.subtitle}
           </p>
         </div>
 
         {/* Profile */}
-        <section className="overflow-hidden rounded-[24px] border border-[#e0e3e6] bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
+        <section className="relative overflow-hidden rounded-[24px] border border-[#e9e3d3] bg-white shadow-[0_4px_18px_rgba(27,36,49,0.04)]">
+          <span aria-hidden className="pointer-events-none absolute right-0 top-0 h-14 w-14 bg-[#ffc93c] [clip-path:polygon(0_0,100%_0,100%_100%)]" />
 
-          <div className="flex items-center gap-4 border-b border-[#eceef0] px-5 py-5">
+          <div className="flex items-center gap-4 border-b border-[#ece6d6] px-5 py-5">
             <div className="relative shrink-0">
               <Avatar
                 src={avatarUrl}
@@ -354,7 +355,7 @@ export default function SettingsPage() {
 
               {memberId !== null && (
                 <label
-                  className={`absolute -bottom-1 -right-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-[#111820] text-white shadow ${
+                  className={`absolute -bottom-1 -right-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-[#1b2431] text-[#ffc93c] shadow ${
                     avatarBusy ? "opacity-50" : ""
                   }`}
                   aria-label={isRu ? "Сменить фото" : "Foto ändern"}
@@ -375,18 +376,18 @@ export default function SettingsPage() {
             </div>
 
             <div className="min-w-0">
-              <p className="text-[18px] font-bold tracking-[-0.02em] text-[#111820]">
+              <p className="text-[18px] font-bold tracking-[-0.02em] text-[#1b2431]">
                 {profile?.full_name ||
                   t.settings.teamMember}
               </p>
 
-              <p className="mt-1 truncate text-[14px] text-[#7a8490]">
+              <p className="mt-1 truncate text-[14px] text-[#7f796a]">
                 {email}
               </p>
 
               {memberId !== null && (
                 <p className="mt-1.5 flex flex-wrap items-center gap-x-3 text-[12px] font-semibold">
-                  <span className="text-[#65707d]">
+                  <span className="text-[#6f6a5c]">
                     {avatarBusy
                       ? isRu ? "Загружаю…" : "Lade…"
                       : avatarMessage ||
@@ -407,16 +408,16 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="divide-y divide-[#eceef0]">
+          <div className="divide-y divide-[#ece6d6]">
 
             {/* Full name */}
             <div className="flex items-center justify-between px-5 py-4">
               <div>
-                <p className="text-[13px] text-[#7a8490]">
+                <p className="text-[13px] text-[#7f796a]">
                   {t.settings.fullName}
                 </p>
 
-                <p className="mt-1 text-[15px] font-semibold text-[#202a35]">
+                <p className="mt-1 text-[15px] font-semibold text-[#2a2a26]">
                   {profile?.full_name ||
                     (isRu
                       ? "Не указано"
@@ -426,23 +427,23 @@ export default function SettingsPage() {
 
               <UserRound
                 size={18}
-                className="text-[#a0a8b1]"
+                className="text-[#b3ac9a]"
               />
             </div>
 
             {/* Email */}
             <div className="flex items-center justify-between px-5 py-4">
               <div className="min-w-0 pr-4">
-                <p className="text-[13px] text-[#7a8490]">
+                <p className="text-[13px] text-[#7f796a]">
                   {t.settings.email}
                 </p>
 
-                <p className="mt-1 truncate text-[15px] font-semibold text-[#202a35]">
+                <p className="mt-1 truncate text-[15px] font-semibold text-[#2a2a26]">
                   {email}
                 </p>
               </div>
 
-              <span className="shrink-0 rounded-full bg-[#f3f4f5] px-3 py-1 text-[11px] font-semibold text-[#687585]">
+              <span className="shrink-0 rounded-full bg-[#f3efe3] px-3 py-1 text-[11px] font-semibold text-[#6f6a5c]">
                 {isRu ? "Аккаунт" : "Konto"}
               </span>
             </div>
@@ -450,12 +451,12 @@ export default function SettingsPage() {
             {/* Role */}
             <div className="flex items-center justify-between px-5 py-4">
               <div>
-                <p className="text-[13px] text-[#7a8490]">
+                <p className="text-[13px] text-[#7f796a]">
                   {t.settings.role}
                 </p>
 
                 <div className="mt-1 flex items-center gap-2">
-                  <p className="text-[15px] font-semibold text-[#202a35]">
+                  <p className="text-[15px] font-semibold text-[#2a2a26]">
                     {profile?.role === "admin"
                       ? t.settings.administrator
                       : t.settings.teamMember}
@@ -464,13 +465,13 @@ export default function SettingsPage() {
                   {profile?.role === "admin" && (
                     <ShieldCheck
                       size={16}
-                      className="text-[#111820]"
+                      className="text-[#1b2431]"
                     />
                   )}
                 </div>
               </div>
 
-              <span className="rounded-full bg-[#f3f4f5] px-3 py-1 text-[11px] font-semibold text-[#687585]">
+              <span className="rounded-full bg-[#f3efe3] px-3 py-1 text-[11px] font-semibold text-[#6f6a5c]">
                 {profile?.role === "admin"
                   ? "ADMIN"
                   : "USER"}
@@ -480,14 +481,14 @@ export default function SettingsPage() {
         </section>
 
         {/* Security */}
-        <section className="mt-4 overflow-hidden rounded-[24px] border border-[#e0e3e6] bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
+        <section className="mt-4 overflow-hidden rounded-[24px] border border-[#e9e3d3] bg-white shadow-[0_4px_18px_rgba(27,36,49,0.04)]">
 
           <div className="px-5 py-5">
-            <p className="text-[18px] font-bold tracking-[-0.02em] text-[#111820]">
+            <p className="text-[18px] font-bold tracking-[-0.02em] text-[#1b2431]">
               {t.settings.security}
             </p>
 
-            <p className="mt-1 text-[14px] leading-5 text-[#7a8490]">
+            <p className="mt-1 text-[14px] leading-5 text-[#7f796a]">
               {t.settings.securityDescription}
             </p>
           </div>
@@ -500,18 +501,18 @@ export default function SettingsPage() {
                 setPasswordMessage("");
                 setPasswordError("");
               }}
-              className="flex min-h-[64px] w-full items-center gap-4 border-t border-[#eceef0] px-5 text-left transition active:bg-[#f7f7f6]"
+              className="flex min-h-[64px] w-full items-center gap-4 border-t border-[#ece6d6] px-5 text-left transition active:bg-[#faf8f3]"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-[#f3f4f5] text-[#303b48]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-[#f3efe3] text-[#3a3a35]">
                 <KeyRound size={19} />
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-semibold text-[#202a35]">
+                <p className="text-[15px] font-semibold text-[#2a2a26]">
                   {t.settings.changePassword}
                 </p>
 
-                <p className="mt-0.5 text-[12px] text-[#8a939d]">
+                <p className="mt-0.5 text-[12px] text-[#8f897a]">
                   {isRu
                     ? "Установить новый пароль"
                     : "Neues Passwort festlegen"}
@@ -520,13 +521,13 @@ export default function SettingsPage() {
 
               <ChevronRight
                 size={19}
-                className="text-[#a0a8b1]"
+                className="text-[#b3ac9a]"
               />
             </button>
           ) : (
             <form
               onSubmit={handlePasswordChange}
-              className="border-t border-[#eceef0] p-5"
+              className="border-t border-[#ece6d6] p-5"
             >
               <div className="space-y-4">
 
@@ -534,7 +535,7 @@ export default function SettingsPage() {
                 <div>
                   <label
                     htmlFor="new-password"
-                    className="mb-2 block px-1 text-[13px] font-semibold text-[#374353]"
+                    className="mb-2 block px-1 text-[13px] font-semibold text-[#3a3a35]"
                   >
                     {t.settings.newPassword}
                   </label>
@@ -557,7 +558,7 @@ export default function SettingsPage() {
                         t.settings.passwordPlaceholder
                       }
                       autoComplete="new-password"
-                      className="h-[58px] w-full rounded-[17px] border border-[#d9dee4] bg-[#fafafa] px-4 pr-14 text-[16px] text-[#111820] outline-none transition placeholder:text-[#aab2bd] focus:border-[#111820] focus:bg-white focus:ring-4 focus:ring-[#111820]/5"
+                      className="h-[58px] w-full rounded-[17px] border border-[#ddd5c0] bg-[#fffdf8] px-4 pr-14 text-[16px] text-[#1b2431] outline-none transition placeholder:text-[#b3ac9a] focus:border-[#1b2431] focus:bg-white focus:ring-4 focus:ring-[#1b2431]/5"
                     />
 
                     <button
@@ -567,7 +568,7 @@ export default function SettingsPage() {
                           (value) => !value,
                         )
                       }
-                      className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[#687585]"
+                      className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[#6f6a5c]"
                       aria-label={
                         showPassword
                           ? isRu
@@ -591,7 +592,7 @@ export default function SettingsPage() {
                 <div>
                   <label
                     htmlFor="repeat-password"
-                    className="mb-2 block px-1 text-[13px] font-semibold text-[#374353]"
+                    className="mb-2 block px-1 text-[13px] font-semibold text-[#3a3a35]"
                   >
                     {t.settings.repeatPassword}
                   </label>
@@ -615,7 +616,7 @@ export default function SettingsPage() {
                           .repeatPasswordPlaceholder
                       }
                       autoComplete="new-password"
-                      className="h-[58px] w-full rounded-[17px] border border-[#d9dee4] bg-[#fafafa] px-4 pr-14 text-[16px] text-[#111820] outline-none transition placeholder:text-[#aab2bd] focus:border-[#111820] focus:bg-white focus:ring-4 focus:ring-[#111820]/5"
+                      className="h-[58px] w-full rounded-[17px] border border-[#ddd5c0] bg-[#fffdf8] px-4 pr-14 text-[16px] text-[#1b2431] outline-none transition placeholder:text-[#b3ac9a] focus:border-[#1b2431] focus:bg-white focus:ring-4 focus:ring-[#1b2431]/5"
                     />
 
                     <button
@@ -625,7 +626,7 @@ export default function SettingsPage() {
                           (value) => !value,
                         )
                       }
-                      className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[#687585]"
+                      className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[#6f6a5c]"
                       aria-label={
                         showPasswordRepeat
                           ? isRu
@@ -663,7 +664,7 @@ export default function SettingsPage() {
                       setPasswordRepeat("");
                       setPasswordError("");
                     }}
-                    className="h-[54px] flex-1 rounded-full border border-[#dfe3e6] bg-white text-[14px] font-semibold text-[#374353]"
+                    className="h-[54px] flex-1 rounded-full border border-[#e9e3d3] bg-white text-[14px] font-semibold text-[#3a3a35]"
                   >
                     {t.settings.cancel}
                   </button>
@@ -671,7 +672,7 @@ export default function SettingsPage() {
                   <button
                     type="submit"
                     disabled={savingPassword}
-                    className="flex h-[54px] flex-[1.4] items-center justify-center gap-2 rounded-full bg-[#111820] text-[14px] font-semibold text-white transition active:scale-[0.99] disabled:opacity-50"
+                    className="flex h-[54px] flex-[1.4] items-center justify-center gap-2 rounded-full bg-[#1b2431] text-[14px] font-semibold text-[#ffc93c] transition active:scale-[0.99] disabled:opacity-50"
                   >
                     {savingPassword
                       ? isRu
@@ -705,19 +706,19 @@ export default function SettingsPage() {
         )}
 
         {/* Language */}
-        <section className="mt-4 overflow-hidden rounded-[24px] border border-[#e0e3e6] bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
+        <section className="mt-4 overflow-hidden rounded-[24px] border border-[#e9e3d3] bg-white shadow-[0_4px_18px_rgba(27,36,49,0.04)]">
 
           <div className="px-5 py-5">
-            <p className="text-[18px] font-bold tracking-[-0.02em] text-[#111820]">
+            <p className="text-[18px] font-bold tracking-[-0.02em] text-[#1b2431]">
               {t.settings.language}
             </p>
 
-            <p className="mt-1 text-[14px] leading-5 text-[#7a8490]">
+            <p className="mt-1 text-[14px] leading-5 text-[#7f796a]">
               {t.settings.languageDescription}
             </p>
           </div>
 
-          <div className="border-t border-[#eceef0] p-3">
+          <div className="border-t border-[#ece6d6] p-3">
 
             {/* Deutsch */}
             <button
@@ -725,8 +726,8 @@ export default function SettingsPage() {
               onClick={() => setLanguage("de")}
               className={`flex min-h-[64px] w-full items-center gap-4 rounded-[18px] px-4 text-left transition active:scale-[0.99] ${
                 language === "de"
-                  ? "bg-[#111820] text-white"
-                  : "bg-[#f6f7f7] text-[#303b48]"
+                  ? "bg-[#1b2431] text-[#ffc93c]"
+                  : "bg-[#f6f2e8] text-[#3a3a35]"
               }`}
             >
               <div
@@ -748,7 +749,7 @@ export default function SettingsPage() {
                   className={`mt-0.5 text-[12px] ${
                     language === "de"
                       ? "text-white/65"
-                      : "text-[#8a939d]"
+                      : "text-[#8f897a]"
                   }`}
                 >
                   {t.settings.german}
@@ -766,8 +767,8 @@ export default function SettingsPage() {
               onClick={() => setLanguage("ru")}
               className={`mt-2 flex min-h-[64px] w-full items-center gap-4 rounded-[18px] px-4 text-left transition active:scale-[0.99] ${
                 language === "ru"
-                  ? "bg-[#111820] text-white"
-                  : "bg-[#f6f7f7] text-[#303b48]"
+                  ? "bg-[#1b2431] text-[#ffc93c]"
+                  : "bg-[#f6f2e8] text-[#3a3a35]"
               }`}
             >
               <div
@@ -789,7 +790,7 @@ export default function SettingsPage() {
                   className={`mt-0.5 text-[12px] ${
                     language === "ru"
                       ? "text-white/65"
-                      : "text-[#8a939d]"
+                      : "text-[#8f897a]"
                   }`}
                 >
                   {t.settings.russian}
@@ -809,7 +810,7 @@ export default function SettingsPage() {
         <PushNotifications isRu={isRu} />
 
         {/* Logout */}
-        <section className="mt-4 overflow-hidden rounded-[24px] border border-red-100 bg-white shadow-[0_4px_18px_rgba(17,24,32,0.04)]">
+        <section className="mt-4 overflow-hidden rounded-[24px] border border-red-100 bg-white shadow-[0_4px_18px_rgba(27,36,49,0.04)]">
 
           <button
             type="button"
@@ -842,7 +843,7 @@ export default function SettingsPage() {
           </button>
         </section>
 
-        <p className="mt-6 px-2 text-center text-[12px] text-[#9aa2aa]">
+        <p className="mt-6 px-2 text-center text-[12px] text-[#b3ac9a]">
           {t.common.appName} ·{" "}
           {isRu
             ? "Рабочее пространство команды"

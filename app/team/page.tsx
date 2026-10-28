@@ -7,6 +7,7 @@ import DatePicker from "@/components/DatePicker";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
+  Cake,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
@@ -1608,14 +1609,16 @@ export default function TeamPage() {
 
                         {calculateAge(member.birth_date) !== null && (
                           <span className="rounded-lg bg-neutral-100 px-2 py-1 text-[10px] font-bold text-neutral-600">
-                            🎂 {calculateAge(member.birth_date)}{" "}
+                            <Cake size={11} className="mr-1 inline -mt-0.5" />
+                            {calculateAge(member.birth_date)}{" "}
                             {language === "de" ? "J." : "лет"}
                           </span>
                         )}
 
                         {member.email && (
                           <span className="min-w-0 max-w-full truncate rounded-lg bg-neutral-100 px-2 py-1 text-[10px] font-semibold text-neutral-500">
-                            ✉ {member.email}
+                            <Mail size={11} className="mr-1 inline -mt-0.5" />
+                            {member.email}
                           </span>
                         )}
                       </div>

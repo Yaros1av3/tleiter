@@ -11,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 
+import EventIcon from "@/components/EventIcon";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/ToastProvider";
@@ -150,7 +151,7 @@ export default function FormsPage() {
           </div>
         ) : forms.length === 0 ? (
           <div className="rounded-[22px] border border-dashed border-neutral-300 px-6 py-12 text-center">
-            <div className="text-4xl">🎉</div>
+            <EventIcon name="party" size={40} className="mx-auto text-neutral-300" />
             <p className="mt-3 text-[15px] font-semibold text-neutral-700">
               {isRu ? "Форм пока нет" : "Noch keine Formulare"}
             </p>
@@ -183,9 +184,9 @@ export default function FormsPage() {
                     className="flex w-full items-center gap-3 p-4 text-left active:bg-neutral-50"
                   >
                     <div
-                      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${theme.hero} text-[28px]`}
+                      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${theme.hero} text-white`}
                     >
-                      {form.emoji}
+                      <EventIcon name={form.emoji} size={26} />
                     </div>
 
                     <div className="min-w-0 flex-1">

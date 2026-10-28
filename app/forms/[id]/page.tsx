@@ -22,12 +22,13 @@ import {
 } from "lucide-react";
 
 import DatePicker from "@/components/DatePicker";
+import EventIcon from "@/components/EventIcon";
 import TimePicker from "@/components/TimePicker";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/ToastProvider";
 import {
-  EMOJIS,
+  EVENT_ICONS,
   QUESTION_TYPES,
   STANDARD_FIELDS,
   THEMES,
@@ -432,7 +433,7 @@ export default function FormDetailPage() {
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[34px] leading-none">{draft.emoji}</div>
+              <EventIcon name={draft.emoji} size={34} />
               <h1 className="mt-2 break-words text-[24px] font-extrabold leading-tight tracking-[-0.03em]">
                 {titleShown}
               </h1>
@@ -608,18 +609,19 @@ function EditTab({
       <div className={card}>
         <label className={label}>{isRu ? "Значок" : "Symbol"}</label>
         <div className="flex flex-wrap gap-1.5">
-          {EMOJIS.map((emoji) => (
+          {EVENT_ICONS.map((icon) => (
             <button
-              key={emoji}
+              key={icon}
               type="button"
-              onClick={() => patch({ emoji })}
-              className={`flex h-11 w-11 items-center justify-center rounded-xl text-[22px] transition ${
-                draft.emoji === emoji
-                  ? "bg-[#111820] ring-2 ring-[#111820]"
-                  : "bg-neutral-100"
+              onClick={() => patch({ emoji: icon })}
+              aria-label={icon}
+              className={`flex h-11 w-11 items-center justify-center rounded-xl transition ${
+                draft.emoji === icon
+                  ? "bg-[#1b2431] text-[#ffc93c]"
+                  : "bg-neutral-100 text-neutral-500"
               }`}
             >
-              {emoji}
+              <EventIcon name={icon} size={20} />
             </button>
           ))}
         </div>

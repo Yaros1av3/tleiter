@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Check, Clock3, MapPin, Users } from "lucide-react";
 
+import EventIcon from "@/components/EventIcon";
 import {
   formatEventDate,
   hasCyrillic,
@@ -455,8 +456,8 @@ export default function PublicForm({ slug }: { slug: string }) {
 
           {form && (
             <div className="relative mt-6">
-              <div className="text-[48px] leading-none drop-shadow">
-                {form.emoji}
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 text-white backdrop-blur">
+                <EventIcon name={form.emoji} size={30} />
               </div>
 
               <h1 className="mt-3 text-[28px] font-extrabold leading-[1.1] tracking-[-0.03em] sm:text-[32px]">

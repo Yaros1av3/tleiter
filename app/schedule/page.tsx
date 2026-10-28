@@ -2012,18 +2012,22 @@ export default function SchedulePage() {
                       id={`day-${date}`}
                       className={`scroll-mt-20 overflow-hidden rounded-[20px] border bg-white transition-shadow duration-500 ${
                         focusedDate === date
-                          ? "border-[#111820] shadow-[0_0_0_3px_rgba(17,24,32,0.12)]"
+                          ? "border-[#ffc93c] shadow-[0_0_0_3px_rgba(255,201,60,0.35)]"
                           : "border-[#e0e2e5] shadow-[0_2px_10px_rgba(17,24,32,0.03)]"
                       } ${isPast ? "opacity-70" : ""}`}
                     >
                       {/* DAY HEADER */}
                       <div className="flex items-center gap-3 border-b border-[#eceef0] bg-[#fafafa] px-3 py-2.5 md:px-4">
-                        <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-[13px] bg-[#111820] text-white">
-                          <span className="text-[17px] font-bold leading-none">
+                        <div className="relative flex h-11 w-11 shrink-0 flex-col items-center justify-center overflow-hidden rounded-[13px] bg-[#1b2431] text-white">
+                          <span
+                            aria-hidden="true"
+                            className="absolute bottom-0 right-0 h-3.5 w-3.5 bg-[#ffc93c] [clip-path:polygon(100%_0,100%_100%,0_100%)]"
+                          />
+                          <span className="relative text-[17px] font-bold leading-none">
                             {date.slice(8, 10)}
                           </span>
 
-                          <span className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.1em] text-[#aeb6bf]">
+                          <span className="relative mt-0.5 text-[8px] font-bold uppercase tracking-[0.1em] text-[#ffc93c]">
                             {getWeekday(date)}
                           </span>
                         </div>
@@ -2035,12 +2039,12 @@ export default function SchedulePage() {
 
                           <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[#969ea8]">
                             {isToday ? (
-                              <span className="rounded-full bg-[#111820] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                              <span className="rounded-full bg-[#ffc93c] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#1b2431]">
                                 {isRu ? "Сегодня" : "Heute"}
                               </span>
                             ) : (
                               date === firstUpcomingDate && (
-                                <span className="rounded-full bg-[#111820] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                                <span className="rounded-full bg-[#ffc93c] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#1b2431]">
                                   {isRu ? "Ближайшее" : "Nächster"}
                                 </span>
                               )

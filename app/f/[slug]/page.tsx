@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: when || undefined,
     robots: { index: false, follow: false },
     openGraph: {
-      title: `${form.emoji} ${title}`,
+      title,
       description: when || undefined,
       type: "website",
     },

@@ -249,7 +249,7 @@ export default function UpdatePasswordPage() {
 
   if (checkingSession) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f7f7f6] px-6">
+      <main className="flex min-h-screen items-center justify-center bg-[#faf8f3] px-6">
         <div className="flex flex-col items-center">
           <Image
             src="/tlite-logo.png"
@@ -260,8 +260,8 @@ export default function UpdatePasswordPage() {
             className="h-[58px] w-[58px] rounded-[17px]"
           />
 
-          <div className="mt-4 flex items-center gap-2 text-sm font-medium text-[#687585]">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#d8dce1] border-t-[#111820]" />
+          <div className="mt-4 flex items-center gap-2 text-sm font-medium text-[#6f6a5c]">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#d8dce1] border-t-[#1b2431]" />
             <span>
               {isRu
                 ? "Проверяем ссылку..."
@@ -274,7 +274,8 @@ export default function UpdatePasswordPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f7f6] px-4 py-6">
+    <main className="relative isolate min-h-screen overflow-hidden bg-[#faf8f3] px-4 py-6">
+      <span aria-hidden className="pointer-events-none absolute right-0 top-0 -z-10 h-28 w-28 bg-[#ffc93c] [clip-path:polygon(0_0,100%_0,100%_100%)]" />
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-[430px] items-center">
         <div className="w-full">
 
@@ -294,24 +295,24 @@ export default function UpdatePasswordPage() {
               />
 
               <div>
-                <div className="text-[27px] font-bold leading-none tracking-[-0.04em] text-[#111820]">
+                <div className="text-[27px] font-bold leading-none tracking-[-0.04em] text-[#1b2431]">
                   TLight
                 </div>
 
-                <div className="mt-1 text-[11px] font-medium tracking-[0.04em] text-[#8a939e]">
+                <div className="mt-1 text-[11px] font-medium tracking-[0.04em] text-[#8f897a]">
                   TEAM WORKSPACE
                 </div>
               </div>
             </div>
 
             {/* Language */}
-            <div className="flex rounded-full border border-neutral-200 bg-white p-1 shadow-[0_3px_12px_rgba(17,24,32,0.05)]">
+            <div className="flex rounded-full border border-neutral-200 bg-white p-1 shadow-[0_3px_12px_rgba(27,36,49,0.05)]">
               <button
                 type="button"
                 onClick={() => setLanguage("de")}
                 className={`min-h-9 rounded-full px-3.5 text-xs font-semibold transition ${
                   !isRu
-                    ? "bg-[#111820] text-white shadow-sm"
+                    ? "bg-[#1b2431] text-[#ffc93c] shadow-sm"
                     : "text-neutral-400"
                 }`}
               >
@@ -323,7 +324,7 @@ export default function UpdatePasswordPage() {
                 onClick={() => setLanguage("ru")}
                 className={`min-h-9 rounded-full px-3.5 text-xs font-semibold transition ${
                   isRu
-                    ? "bg-[#111820] text-white shadow-sm"
+                    ? "bg-[#1b2431] text-[#ffc93c] shadow-sm"
                     : "text-neutral-400"
                 }`}
               >
@@ -338,7 +339,7 @@ export default function UpdatePasswordPage() {
 
           {success ? (
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#dfe6e1] bg-white px-3.5 py-2 shadow-[0_3px_12px_rgba(17,24,32,0.04)]">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#dfe6e1] bg-white px-3.5 py-2 shadow-[0_3px_12px_rgba(27,36,49,0.04)]">
                 <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#526d5b] text-white">
                   <CheckCircle2
                     size={12}
@@ -346,26 +347,26 @@ export default function UpdatePasswordPage() {
                   />
                 </div>
 
-                <span className="text-[11px] font-semibold tracking-[0.06em] text-[#687585]">
+                <span className="text-[11px] font-semibold tracking-[0.06em] text-[#6f6a5c]">
                   {isRu
                     ? "ПАРОЛЬ ИЗМЕНЁН"
                     : "PASSWORT GEÄNDERT"}
                 </span>
               </div>
 
-              <h1 className="text-[34px] font-bold leading-[1.04] tracking-[-0.045em] text-[#111820]">
+              <h1 className="text-[34px] font-bold leading-[1.04] tracking-[-0.045em] text-[#1b2431]">
                 {isRu
                   ? "Готово!"
                   : "Geschafft!"}
               </h1>
 
-              <p className="mt-3 max-w-[370px] text-[16px] leading-6 text-[#647080]">
+              <p className="mt-3 max-w-[370px] text-[16px] leading-6 text-[#6f6a5c]">
                 {isRu
                   ? "Твой пароль успешно изменён. Теперь ты можешь войти в TLight."
                   : "Dein Passwort wurde erfolgreich geändert. Du kannst dich jetzt bei TLight anmelden."}
               </p>
 
-              <div className="mt-8 rounded-[24px] border border-[#dfe6e1] bg-white p-5 shadow-[0_5px_22px_rgba(17,24,32,0.05)]">
+              <div className="mt-8 rounded-[24px] border border-[#dfe6e1] bg-white p-5 shadow-[0_5px_22px_rgba(27,36,49,0.05)]">
                 <div className="flex h-12 w-12 items-center justify-center rounded-[16px] bg-[#eef3ef] text-[#526d5b]">
                   <CheckCircle2
                     size={25}
@@ -373,7 +374,7 @@ export default function UpdatePasswordPage() {
                   />
                 </div>
 
-                <p className="mt-5 text-[14px] leading-6 text-[#687585]">
+                <p className="mt-5 text-[14px] leading-6 text-[#6f6a5c]">
                   {isRu
                     ? "Все готово. Используй новый пароль при следующем входе."
                     : "Alles ist bereit. Verwende dein neues Passwort bei der nächsten Anmeldung."}
@@ -383,7 +384,7 @@ export default function UpdatePasswordPage() {
               <button
                 type="button"
                 onClick={() => router.push("/login")}
-                className="mt-5 flex h-[62px] w-full items-center justify-center gap-3 rounded-full bg-[#111820] text-[16px] font-semibold text-white shadow-[0_8px_24px_rgba(17,24,32,0.14)] transition active:scale-[0.985]"
+                className="mt-5 flex h-[62px] w-full items-center justify-center gap-3 rounded-full bg-[#1b2431] text-[16px] font-semibold text-white shadow-[0_8px_24px_rgba(27,36,49,0.14)] transition active:scale-[0.985]"
               >
                 <span>
                   {isRu
@@ -393,6 +394,7 @@ export default function UpdatePasswordPage() {
 
                 <ArrowRight
                   size={20}
+                  color="#ffc93c"
                   strokeWidth={2}
                 />
               </button>
@@ -404,28 +406,28 @@ export default function UpdatePasswordPage() {
               ───────────────────────────── */}
 
               <div>
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#e1e4e8] bg-white px-3.5 py-2 shadow-[0_3px_12px_rgba(17,24,32,0.04)]">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#111820] text-white">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#e9e3d3] bg-white px-3.5 py-2 shadow-[0_3px_12px_rgba(27,36,49,0.04)]">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1b2431] text-[#ffc93c]">
                     <KeyRound
                       size={11}
                       strokeWidth={2.2}
                     />
                   </div>
 
-                  <span className="text-[11px] font-semibold tracking-[0.06em] text-[#687585]">
+                  <span className="text-[11px] font-semibold tracking-[0.06em] text-[#6f6a5c]">
                     {isRu
                       ? "НОВЫЙ ПАРОЛЬ"
                       : "NEUES PASSWORT"}
                   </span>
                 </div>
 
-                <h1 className="text-[34px] font-bold leading-[1.04] tracking-[-0.045em] text-[#111820]">
+                <h1 className="text-[34px] font-bold leading-[1.04] tracking-[-0.045em] text-[#1b2431]">
                   {isRu
                     ? "Создай новый пароль"
                     : "Neues Passwort erstellen"}
                 </h1>
 
-                <p className="mt-3 max-w-[370px] text-[16px] leading-6 text-[#647080]">
+                <p className="mt-3 max-w-[370px] text-[16px] leading-6 text-[#6f6a5c]">
                   {isRu
                     ? "Выбери новый пароль для своего TLight аккаунта."
                     : "Lege ein neues Passwort für deinen TLight-Account fest."}
@@ -444,7 +446,7 @@ export default function UpdatePasswordPage() {
                 <div>
                   <label
                     htmlFor="password"
-                    className="mb-2 block px-1 text-[14px] font-semibold text-[#374353]"
+                    className="mb-2 block px-1 text-[14px] font-semibold text-[#3a3a35]"
                   >
                     {isRu
                       ? "Новый пароль"
@@ -455,7 +457,7 @@ export default function UpdatePasswordPage() {
                     <KeyRound
                       size={19}
                       strokeWidth={1.9}
-                      className="absolute left-5 top-1/2 -translate-y-1/2 text-[#9ba4ae]"
+                      className="absolute left-5 top-1/2 -translate-y-1/2 text-[#b3ac9a]"
                     />
 
                     <input
@@ -477,7 +479,7 @@ export default function UpdatePasswordPage() {
                           : "Neues Passwort"
                       }
                       autoComplete="new-password"
-                      className="h-[62px] w-full rounded-[18px] border border-[#d9dee4] bg-white pl-[52px] pr-[58px] text-[16px] text-[#111820] shadow-[0_2px_8px_rgba(17,24,32,0.03)] outline-none transition placeholder:text-[#aab2bd] focus:border-[#111820] focus:ring-4 focus:ring-[#111820]/5"
+                      className="h-[62px] w-full rounded-[18px] border border-[#ddd5c0] bg-white pl-[52px] pr-[58px] text-[16px] text-[#1b2431] shadow-[0_2px_8px_rgba(27,36,49,0.03)] outline-none transition placeholder:text-[#b3ac9a] focus:border-[#1b2431] focus:ring-4 focus:ring-[#ffc93c]/40"
                     />
 
                     <button
@@ -496,7 +498,7 @@ export default function UpdatePasswordPage() {
                             ? "Показать пароль"
                             : "Passwort anzeigen"
                       }
-                      className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[#8d97a2] transition active:bg-[#f1f2f3]"
+                      className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[#8f897a] transition active:bg-[#fff4d1]"
                     >
                       {showPassword ? (
                         <EyeOff
@@ -516,13 +518,13 @@ export default function UpdatePasswordPage() {
                 {/* Strength */}
                 <div className="mt-3 rounded-[18px] border border-[#e3e6e8] bg-white px-4 py-3.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[12px] font-semibold text-[#687585]">
+                    <span className="text-[12px] font-semibold text-[#6f6a5c]">
                       {isRu
                         ? "Надёжность пароля"
                         : "Passwortstärke"}
                     </span>
 
-                    <span className="text-[12px] font-semibold text-[#111820]">
+                    <span className="text-[12px] font-semibold text-[#1b2431]">
                       {strength.label}
                     </span>
                   </div>
@@ -532,13 +534,13 @@ export default function UpdatePasswordPage() {
                       (index) => (
                         <div
                           key={index}
-                          className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e8eaec]"
+                          className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#ece6d6]"
                         >
                           <div
                             className={`h-full rounded-full transition-all ${
                               passwordScore >
                               index
-                                ? "bg-[#111820]"
+                                ? "bg-[#1b2431]"
                                 : "bg-transparent"
                             }`}
                           />
@@ -591,7 +593,7 @@ export default function UpdatePasswordPage() {
                 <div className="mt-5">
                   <label
                     htmlFor="confirmPassword"
-                    className="mb-2 block px-1 text-[14px] font-semibold text-[#374353]"
+                    className="mb-2 block px-1 text-[14px] font-semibold text-[#3a3a35]"
                   >
                     {isRu
                       ? "Повтори пароль"
@@ -605,7 +607,7 @@ export default function UpdatePasswordPage() {
                       className={`absolute left-5 top-1/2 -translate-y-1/2 ${
                         passwordsMatch
                           ? "text-[#526d5b]"
-                          : "text-[#9ba4ae]"
+                          : "text-[#b3ac9a]"
                       }`}
                     />
 
@@ -628,13 +630,13 @@ export default function UpdatePasswordPage() {
                           : "Passwort wiederholen"
                       }
                       autoComplete="new-password"
-                      className={`h-[62px] w-full rounded-[18px] border bg-white pl-[52px] pr-[58px] text-[16px] text-[#111820] shadow-[0_2px_8px_rgba(17,24,32,0.03)] outline-none transition placeholder:text-[#aab2bd] focus:ring-4 ${
+                      className={`h-[62px] w-full rounded-[18px] border bg-white pl-[52px] pr-[58px] text-[16px] text-[#1b2431] shadow-[0_2px_8px_rgba(27,36,49,0.03)] outline-none transition placeholder:text-[#b3ac9a] focus:ring-4 ${
                         confirmPassword.length > 0 &&
                         !passwordsMatch
                           ? "border-red-300 focus:border-red-400 focus:ring-red-500/5"
                           : passwordsMatch
                             ? "border-[#b9cdbf] focus:border-[#526d5b] focus:ring-[#526d5b]/5"
-                            : "border-[#d9dee4] focus:border-[#111820] focus:ring-[#111820]/5"
+                            : "border-[#ddd5c0] focus:border-[#1b2431] focus:ring-[#1b2431]/5"
                       }`}
                     />
 
@@ -654,7 +656,7 @@ export default function UpdatePasswordPage() {
                             ? "Показать пароль"
                             : "Passwort anzeigen"
                       }
-                      className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[#8d97a2] transition active:bg-[#f1f2f3]"
+                      className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[#8f897a] transition active:bg-[#fff4d1]"
                     >
                       {showConfirmPassword ? (
                         <EyeOff
@@ -722,7 +724,7 @@ export default function UpdatePasswordPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="group mt-5 flex h-[62px] w-full items-center justify-center gap-3 rounded-full bg-[#111820] text-[16px] font-semibold text-white shadow-[0_8px_24px_rgba(17,24,32,0.14)] transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="group mt-5 flex h-[62px] w-full items-center justify-center gap-3 rounded-full bg-[#1b2431] text-[16px] font-semibold text-white shadow-[0_8px_24px_rgba(27,36,49,0.14)] transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? (
                     <>
@@ -744,6 +746,7 @@ export default function UpdatePasswordPage() {
 
                       <ArrowRight
                         size={20}
+                        color="#ffc93c"
                         strokeWidth={2}
                         className="transition-transform group-active:translate-x-0.5"
                       />
@@ -758,7 +761,7 @@ export default function UpdatePasswordPage() {
 
               <div className="mt-5 rounded-[19px] border border-[#e3e6e8] bg-white px-4 py-4">
                 <div className="flex gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#f0f2f3] text-[#687585]">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#fff4d1] text-[#6f6a5c]">
                     <ShieldCheck
                       size={18}
                       strokeWidth={1.8}
@@ -766,13 +769,13 @@ export default function UpdatePasswordPage() {
                   </div>
 
                   <div>
-                    <p className="text-[13px] font-semibold text-[#374353]">
+                    <p className="text-[13px] font-semibold text-[#3a3a35]">
                       {isRu
                         ? "Безопасность аккаунта"
                         : "Sicherheit deines Accounts"}
                     </p>
 
-                    <p className="mt-1 text-[12px] leading-5 text-[#8a939e]">
+                    <p className="mt-1 text-[12px] leading-5 text-[#8f897a]">
                       {isRu
                         ? "Используй уникальный пароль, который не используешь в других сервисах."
                         : "Verwende ein einzigartiges Passwort, das du nicht bei anderen Diensten nutzt."}
@@ -785,7 +788,7 @@ export default function UpdatePasswordPage() {
               <button
                 type="button"
                 onClick={() => router.push("/login")}
-                className="mt-6 flex w-full items-center justify-center gap-2 text-[14px] font-semibold text-[#687585] transition active:opacity-60"
+                className="mt-6 flex w-full items-center justify-center gap-2 text-[14px] font-semibold text-[#6f6a5c] transition active:opacity-60"
               >
                 <ArrowLeft
                   size={16}
@@ -828,7 +831,7 @@ function PasswordRequirement({
       className={`flex min-h-[38px] items-center gap-2 rounded-[12px] px-3 text-[12px] font-medium ${
         valid
           ? "bg-[#eef3ef] text-[#526d5b]"
-          : "bg-[#f0f1f2] text-[#8a939e]"
+          : "bg-[#f3efe3] text-[#8f897a]"
       }`}
     >
       {valid ? (
@@ -837,7 +840,7 @@ function PasswordRequirement({
           strokeWidth={2}
         />
       ) : (
-        <div className="h-1.5 w-1.5 rounded-full bg-[#aeb5bd]" />
+        <div className="h-1.5 w-1.5 rounded-full bg-[#c4bda9]" />
       )}
 
       <span>{text}</span>

@@ -230,7 +230,8 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f7f6] px-4 py-6">
+    <main className="relative isolate min-h-screen overflow-hidden bg-[#faf8f3] px-4 py-6">
+      <span aria-hidden className="pointer-events-none absolute right-0 top-0 -z-10 h-28 w-28 bg-[#ffc93c] [clip-path:polygon(0_0,100%_0,100%_100%)]" />
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-[430px] items-center">
         <div className="w-full">
 
@@ -250,24 +251,24 @@ export default function RegisterPage() {
               />
 
               <div>
-                <div className="text-[27px] font-bold leading-none tracking-[-0.04em] text-[#111820]">
+                <div className="text-[27px] font-bold leading-none tracking-[-0.04em] text-[#1b2431]">
                   TLight
                 </div>
 
-                <div className="mt-1 text-[11px] font-medium tracking-[0.04em] text-[#8a939e]">
+                <div className="mt-1 text-[11px] font-medium tracking-[0.04em] text-[#8f897a]">
                   TEAM WORKSPACE
                 </div>
               </div>
             </div>
 
             {/* Language */}
-            <div className="flex rounded-full border border-neutral-200 bg-white p-1 shadow-[0_3px_12px_rgba(17,24,32,0.05)]">
+            <div className="flex rounded-full border border-neutral-200 bg-white p-1 shadow-[0_3px_12px_rgba(27,36,49,0.05)]">
               <button
                 type="button"
                 onClick={() => setLanguage("de")}
                 className={`min-h-9 rounded-full px-3.5 text-xs font-semibold transition ${
                   !isRu
-                    ? "bg-[#111820] text-white shadow-sm"
+                    ? "bg-[#1b2431] text-[#ffc93c] shadow-sm"
                     : "text-neutral-400"
                 }`}
               >
@@ -279,7 +280,7 @@ export default function RegisterPage() {
                 onClick={() => setLanguage("ru")}
                 className={`min-h-9 rounded-full px-3.5 text-xs font-semibold transition ${
                   isRu
-                    ? "bg-[#111820] text-white shadow-sm"
+                    ? "bg-[#1b2431] text-[#ffc93c] shadow-sm"
                     : "text-neutral-400"
                 }`}
               >
@@ -293,28 +294,28 @@ export default function RegisterPage() {
           ───────────────────────────── */}
 
           <div>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#e1e4e8] bg-white px-3.5 py-2 shadow-[0_3px_12px_rgba(17,24,32,0.04)]">
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#111820] text-white">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#e9e3d3] bg-white px-3.5 py-2 shadow-[0_3px_12px_rgba(27,36,49,0.04)]">
+              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1b2431] text-[#ffc93c]">
                 <UserRound
                   size={11}
                   strokeWidth={2.2}
                 />
               </div>
 
-              <span className="text-[11px] font-semibold tracking-[0.06em] text-[#687585]">
+              <span className="text-[11px] font-semibold tracking-[0.06em] text-[#6f6a5c]">
                 {isRu
                   ? "НОВЫЙ АККАУНТ"
                   : "NEUES KONTO"}
               </span>
             </div>
 
-            <h1 className="text-[34px] font-bold leading-[1.04] tracking-[-0.045em] text-[#111820]">
+            <h1 className="text-[34px] font-bold leading-[1.04] tracking-[-0.045em] text-[#1b2431]">
               {isRu
                 ? "Создать аккаунт"
                 : "Konto erstellen"}
             </h1>
 
-            <p className="mt-3 max-w-[370px] text-[16px] leading-6 text-[#647080]">
+            <p className="mt-3 max-w-[370px] text-[16px] leading-6 text-[#6f6a5c]">
               {isRu
                 ? "Создай аккаунт, чтобы присоединиться к команде и работать вместе."
                 : "Erstelle dein Konto, um deinem Team beizutreten und gemeinsam zu arbeiten."}
@@ -333,7 +334,7 @@ export default function RegisterPage() {
             <div>
               <label
                 htmlFor="firstName"
-                className="mb-2 block px-1 text-[14px] font-semibold text-[#374353]"
+                className="mb-2 block px-1 text-[14px] font-semibold text-[#3a3a35]"
               >
                 {isRu ? "Имя" : "Vorname"}
               </label>
@@ -344,8 +345,8 @@ export default function RegisterPage() {
                   strokeWidth={1.9}
                   className={`absolute left-5 top-1/2 -translate-y-1/2 transition ${
                     focusedField === "firstName"
-                      ? "text-[#111820]"
-                      : "text-[#9ba4ae]"
+                      ? "text-[#1b2431]"
+                      : "text-[#b3ac9a]"
                   }`}
                 />
 
@@ -359,10 +360,10 @@ export default function RegisterPage() {
                   placeholder={isRu ? "Имя" : "Vorname"}
                   autoComplete="given-name"
                   autoCapitalize="words"
-                  className={`h-[62px] w-full rounded-[18px] border bg-white pl-13 pr-5 text-[16px] text-[#111820] shadow-[0_2px_8px_rgba(17,24,32,0.03)] outline-none transition placeholder:text-[#aab2bd] ${
+                  className={`h-[62px] w-full rounded-[18px] border bg-white pl-13 pr-5 text-[16px] text-[#1b2431] shadow-[0_2px_8px_rgba(27,36,49,0.03)] outline-none transition placeholder:text-[#b3ac9a] ${
                     focusedField === "firstName"
-                      ? "border-[#111820] ring-4 ring-[#111820]/5"
-                      : "border-[#d9dee4]"
+                      ? "border-[#1b2431] ring-4 ring-[#ffc93c]/40"
+                      : "border-[#ddd5c0]"
                   }`}
                 />
               </div>
@@ -371,7 +372,7 @@ export default function RegisterPage() {
             <div>
               <label
                 htmlFor="lastName"
-                className="mb-2 block px-1 text-[14px] font-semibold text-[#374353]"
+                className="mb-2 block px-1 text-[14px] font-semibold text-[#3a3a35]"
               >
                 {isRu ? "Фамилия" : "Nachname"}
               </label>
@@ -382,8 +383,8 @@ export default function RegisterPage() {
                   strokeWidth={1.9}
                   className={`absolute left-5 top-1/2 -translate-y-1/2 transition ${
                     focusedField === "lastName"
-                      ? "text-[#111820]"
-                      : "text-[#9ba4ae]"
+                      ? "text-[#1b2431]"
+                      : "text-[#b3ac9a]"
                   }`}
                 />
 
@@ -397,10 +398,10 @@ export default function RegisterPage() {
                   placeholder={isRu ? "Фамилия" : "Nachname"}
                   autoComplete="family-name"
                   autoCapitalize="words"
-                  className={`h-[62px] w-full rounded-[18px] border bg-white pl-13 pr-5 text-[16px] text-[#111820] shadow-[0_2px_8px_rgba(17,24,32,0.03)] outline-none transition placeholder:text-[#aab2bd] ${
+                  className={`h-[62px] w-full rounded-[18px] border bg-white pl-13 pr-5 text-[16px] text-[#1b2431] shadow-[0_2px_8px_rgba(27,36,49,0.03)] outline-none transition placeholder:text-[#b3ac9a] ${
                     focusedField === "lastName"
-                      ? "border-[#111820] ring-4 ring-[#111820]/5"
-                      : "border-[#d9dee4]"
+                      ? "border-[#1b2431] ring-4 ring-[#ffc93c]/40"
+                      : "border-[#ddd5c0]"
                   }`}
                 />
               </div>
@@ -409,7 +410,7 @@ export default function RegisterPage() {
             <div>
               <label
                 htmlFor="phone"
-                className="mb-2 block px-1 text-[14px] font-semibold text-[#374353]"
+                className="mb-2 block px-1 text-[14px] font-semibold text-[#3a3a35]"
               >
                 {isRu ? "Телефон" : "Telefon"}
               </label>
@@ -420,8 +421,8 @@ export default function RegisterPage() {
                   strokeWidth={1.9}
                   className={`absolute left-5 top-1/2 -translate-y-1/2 transition ${
                     focusedField === "phone"
-                      ? "text-[#111820]"
-                      : "text-[#9ba4ae]"
+                      ? "text-[#1b2431]"
+                      : "text-[#b3ac9a]"
                   }`}
                 />
 
@@ -435,10 +436,10 @@ export default function RegisterPage() {
                   placeholder={"+49 …"}
                   autoComplete="tel"
                   
-                  className={`h-[62px] w-full rounded-[18px] border bg-white pl-13 pr-5 text-[16px] text-[#111820] shadow-[0_2px_8px_rgba(17,24,32,0.03)] outline-none transition placeholder:text-[#aab2bd] ${
+                  className={`h-[62px] w-full rounded-[18px] border bg-white pl-13 pr-5 text-[16px] text-[#1b2431] shadow-[0_2px_8px_rgba(27,36,49,0.03)] outline-none transition placeholder:text-[#b3ac9a] ${
                     focusedField === "phone"
-                      ? "border-[#111820] ring-4 ring-[#111820]/5"
-                      : "border-[#d9dee4]"
+                      ? "border-[#1b2431] ring-4 ring-[#ffc93c]/40"
+                      : "border-[#ddd5c0]"
                   }`}
                 />
               </div>
@@ -446,7 +447,7 @@ export default function RegisterPage() {
 
             {/* Birth date */}
             <div>
-              <label className="mb-2 block px-1 text-[14px] font-semibold text-[#374353]">
+              <label className="mb-2 block px-1 text-[14px] font-semibold text-[#3a3a35]">
                 {isRu ? "Дата рождения" : "Geburtsdatum"}
               </label>
 
@@ -455,7 +456,7 @@ export default function RegisterPage() {
                   value={bDay}
                   onChange={(event) => setBDay(event.target.value)}
                   aria-label={isRu ? "День" : "Tag"}
-                  className="h-[54px] w-full rounded-[16px] border border-[#d9dee4] bg-white px-3 text-[16px] text-[#111820] outline-none focus:border-[#111820]"
+                  className="h-[54px] w-full rounded-[16px] border border-[#ddd5c0] bg-white px-3 text-[16px] text-[#1b2431] outline-none focus:border-[#1b2431]"
                 >
                   <option value="">{isRu ? "День" : "Tag"}</option>
                   {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
@@ -467,7 +468,7 @@ export default function RegisterPage() {
                   value={bMonth}
                   onChange={(event) => setBMonth(event.target.value)}
                   aria-label={isRu ? "Месяц" : "Monat"}
-                  className="h-[54px] w-full rounded-[16px] border border-[#d9dee4] bg-white px-3 text-[16px] text-[#111820] outline-none focus:border-[#111820]"
+                  className="h-[54px] w-full rounded-[16px] border border-[#ddd5c0] bg-white px-3 text-[16px] text-[#1b2431] outline-none focus:border-[#1b2431]"
                 >
                   <option value="">{isRu ? "Месяц" : "Monat"}</option>
                   {(isRu ? MONTHS_RU : MONTHS_DE).map((name, index) => (
@@ -479,7 +480,7 @@ export default function RegisterPage() {
                   value={bYear}
                   onChange={(event) => setBYear(event.target.value)}
                   aria-label={isRu ? "Год" : "Jahr"}
-                  className="h-[54px] w-full rounded-[16px] border border-[#d9dee4] bg-white px-3 text-[16px] text-[#111820] outline-none focus:border-[#111820]"
+                  className="h-[54px] w-full rounded-[16px] border border-[#ddd5c0] bg-white px-3 text-[16px] text-[#1b2431] outline-none focus:border-[#1b2431]"
                 >
                   <option value="">{isRu ? "Год" : "Jahr"}</option>
                   {Array.from(
@@ -494,7 +495,7 @@ export default function RegisterPage() {
 
             {/* Languages */}
             <div>
-              <label className="mb-2 block px-1 text-[14px] font-semibold text-[#374353]">
+              <label className="mb-2 block px-1 text-[14px] font-semibold text-[#3a3a35]">
                 {isRu ? "Языки" : "Sprachen"}
               </label>
 
@@ -517,8 +518,8 @@ export default function RegisterPage() {
                       }
                       className={`flex h-[48px] flex-1 items-center justify-center gap-2 rounded-full border text-[15px] font-semibold transition ${
                         on
-                          ? "border-[#111820] bg-[#111820] text-white"
-                          : "border-[#d9dee4] bg-white text-[#374353]"
+                          ? "border-[#1b2431] bg-[#1b2431] text-[#ffc93c]"
+                          : "border-[#ddd5c0] bg-white text-[#3a3a35]"
                       }`}
                     >
                       {on && <Check size={16} strokeWidth={2.4} />}
@@ -533,7 +534,7 @@ export default function RegisterPage() {
             <div>
               <label
                 htmlFor="email"
-                className="mb-2 block px-1 text-[14px] font-semibold text-[#374353]"
+                className="mb-2 block px-1 text-[14px] font-semibold text-[#3a3a35]"
               >
                 E-Mail
               </label>
@@ -550,8 +551,8 @@ export default function RegisterPage() {
                   strokeWidth={1.9}
                   className={`absolute left-5 top-1/2 -translate-y-1/2 transition ${
                     focusedField === "email"
-                      ? "text-[#111820]"
-                      : "text-[#9ba4ae]"
+                      ? "text-[#1b2431]"
+                      : "text-[#b3ac9a]"
                   }`}
                 />
 
@@ -573,10 +574,10 @@ export default function RegisterPage() {
                   placeholder="name@example.com"
                   autoComplete="email"
                   inputMode="email"
-                  className={`h-[62px] w-full rounded-[18px] border bg-white pl-13 pr-5 text-[16px] text-[#111820] shadow-[0_2px_8px_rgba(17,24,32,0.03)] outline-none transition placeholder:text-[#aab2bd] ${
+                  className={`h-[62px] w-full rounded-[18px] border bg-white pl-13 pr-5 text-[16px] text-[#1b2431] shadow-[0_2px_8px_rgba(27,36,49,0.03)] outline-none transition placeholder:text-[#b3ac9a] ${
                     focusedField === "email"
-                      ? "border-[#111820] ring-4 ring-[#111820]/5"
-                      : "border-[#d9dee4]"
+                      ? "border-[#1b2431] ring-4 ring-[#ffc93c]/40"
+                      : "border-[#ddd5c0]"
                   }`}
                 />
               </div>
@@ -587,7 +588,7 @@ export default function RegisterPage() {
               <div className="mb-2 flex items-center justify-between px-1">
                 <label
                   htmlFor="password"
-                  className="text-[14px] font-semibold text-[#374353]"
+                  className="text-[14px] font-semibold text-[#3a3a35]"
                 >
                   {isRu
                     ? "Пароль"
@@ -615,8 +616,8 @@ export default function RegisterPage() {
                   strokeWidth={1.9}
                   className={`absolute left-5 top-1/2 -translate-y-1/2 transition ${
                     focusedField === "password"
-                      ? "text-[#111820]"
-                      : "text-[#9ba4ae]"
+                      ? "text-[#1b2431]"
+                      : "text-[#b3ac9a]"
                   }`}
                 />
 
@@ -645,10 +646,10 @@ export default function RegisterPage() {
                       : "Erstelle ein sicheres Passwort"
                   }
                   autoComplete="new-password"
-                  className={`h-[62px] w-full rounded-[18px] border bg-white pl-13 pr-[62px] text-[16px] text-[#111820] shadow-[0_2px_8px_rgba(17,24,32,0.03)] outline-none transition placeholder:text-[#aab2bd] ${
+                  className={`h-[62px] w-full rounded-[18px] border bg-white pl-13 pr-[62px] text-[16px] text-[#1b2431] shadow-[0_2px_8px_rgba(27,36,49,0.03)] outline-none transition placeholder:text-[#b3ac9a] ${
                     focusedField === "password"
-                      ? "border-[#111820] ring-4 ring-[#111820]/5"
-                      : "border-[#d9dee4]"
+                      ? "border-[#1b2431] ring-4 ring-[#ffc93c]/40"
+                      : "border-[#ddd5c0]"
                   }`}
                 />
 
@@ -659,7 +660,7 @@ export default function RegisterPage() {
                       (value) => !value,
                     )
                   }
-                  className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[#687585] transition active:scale-95"
+                  className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl text-[#6f6a5c] transition active:scale-95"
                   aria-label={
                     showPassword
                       ? isRu
@@ -680,11 +681,11 @@ export default function RegisterPage() {
 
               {/* Password strength */}
               {password.length > 0 && (
-                <div className="mt-3 rounded-[18px] border border-[#e2e5e8] bg-white px-4 py-3.5 shadow-[0_2px_8px_rgba(17,24,32,0.025)]">
+                <div className="mt-3 rounded-[18px] border border-[#e2e5e8] bg-white px-4 py-3.5 shadow-[0_2px_8px_rgba(27,36,49,0.025)]">
 
                   {/* Strength header */}
                   <div className="flex items-center justify-between">
-                    <span className="text-[12px] font-medium text-[#8a939e]">
+                    <span className="text-[12px] font-medium text-[#8f897a]">
                       {isRu
                         ? "Надёжность пароля"
                         : "Passwortstärke"}
@@ -764,7 +765,7 @@ export default function RegisterPage() {
             </div>
 
             {/* Name explanation */}
-            <div className="flex gap-3 rounded-[17px] border border-[#e3e6e8] bg-white px-4 py-3.5 text-[13px] leading-5 text-[#687585]">
+            <div className="flex gap-3 rounded-[17px] border border-[#e3e6e8] bg-white px-4 py-3.5 text-[13px] leading-5 text-[#6f6a5c]">
               <Info
                 size={17}
                 strokeWidth={1.8}
@@ -796,7 +797,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group mt-2 flex h-[62px] w-full items-center justify-center gap-3 rounded-full bg-[#111820] text-[16px] font-semibold text-white shadow-[0_8px_24px_rgba(17,24,32,0.14)] transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60"
+              className="group mt-2 flex h-[62px] w-full items-center justify-center gap-3 rounded-full bg-[#1b2431] text-[16px] font-semibold text-white shadow-[0_8px_24px_rgba(27,36,49,0.14)] transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? (
                 <>
@@ -818,6 +819,7 @@ export default function RegisterPage() {
 
                   <ArrowRight
                     size={20}
+                    color="#ffc93c"
                     strokeWidth={2}
                     className="transition-transform group-active:translate-x-0.5"
                   />
@@ -830,7 +832,7 @@ export default function RegisterPage() {
               SECURITY
           ───────────────────────────── */}
 
-          <div className="mt-6 flex items-center justify-center gap-2 text-center text-[12px] text-[#8a939e]">
+          <div className="mt-6 flex items-center justify-center gap-2 text-center text-[12px] text-[#8f897a]">
             <ShieldCheck
               size={15}
               strokeWidth={1.8}
@@ -847,16 +849,16 @@ export default function RegisterPage() {
               LOGIN
           ───────────────────────────── */}
 
-          <div className="mt-7 rounded-[20px] border border-[#e1e4e8] bg-white px-5 py-4 shadow-[0_3px_14px_rgba(17,24,32,0.04)]">
+          <div className="mt-7 rounded-[20px] border border-[#e9e3d3] bg-white px-5 py-4 shadow-[0_3px_14px_rgba(27,36,49,0.04)]">
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-[13px] font-medium text-[#8a939e]">
+                <p className="text-[13px] font-medium text-[#8f897a]">
                   {isRu
                     ? "Уже есть аккаунт?"
                     : "Bereits registriert?"}
                 </p>
 
-                <p className="mt-0.5 text-[14px] font-semibold text-[#111820]">
+                <p className="mt-0.5 text-[14px] font-semibold text-[#1b2431]">
                   {isRu
                     ? "Войди в TLight"
                     : "Melde dich bei TLight an"}
@@ -868,7 +870,7 @@ export default function RegisterPage() {
                 onClick={() =>
                   router.push("/login")
                 }
-                className="flex h-10 shrink-0 items-center gap-2 rounded-full bg-[#f0f2f3] px-4 text-[13px] font-semibold text-[#111820] transition active:scale-95"
+                className="flex h-10 shrink-0 items-center gap-2 rounded-full bg-[#fff4d1] px-4 text-[13px] font-semibold text-[#1b2431] transition active:scale-95"
               >
                 {isRu
                   ? "Войти"
@@ -884,15 +886,15 @@ export default function RegisterPage() {
 
           {/* Small benefits */}
           <div className="mt-6 grid grid-cols-2 gap-3">
-            <div className="rounded-[17px] border border-[#e4e6e8] bg-[#fafafa] px-3.5 py-3">
+            <div className="rounded-[17px] border border-[#e9e3d3] bg-[#fffdf8] px-3.5 py-3">
               <div className="flex items-center gap-2">
                 <CheckCircle2
                   size={15}
                   strokeWidth={1.8}
-                  className="text-[#687585]"
+                  className="text-[#6f6a5c]"
                 />
 
-                <span className="text-[11px] font-semibold text-[#687585]">
+                <span className="text-[11px] font-semibold text-[#6f6a5c]">
                   {isRu
                     ? "Быстрый доступ"
                     : "Schneller Zugang"}
@@ -900,15 +902,15 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div className="rounded-[17px] border border-[#e4e6e8] bg-[#fafafa] px-3.5 py-3">
+            <div className="rounded-[17px] border border-[#e9e3d3] bg-[#fffdf8] px-3.5 py-3">
               <div className="flex items-center gap-2">
                 <ShieldCheck
                   size={15}
                   strokeWidth={1.8}
-                  className="text-[#687585]"
+                  className="text-[#6f6a5c]"
                 />
 
-                <span className="text-[11px] font-semibold text-[#687585]">
+                <span className="text-[11px] font-semibold text-[#6f6a5c]">
                   {isRu
                     ? "Безопасно"
                     : "Sicher"}

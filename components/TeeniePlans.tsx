@@ -2,19 +2,30 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Calendar,
+  Bus,
   Check,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
+  BookOpen,
+  Clapperboard,
+  Dices,
+  Footprints,
+  Music,
+  Palette,
+  PartyPopper,
   Pencil,
   Plus,
   ShoppingCart,
+  Sparkles,
   Trash2,
+  Trophy,
+  Utensils,
+  Wrench,
   X,
+  type LucideIcon,
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
+import DatePicker from "@/components/DatePicker";
 
 type Kind =
   | "film"
@@ -54,158 +65,20 @@ type Props = {
   onShoppingAdded?: () => void;
 };
 
-const KINDS: { key: Kind; emoji: string; ru: string; de: string }[] = [
-  { key: "film", emoji: "🎬", ru: "Фильм", de: "Film" },
-  { key: "game", emoji: "🎲", ru: "Игры", de: "Spiele" },
-  { key: "craft", emoji: "🎨", ru: "Творчество", de: "Basteln" },
-  { key: "workshop", emoji: "🛠️", ru: "Мастер-класс", de: "Workshop" },
-  { key: "cooking", emoji: "🍳", ru: "Готовим", de: "Kochen" },
-  { key: "outing", emoji: "🚶", ru: "Прогулка / музей", de: "Ausflug / Museum" },
-  { key: "sport", emoji: "⚽", ru: "Спорт", de: "Sport" },
-  { key: "music", emoji: "🎵", ru: "Музыка", de: "Musik" },
-  { key: "bible", emoji: "📖", ru: "Библия / беседа", de: "Bibel / Gespräch" },
-  { key: "party", emoji: "🎉", ru: "Праздник", de: "Feier" },
-  { key: "trip", emoji: "🚌", ru: "Поездка", de: "Fahrt" },
-  { key: "other", emoji: "✨", ru: "Другое", de: "Sonstiges" },
+const KINDS: { key: Kind; icon: LucideIcon; ru: string; de: string }[] = [
+  { key: "film", icon: Clapperboard, ru: "Фильм", de: "Film" },
+  { key: "game", icon: Dices, ru: "Игры", de: "Spiele" },
+  { key: "craft", icon: Palette, ru: "Творчество", de: "Basteln" },
+  { key: "workshop", icon: Wrench, ru: "Мастер-класс", de: "Workshop" },
+  { key: "cooking", icon: Utensils, ru: "Готовим", de: "Kochen" },
+  { key: "outing", icon: Footprints, ru: "Прогулка / музей", de: "Ausflug / Museum" },
+  { key: "sport", icon: Trophy, ru: "Спорт", de: "Sport" },
+  { key: "music", icon: Music, ru: "Музыка", de: "Musik" },
+  { key: "bible", icon: BookOpen, ru: "Библия / беседа", de: "Bibel / Gespräch" },
+  { key: "party", icon: PartyPopper, ru: "Праздник", de: "Feier" },
+  { key: "trip", icon: Bus, ru: "Поездка", de: "Fahrt" },
+  { key: "other", icon: Sparkles, ru: "Другое", de: "Sonstiges" },
 ];
-
-/* ---------- красивый календарь для выбора дня ---------- */
-
-function CalendarPicker({
-  value,
-  onChange,
-  locale,
-  isRu,
-  marked,
-}: {
-  value: string;
-  onChange: (next: string) => void;
-  locale: string;
-  isRu: boolean;
-  marked: Set<string>;
-}) {
-  const [month, setMonth] = useState(() => {
-    const base = value ? new Date(`${value}T12:00:00`) : new Date();
-    return new Date(base.getFullYear(), base.getMonth(), 1);
-  });
-
-  const todayKey = toKey(new Date());
-
-  // подписи дней недели, неделя начинается с понедельника
-  const weekdays = Array.from({ length: 7 }, (_, index) =>
-    new Date(2024, 0, 1 + index).toLocaleDateString(locale, { weekday: "short" }),
-  );
-
-  const first = new Date(month.getFullYear(), month.getMonth(), 1);
-  const offset = (first.getDay() + 6) % 7;
-  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-
-  const cells: (number | null)[] = [
-    ...Array.from({ length: offset }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
-  ];
-
-  return (
-    <div className="rounded-[18px] border border-[#e6e8ea] bg-white p-3 shadow-[0_8px_24px_rgba(17,24,32,0.08)]">
-      <div className="mb-2 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f1f2f3] text-[#4e5966] active:scale-95"
-          aria-label={isRu ? "Предыдущий месяц" : "Vorheriger Monat"}
-        >
-          <ChevronLeft size={17} />
-        </button>
-
-        <p className="text-[15px] font-bold capitalize tracking-[-0.02em] text-[#111820]">
-          {month.toLocaleDateString(locale, { month: "long", year: "numeric" })}
-        </p>
-
-        <button
-          type="button"
-          onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f1f2f3] text-[#4e5966] active:scale-95"
-          aria-label={isRu ? "Следующий месяц" : "Nächster Monat"}
-        >
-          <ChevronRight size={17} />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-7 gap-y-1 text-center">
-        {weekdays.map((label, index) => (
-          <span
-            key={label + index}
-            className={`py-1 text-[10.5px] font-bold uppercase tracking-wide ${
-              index === 1 ? "text-amber-600" : "text-[#a0a8b1]"
-            }`}
-          >
-            {label.replace(".", "")}
-          </span>
-        ))}
-
-        {cells.map((day, index) => {
-          if (day === null) return <span key={`e-${index}`} />;
-
-          const key = `${month.getFullYear()}-${pad(month.getMonth() + 1)}-${pad(day)}`;
-          const selected = key === value;
-          const isToday = key === todayKey;
-          const isTuesday = (index % 7) === 1;
-          const hasPlan = marked.has(key);
-
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onChange(key)}
-              className={`relative mx-auto flex h-10 w-10 items-center justify-center rounded-full text-[14px] font-semibold transition active:scale-90 ${
-                selected
-                  ? "bg-[#111820] text-white shadow-md"
-                  : isToday
-                    ? "bg-amber-100 text-amber-900"
-                    : isTuesday
-                      ? "text-[#111820] hover:bg-[#f1f2f3]"
-                      : "text-[#4e5966] hover:bg-[#f1f2f3]"
-              }`}
-            >
-              {day}
-
-              {hasPlan && !selected && (
-                <span className="absolute bottom-1 h-1 w-1 rounded-full bg-emerald-500" />
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-[#f0f1f2] pt-2.5">
-        <button
-          type="button"
-          onClick={() => onChange(todayKey)}
-          className="h-8 rounded-full bg-[#f1f2f3] px-3 text-[12px] font-semibold text-[#4e5966]"
-        >
-          {isRu ? "Сегодня" : "Heute"}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            const key = lastTuesdayKey();
-            onChange(key);
-            setMonth(new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, 1));
-          }}
-          className="h-8 rounded-full bg-[#f1f2f3] px-3 text-[12px] font-semibold text-[#4e5966]"
-        >
-          {isRu ? "Последний вторник месяца" : "Letzter Dienstag im Monat"}
-        </button>
-
-        <span className="ml-auto flex items-center gap-1 text-[10.5px] text-[#9aa2ad]">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          {isRu ? "уже есть план" : "schon ein Plan"}
-        </span>
-      </div>
-    </div>
-  );
-}
 
 function pad(value: number) {
   return String(value).padStart(2, "0");
@@ -246,7 +119,6 @@ export default function TeeniePlans({ isRu, onShoppingAdded }: Props) {
   const [kind, setKind] = useState<Kind>("other");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
-  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const [openId, setOpenId] = useState<number | null>(null);
   const [newItem, setNewItem] = useState<Record<number, string>>({});
@@ -298,7 +170,6 @@ export default function TeeniePlans({ isRu, onShoppingAdded }: Props) {
     setDate("");
     setKind("other");
     setNotes("");
-    setCalendarOpen(false);
     setFormOpen(false);
   }
 
@@ -477,8 +348,8 @@ export default function TeeniePlans({ isRu, onShoppingAdded }: Props) {
           onClick={() => setOpenId(open ? null : plan.id)}
           className="flex w-full items-start gap-3 px-4 py-3.5 text-left"
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[#f1f2f3] text-[19px]">
-            {kindInfo.emoji}
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-[#f1f2f3] text-[#1b2431]">
+            <kindInfo.icon size={19} strokeWidth={1.9} />
           </span>
 
           <span className="min-w-0 flex-1">
@@ -723,57 +594,24 @@ export default function TeeniePlans({ isRu, onShoppingAdded }: Props) {
                   kind === item.key ? "bg-[#111820] text-white" : "bg-[#f1f2f3] text-[#4e5966]"
                 }`}
               >
-                <span>{item.emoji}</span>
+                <item.icon size={14} strokeWidth={2} />
                 {isRu ? item.ru : item.de}
               </button>
             ))}
           </div>
 
           <div className="mt-3">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setCalendarOpen((value) => !value)}
-                className={`flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-xl px-3 text-left text-[14px] font-semibold transition ${
-                  calendarOpen ? "bg-[#111820] text-white" : "bg-[#f1f2f3] text-[#111820]"
-                }`}
-              >
-                <Calendar size={16} className={calendarOpen ? "text-white" : "text-[#8a939d]"} />
-                <span className="truncate capitalize">
-                  {date
-                    ? formatDate(date)
-                    : isRu ? "Выбрать день" : "Tag wählen"}
-                </span>
-              </button>
-
-              {date && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDate("");
-                    setCalendarOpen(false);
-                  }}
-                  className="h-11 shrink-0 px-2 text-[12px] font-semibold text-[#9aa2ad]"
-                >
-                  {isRu ? "Без даты" : "Ohne Datum"}
-                </button>
-              )}
-            </div>
-
-            {calendarOpen && (
-              <div className="mt-2">
-                <CalendarPicker
-                  value={date}
-                  locale={locale}
-                  isRu={isRu}
-                  marked={new Set(plans.map((plan) => plan.plan_date).filter(Boolean) as string[])}
-                  onChange={(next) => {
-                    setDate(next);
-                    setCalendarOpen(false);
-                  }}
-                />
-              </div>
-            )}
+            <DatePicker
+              value={date}
+              onChange={setDate}
+              marked={new Set(plans.map((plan) => plan.plan_date).filter(Boolean) as string[])}
+              shortcuts={[
+                {
+                  label: isRu ? "Последний вторник месяца" : "Letzter Dienstag im Monat",
+                  value: lastTuesdayKey(),
+                },
+              ]}
+            />
           </div>
 
           <textarea

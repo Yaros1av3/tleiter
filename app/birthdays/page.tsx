@@ -449,7 +449,7 @@ export default function BirthdaysPage() {
 
               {info.soon.length === 0 ? (
                 <p className="px-4 pb-4 pt-2 text-[13px] text-amber-800/70">
-                  {isRu ? "В ближайшие две недели никого — или всех уже поздравили 🎉" : "In den nächsten zwei Wochen niemand – oder alle sind schon gratuliert 🎉"}
+                  {isRu ? "В ближайшие две недели никого — или всех уже поздравили" : "In den nächsten zwei Wochen niemand – oder alle sind schon gratuliert"}
                 </p>
               ) : (
                 <div className="mt-1 divide-y divide-amber-100">

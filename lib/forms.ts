@@ -76,6 +76,14 @@ export const THEMES: Record<
   string,
   { name: string; hero: string; accent: string; soft: string; ring: string; text: string }
 > = {
+  tlight: {
+    name: "TLight",
+    hero: "from-[#1b2431] via-[#1b2431] to-[#3a4a63]",
+    accent: "bg-[#ffc93c] text-[#1b2431]",
+    soft: "bg-[#fff4d1] text-[#8a5f00]",
+    ring: "focus:border-[#ffc93c] focus:ring-[#ffc93c]/30",
+    text: "text-[#b07800]",
+  },
   amber: {
     name: "Солнце",
     hero: "from-amber-300 via-orange-400 to-orange-500",
@@ -118,10 +126,24 @@ export const THEMES: Record<
   },
 };
 
-export const EMOJIS = ["🎉", "🎂", "⛺", "🎮", "🍕", "⚽", "🎄", "🙏", "🎬", "🏖️", "🎤", "🔥"];
+/* Значок мероприятия — ключ иконки (а не смайлик). Рисует components/EventIcon.tsx */
+export const EVENT_ICONS = [
+  "party",
+  "cake",
+  "camp",
+  "games",
+  "food",
+  "sport",
+  "tree",
+  "heart",
+  "movie",
+  "sun",
+  "music",
+  "fire",
+] as const;
 
 export function themeOf(key: string | null | undefined) {
-  return THEMES[key ?? ""] ?? THEMES.amber;
+  return THEMES[key ?? ""] ?? THEMES.tlight;
 }
 
 export function newId() {

@@ -764,8 +764,8 @@ export default function Home() {
               aria-label={isRu ? "Идеи" : "Ideen"}
               className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition active:scale-95 ${
                 ideas.unread
-                  ? "border-amber-400 bg-amber-300 text-[#111820] shadow-[0_0_0_4px_rgba(252,211,77,0.35)]"
-                  : "border-[#dfe2e5] bg-white text-[#374353] shadow-[0_2px_8px_rgba(17,24,32,0.05)]"
+                  ? "border-[#ffc93c] bg-[#ffc93c] text-[#1b2431] shadow-[0_0_0_4px_rgba(255,201,60,0.35)]"
+                  : "border-[#ffe08a] bg-[#fff4d1] text-[#9a6b00] shadow-[0_2px_8px_rgba(17,24,32,0.05)]"
               }`}
             >
               <Lightbulb
@@ -997,14 +997,18 @@ export default function Home() {
                         className="group w-full overflow-hidden rounded-[22px] border border-neutral-200 bg-white text-left shadow-[0_4px_18px_rgba(17,24,32,0.05)] transition active:scale-[0.995]"
                       >
                         <div className="flex">
-                          <div className="flex w-[78px] shrink-0 flex-col items-center justify-center bg-[#111820] px-2 py-3 text-white">
+                          <div className="relative flex w-[78px] shrink-0 flex-col items-center justify-center overflow-hidden bg-[#1b2431] px-2 py-3 text-white">
+                            <span
+                              aria-hidden="true"
+                              className="absolute bottom-0 right-0 h-9 w-9 bg-[#ffc93c] [clip-path:polygon(100%_0,100%_100%,0_100%)]"
+                            />
                             <Clock3
                               size={17}
                               strokeWidth={1.7}
-                              className="mb-2 text-neutral-400"
+                              className="relative mb-2 text-[#ffc93c]"
                             />
 
-                            <span className="text-[19px] font-bold leading-none tracking-[-0.04em]">
+                            <span className="relative text-[19px] font-bold leading-none tracking-[-0.04em]">
                               {entry.service_time}
                             </span>
                           </div>
@@ -1414,7 +1418,7 @@ export default function Home() {
 
                         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-100">
                           <div
-                            className="h-full rounded-full bg-[#111820] transition-all"
+                            className="h-full rounded-full bg-gradient-to-r from-[#1b2431] to-[#ffc93c] transition-all"
                             style={{
                               width: `${progress}%`,
                             }}
