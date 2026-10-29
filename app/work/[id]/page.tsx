@@ -485,6 +485,8 @@ export default function WorkProjectPage() {
   const [checklists, setChecklists] =
     useState<ChecklistItem[]>([]);
 
+  const [takers, setTakers] =
+    useState<Record<number, number[]>>({});
   const [myMemberId, setMyMemberId] =
     useState<number | null>(null);
   const [claimBusy, setClaimBusy] =
@@ -752,6 +754,27 @@ export default function WorkProjectPage() {
 
     setProject(loadedProject);
     setItems(loadedItems);
+
+    if (loadedItems.length > 0) {
+      const { data: takerRows } = await supabase
+        .from("work_item_members")
+        .select("item_id, member_id")
+        .in(
+          "item_id",
+          loadedItems.map((item) => item.id)
+        );
+
+      const map: Record<number, number[]> = {};
+
+      for (const row of takerRows ?? []) {
+        const key = row.item_id as number;
+        (map[key] ??= []).push(row.member_id as number);
+      }
+
+      setTakers(map);
+    } else {
+      setTakers({});
+    }
     setTeam(
       (teamData ?? []) as TeamMember[]
     );
@@ -796,11 +819,35 @@ export default function WorkProjectPage() {
 
   const isRuLang = language === "ru";
 
-  const openRoles = items.filter(
+  // задачи, на которые можно записаться: без назначенного админом исполнителя
+  const joinable = items.filter(
     (item) =>
       item.assigned_to === null &&
       item.status !== "completed"
   );
+
+  // из них те, на которые пока никто не записался
+  const openRoles = joinable.filter(
+    (item) => (takers[item.id] ?? []).length === 0
+  );
+
+  function ownerNames(item: WorkItem) {
+    const ids = [
+      ...(item.assigned_to ? [item.assigned_to] : []),
+      ...(takers[item.id] ?? []),
+    ];
+
+    return ids
+      .map((id) => getMember(id)?.first_name)
+      .filter(Boolean) as string[];
+  }
+
+  function isMine(item: WorkItem) {
+    return (
+      myMemberId !== null &&
+      (takers[item.id] ?? []).includes(myMemberId)
+    );
+  }
 
   async function claimItem(itemId: number) {
     if (claimBusy !== null) return;
@@ -814,8 +861,8 @@ export default function WorkProjectPage() {
     if (error || data !== true) {
       setNotifyInfo(
         isRuLang
-          ? "Не получилось записаться: возможно, задачу уже взял другой."
-          : "Eintragen nicht möglich – vielleicht hat schon jemand die Aufgabe übernommen."
+          ? "Не получилось записаться. Попробуй ещё раз."
+          : "Eintragen nicht möglich. Bitte versuche es noch einmal."
       );
     } else {
       setNotifyInfo(
@@ -1635,24 +1682,24 @@ export default function WorkProjectPage() {
             </p>
           )}
 
-          {openRoles.length > 0 && (
+          {joinable.length > 0 && (
             <section className="mt-4 overflow-hidden rounded-[24px] border border-[#e9e3d3] bg-white">
               <div className="flex items-center gap-3 border-b border-[#ece6d6] bg-[#fff4d1] px-4 py-3">
                 <Hand size={18} className="text-[#9a6b00]" />
                 <div className="min-w-0 flex-1">
                   <p className="text-[14px] font-bold text-[#1b2431]">
-                    {isRuLang ? "Свободные задачи" : "Offene Aufgaben"} · {openRoles.length}
+                    {isRuLang ? "Запишись на задачу" : "Für Aufgabe eintragen"} · {joinable.length}
                   </p>
                   <p className="text-[12px] text-[#9a6b00]">
                     {isRuLang
-                      ? "Нажми «Беру», если готов(а) взять на себя"
-                      : "Tippe auf „Übernehmen“, wenn du das machen möchtest"}
+                      ? `Без исполнителя: ${openRoles.length}. Одну задачу могут взять несколько человек`
+                      : `Ohne Person: ${openRoles.length}. Mehrere Personen können eine Aufgabe übernehmen`}
                   </p>
                 </div>
               </div>
 
               <div className="divide-y divide-[#ece6d6]">
-                {openRoles.map((item) => (
+                {joinable.map((item) => (
                   <div
                     key={item.id}
                     className="flex items-center gap-3 px-4 py-3"
@@ -1668,6 +1715,19 @@ export default function WorkProjectPage() {
                         </p>
                       )}
 
+                      {(takers[item.id] ?? []).length > 0 && (
+                        <p className="mt-1.5 flex flex-wrap gap-1">
+                          {ownerNames(item).map((name, index) => (
+                            <span
+                              key={`${item.id}-${index}`}
+                              className="rounded-full bg-[#fff4d1] px-2.5 py-1 text-[11px] font-semibold text-[#9a6b00]"
+                            >
+                              {name}
+                            </span>
+                          ))}
+                        </p>
+                      )}
+
                       {item.deadline && (
                         <p className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-[#8f897a]">
                           <Clock3 size={11} />
@@ -1677,14 +1737,25 @@ export default function WorkProjectPage() {
                     </div>
 
                     {myMemberId !== null ? (
-                      <button
-                        type="button"
-                        onClick={() => claimItem(item.id)}
-                        disabled={claimBusy !== null}
-                        className="h-10 shrink-0 rounded-full bg-[#1b2431] px-5 text-[13px] font-bold text-[#ffc93c] active:scale-95 disabled:opacity-50"
-                      >
-                        {isRuLang ? "Беру" : "Übernehmen"}
-                      </button>
+                      isMine(item) ? (
+                        <button
+                          type="button"
+                          onClick={() => releaseItem(item.id)}
+                          disabled={claimBusy !== null}
+                          className="h-10 shrink-0 rounded-full border border-[#e9e3d3] px-4 text-[12px] font-semibold text-[#6f6a5c] active:scale-95 disabled:opacity-50"
+                        >
+                          {isRuLang ? "Отказаться" : "Abgeben"}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => claimItem(item.id)}
+                          disabled={claimBusy !== null}
+                          className="h-10 shrink-0 rounded-full bg-[#1b2431] px-5 text-[13px] font-bold text-[#ffc93c] active:scale-95 disabled:opacity-50"
+                        >
+                          {isRuLang ? "Беру" : "Übernehmen"}
+                        </button>
+                      )
                     ) : (
                       <span className="max-w-[120px] text-right text-[11px] leading-4 text-[#8f897a]">
                         {isRuLang
@@ -1873,14 +1944,15 @@ export default function WorkProjectPage() {
                               </span>
                             )}
 
-                            {member && (
-                              <span className="flex items-center gap-1 text-[11px] font-semibold text-[#828886]">
+                            {ownerNames(item).length > 0 && (
+                              <span className="flex min-w-0 items-center gap-1 text-[11px] font-semibold text-[#828886]">
                                 <UserRound
                                   size={12}
+                                  className="shrink-0"
                                 />
-                                {
-                                  member.first_name
-                                }
+                                <span className="truncate">
+                                  {ownerNames(item).join(", ")}
+                                </span>
                               </span>
                             )}
                           </div>
@@ -2042,16 +2114,9 @@ export default function WorkProjectPage() {
                                     }
                                   </span>
 
-                                  {getMember(
-                                    item.assigned_to
-                                  ) && (
-                                    <span className="text-[10px] font-semibold text-[#848a88]">
-                                      {
-                                        getMember(
-                                          item.assigned_to
-                                        )!
-                                          .first_name
-                                      }
+                                  {ownerNames(item).length > 0 && (
+                                    <span className="max-w-[60%] truncate text-[10px] font-semibold text-[#848a88]">
+                                      {ownerNames(item).join(", ")}
                                     </span>
                                   )}
                                 </div>
@@ -2216,17 +2281,14 @@ export default function WorkProjectPage() {
                   <p className="mt-1 flex items-center gap-1.5 text-sm font-bold">
                     <UserRound size={14} />
 
-                    {getMember(
-                      selectedItem.assigned_to
-                    )
-                      ? getMember(
-                          selectedItem.assigned_to
-                        )!.first_name
+                    {ownerNames(selectedItem).length > 0
+                      ? ownerNames(selectedItem).join(", ")
                       : text.stillOpen}
                   </p>
 
                   {myMemberId !== null &&
-                    selectedItem.assigned_to === null && (
+                    selectedItem.assigned_to === null &&
+                    !isMine(selectedItem) && (
                       <button
                         type="button"
                         onClick={() => claimItem(selectedItem.id)}
@@ -2237,8 +2299,7 @@ export default function WorkProjectPage() {
                       </button>
                     )}
 
-                  {myMemberId !== null &&
-                    selectedItem.assigned_to === myMemberId && (
+                  {isMine(selectedItem) && (
                       <button
                         type="button"
                         onClick={() => releaseItem(selectedItem.id)}

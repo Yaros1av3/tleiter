@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 /*
  * Уведомление команде о проекте. Отправлять может только админ.
- * Приходит всем, у кого включены уведомления (кроме самого отправителя).
+ * Приходит всем, у кого включены уведомления, включая самого отправителя
+ * (так видно, что уведомление ушло, и можно проверить его на своём телефоне).
  */
 export async function POST(request: NextRequest) {
   const token = request.headers
@@ -63,17 +64,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  const { count: openRoles } = await supabase
+  const { data: freeItems } = await supabase
     .from("work_items")
-    .select("id", { count: "exact", head: true })
+    .select("id")
     .eq("project_id", project.id)
     .is("assigned_to", null)
     .neq("status", "completed");
 
+  const freeIds = (freeItems ?? []).map((row) => row.id as number);
+
+  const { data: taken } = freeIds.length
+    ? await supabase
+        .from("work_item_members")
+        .select("item_id")
+        .in("item_id", freeIds)
+    : { data: [] as { item_id: number }[] };
+
+  const takenSet = new Set((taken ?? []).map((row) => row.item_id));
+  const openRoles = freeIds.filter((id) => !takenSet.has(id)).length;
+
   const { data: subs } = await supabase
     .from("push_subscriptions")
-    .select("endpoint, p256dh, auth")
-    .neq("user_id", userData.user.id);
+    .select("endpoint, p256dh, auth");
 
   webpush.setVapidDetails(subject, publicKey, privateKey);
 
