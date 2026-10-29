@@ -224,7 +224,8 @@ export default function RegisterPage() {
     }
 
     if (data.user) {
-      router.push("/");
+      const next = new URLSearchParams(window.location.search).get("next");
+      router.push(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
       router.refresh();
     }
   }

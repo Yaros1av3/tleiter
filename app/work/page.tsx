@@ -20,6 +20,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
+import { markWorkSeen } from "@/lib/useWorkUnread";
 
 type Project = {
   id: number;
@@ -276,6 +277,8 @@ export default function WorkPage() {
 
   const [isAdmin, setIsAdmin] = useState(false);
 
+  const [notifyOnCreate, setNotifyOnCreate] =
+    useState(true);
   const [newProjectOpen, setNewProjectOpen] =
     useState(false);
   const [editProjectOpen, setEditProjectOpen] =
@@ -446,6 +449,7 @@ export default function WorkPage() {
   }
 
   useEffect(() => {
+    void markWorkSeen();
     loadProjects();
   }, []);
 
@@ -528,6 +532,22 @@ export default function WorkPage() {
     setNewEndDate("");
     setSaving(false);
     setNewProjectOpen(false);
+
+    if (notifyOnCreate && data?.id) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      // уведомление команде; если не получилось — проект всё равно создан
+      await fetch("/api/work-notify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token ?? ""}`,
+        },
+        body: JSON.stringify({ projectId: data.id }),
+      }).catch(() => null);
+    }
 
     if (data?.id) {
       router.push(`/work/${data.id}`);
@@ -1127,6 +1147,20 @@ export default function WorkPage() {
                     className="w-full resize-none rounded-2xl bg-[#f7f7f5] px-4 py-3 text-[14px] leading-5 outline-none focus:ring-2 focus:ring-[#1b2431]/10"
                   />
                 </div>
+
+                <label className="flex items-center gap-3 rounded-2xl bg-[#fff4d1] px-4 py-3 text-[13px] font-semibold text-[#1b2431]">
+                  <input
+                    type="checkbox"
+                    checked={notifyOnCreate}
+                    onChange={(event) =>
+                      setNotifyOnCreate(event.target.checked)
+                    }
+                    className="h-5 w-5 accent-[#1b2431]"
+                  />
+                  {language === "ru"
+                    ? "Отправить уведомление команде"
+                    : "Team benachrichtigen"}
+                </label>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>

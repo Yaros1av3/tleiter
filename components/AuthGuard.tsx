@@ -94,7 +94,7 @@ function AuthGuardInner({
          * Other protected pages still go to Login.
          */
         if (pathname !== "/") {
-          router.replace("/login");
+          router.replace(`/login?next=${encodeURIComponent(pathname)}`);
           return;
         }
 
@@ -168,7 +168,7 @@ function AuthGuardInner({
             return;
           }
 
-          router.replace("/login");
+          router.replace(`/login?next=${encodeURIComponent(pathname)}`);
           return;
         }
 

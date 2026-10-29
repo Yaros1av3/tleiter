@@ -16,6 +16,9 @@ import {
   ListTodo,
   Pencil,
   Plus,
+  Share2,
+  Bell,
+  Hand,
   Trash2,
   UserRound,
   X,
@@ -23,6 +26,7 @@ import {
 
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
+import { markWorkSeen } from "@/lib/useWorkUnread";
 
 type Project = {
   id: number;
@@ -481,6 +485,14 @@ export default function WorkProjectPage() {
   const [checklists, setChecklists] =
     useState<ChecklistItem[]>([]);
 
+  const [myMemberId, setMyMemberId] =
+    useState<number | null>(null);
+  const [claimBusy, setClaimBusy] =
+    useState<number | null>(null);
+  const [notifyInfo, setNotifyInfo] =
+    useState("");
+  const [shareInfo, setShareInfo] =
+    useState("");
   const [isAdmin, setIsAdmin] =
     useState(false);
 
@@ -635,6 +647,16 @@ export default function WorkProjectPage() {
     } = await supabase.auth.getUser();
 
     if (user) {
+      const { data: myMember } = await supabase
+        .from("team_members")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      setMyMemberId(
+        myMember ? (myMember.id as number) : null
+      );
+
       const {
         data: profileData,
         error: profileError,
@@ -769,7 +791,144 @@ export default function WorkProjectPage() {
 
   useEffect(() => {
     loadProject();
+    void markWorkSeen();
   }, [projectId]);
+
+  const isRuLang = language === "ru";
+
+  const openRoles = items.filter(
+    (item) =>
+      item.assigned_to === null &&
+      item.status !== "completed"
+  );
+
+  async function claimItem(itemId: number) {
+    if (claimBusy !== null) return;
+    setClaimBusy(itemId);
+
+    const { data, error } = await supabase.rpc(
+      "claim_work_item",
+      { p_item_id: itemId }
+    );
+
+    if (error || data !== true) {
+      setNotifyInfo(
+        isRuLang
+          ? "Не получилось записаться: возможно, задачу уже взял другой."
+          : "Eintragen nicht möglich – vielleicht hat schon jemand die Aufgabe übernommen."
+      );
+    } else {
+      setNotifyInfo(
+        isRuLang
+          ? "Готово, задача записана на тебя."
+          : "Erledigt, die Aufgabe ist jetzt bei dir eingetragen."
+      );
+    }
+
+    setClaimBusy(null);
+    await loadProject();
+  }
+
+  async function releaseItem(itemId: number) {
+    if (claimBusy !== null) return;
+    setClaimBusy(itemId);
+
+    await supabase.rpc("release_work_item", {
+      p_item_id: itemId,
+    });
+
+    setClaimBusy(null);
+    await loadProject();
+  }
+
+  async function shareProject() {
+    if (!project) return;
+
+    const link = `${window.location.origin}/work/${project.id}`;
+    const lines = [
+      `*${project.title}*`,
+      project.description
+        ? project.description.length > 220
+          ? `${project.description.slice(0, 220)}…`
+          : project.description
+        : "",
+      openRoles.length > 0
+        ? isRuLang
+          ? `Свободных задач: ${openRoles.length}. Открой и отметь, что берёшь на себя:`
+          : `Offene Aufgaben: ${openRoles.length}. Öffne den Link und trag dich ein:`
+        : isRuLang
+          ? "Открой проект в приложении:"
+          : "Projekt in der App öffnen:",
+      link,
+    ].filter(Boolean);
+
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(lines.join("\n\n"))}`,
+      "_blank"
+    );
+  }
+
+  async function copyProjectLink() {
+    if (!project) return;
+
+    try {
+      await navigator.clipboard.writeText(
+        `${window.location.origin}/work/${project.id}`
+      );
+      setShareInfo(
+        isRuLang ? "Ссылка скопирована." : "Link kopiert."
+      );
+    } catch {
+      setShareInfo(
+        isRuLang
+          ? "Не удалось скопировать."
+          : "Kopieren nicht möglich."
+      );
+    }
+  }
+
+  async function notifyTeam() {
+    if (!project) return;
+
+    setNotifyInfo(
+      isRuLang ? "Отправляю…" : "Sende…"
+    );
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const response = await fetch("/api/work-notify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session?.access_token ?? ""}`,
+      },
+      body: JSON.stringify({
+        projectId: project.id,
+        reminder: true,
+      }),
+    }).catch(() => null);
+
+    if (!response || !response.ok) {
+      setNotifyInfo(
+        isRuLang
+          ? "Не удалось отправить уведомление."
+          : "Benachrichtigung konnte nicht gesendet werden."
+      );
+      return;
+    }
+
+    const result = (await response.json()) as {
+      sent?: number;
+    };
+
+    setNotifyInfo(
+      isRuLang
+        ? `Уведомление отправлено: ${result.sent ?? 0} чел.`
+        : `Benachrichtigung gesendet: ${result.sent ?? 0} Personen.`
+    );
+  }
 
   async function deleteProject() {
     if (
@@ -1440,6 +1599,99 @@ export default function WorkProjectPage() {
             </div>
           </section>
 
+          <section className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={shareProject}
+              className="flex h-11 items-center gap-2 rounded-full bg-[#ffc93c] px-5 text-[13px] font-bold text-[#1b2431] active:scale-95"
+            >
+              <Share2 size={16} />
+              {isRuLang ? "Поделиться в WhatsApp" : "In WhatsApp teilen"}
+            </button>
+
+            <button
+              type="button"
+              onClick={copyProjectLink}
+              className="flex h-11 items-center gap-2 rounded-full border border-[#e9e3d3] bg-white px-4 text-[13px] font-semibold text-[#1b2431] active:scale-95"
+            >
+              {isRuLang ? "Копировать ссылку" : "Link kopieren"}
+            </button>
+
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={notifyTeam}
+                className="flex h-11 items-center gap-2 rounded-full border border-[#e9e3d3] bg-white px-4 text-[13px] font-semibold text-[#1b2431] active:scale-95"
+              >
+                <Bell size={16} />
+                {isRuLang ? "Уведомить команду" : "Team benachrichtigen"}
+              </button>
+            )}
+          </section>
+
+          {(notifyInfo || shareInfo) && (
+            <p className="mt-2 px-1 text-[12px] font-semibold text-[#6f6a5c]">
+              {notifyInfo || shareInfo}
+            </p>
+          )}
+
+          {openRoles.length > 0 && (
+            <section className="mt-4 overflow-hidden rounded-[24px] border border-[#e9e3d3] bg-white">
+              <div className="flex items-center gap-3 border-b border-[#ece6d6] bg-[#fff4d1] px-4 py-3">
+                <Hand size={18} className="text-[#9a6b00]" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-bold text-[#1b2431]">
+                    {isRuLang ? "Свободные задачи" : "Offene Aufgaben"} · {openRoles.length}
+                  </p>
+                  <p className="text-[12px] text-[#9a6b00]">
+                    {isRuLang
+                      ? "Нажми «Беру», если готов(а) взять на себя"
+                      : "Tippe auf „Übernehmen“, wenn du das machen möchtest"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="divide-y divide-[#ece6d6]">
+                {openRoles.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-3 px-4 py-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-[14px] font-semibold text-[#1b2431]">
+                        {item.title}
+                      </p>
+
+                      {item.deadline && (
+                        <p className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-[#8f897a]">
+                          <Clock3 size={11} />
+                          {formatDate(item.deadline, language, text.noDate)}
+                        </p>
+                      )}
+                    </div>
+
+                    {myMemberId !== null ? (
+                      <button
+                        type="button"
+                        onClick={() => claimItem(item.id)}
+                        disabled={claimBusy !== null}
+                        className="h-10 shrink-0 rounded-full bg-[#1b2431] px-5 text-[13px] font-bold text-[#ffc93c] active:scale-95 disabled:opacity-50"
+                      >
+                        {isRuLang ? "Беру" : "Übernehmen"}
+                      </button>
+                    ) : (
+                      <span className="max-w-[120px] text-right text-[11px] leading-4 text-[#8f897a]">
+                        {isRuLang
+                          ? "Нужна карточка в «Команде»"
+                          : "Karte im Bereich „Team“ nötig"}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="mt-4 grid grid-cols-4 gap-2">
             {[
               {
@@ -1966,6 +2218,30 @@ export default function WorkProjectPage() {
                         )!.first_name
                       : text.stillOpen}
                   </p>
+
+                  {myMemberId !== null &&
+                    selectedItem.assigned_to === null && (
+                      <button
+                        type="button"
+                        onClick={() => claimItem(selectedItem.id)}
+                        disabled={claimBusy !== null}
+                        className="mt-2 h-9 rounded-full bg-[#1b2431] px-4 text-[12px] font-bold text-[#ffc93c] disabled:opacity-50"
+                      >
+                        {isRuLang ? "Беру" : "Übernehmen"}
+                      </button>
+                    )}
+
+                  {myMemberId !== null &&
+                    selectedItem.assigned_to === myMemberId && (
+                      <button
+                        type="button"
+                        onClick={() => releaseItem(selectedItem.id)}
+                        disabled={claimBusy !== null}
+                        className="mt-2 h-9 rounded-full border border-[#e9e3d3] px-4 text-[12px] font-semibold text-[#6f6a5c] disabled:opacity-50"
+                      >
+                        {isRuLang ? "Отказаться" : "Abgeben"}
+                      </button>
+                    )}
                 </div>
               </div>
 

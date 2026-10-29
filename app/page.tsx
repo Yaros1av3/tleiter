@@ -9,6 +9,7 @@ import {
   Bus,
   Cake,
   CalendarCheck,
+  ChevronRight,
   CalendarDays,
   CalendarRange,
   Clock3,
@@ -29,6 +30,7 @@ import { useAvailabilityReminder } from "@/lib/useAvailabilityReminder";
 import { useTripsReminder } from "@/lib/useTripsReminder";
 import Avatar from "@/components/Avatar";
 import { useIdeasUnread } from "@/lib/useIdeasUnread";
+import { useWorkUnread } from "@/lib/useWorkUnread";
 import { useMyTeenBirthdays } from "@/lib/useMyTeenBirthdays";
 import { shortDays } from "@/lib/birthdays";
 import { useReplacementRequests } from "@/lib/useReplacementRequests";
@@ -241,6 +243,7 @@ export default function Home() {
   const reminder = useAvailabilityReminder();
   const tripsReminder = useTripsReminder();
   const ideas = useIdeasUnread();
+  const workNew = useWorkUnread();
   const myTeenBirthdays = useMyTeenBirthdays();
   const replacementRequests = useReplacementRequests();
 
@@ -799,7 +802,7 @@ export default function Home() {
                 <MoreIcon size={22} />
               )}
 
-              {(reminder.needed || tripsReminder.needed) && !moreOpen && (
+              {(reminder.needed || tripsReminder.needed || workNew.unread) && !moreOpen && (
                 <ReminderDot className="right-0 top-0" />
               )}
             </button>
@@ -813,6 +816,39 @@ export default function Home() {
           {/* =====================================================
               NEW IDEA
           ====================================================== */}
+          {workNew.unread && (
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  workNew.latest && workNew.count === 1
+                    ? `/work/${workNew.latest.id}`
+                    : "/work",
+                )
+              }
+              className="mt-4 flex w-full items-center gap-3 rounded-[18px] bg-[#1b2431] px-3.5 py-2.5 text-left transition active:scale-[0.99]"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#ffc93c] text-[#1b2431]">
+                <BriefcaseBusiness size={18} />
+              </span>
+
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-bold text-[#ffc93c]">
+                  {isRu ? "Новый проект" : "Neues Projekt"}
+                  {workNew.count > 1 ? ` · ${workNew.count}` : ""}
+                </span>
+
+                {workNew.latest && (
+                  <span className="block truncate text-[12px] text-white/70">
+                    {workNew.latest.title}
+                  </span>
+                )}
+              </span>
+
+              <ChevronRight size={18} className="shrink-0 text-[#ffc93c]" />
+            </button>
+          )}
+
           {ideas.unread && (
             <button
               type="button"
@@ -1658,6 +1694,10 @@ export default function Home() {
                           myTeenBirthdays.length > 0 && (
                             <ReminderDot className="-right-0.5 -top-0.5" />
                           )}
+
+                        {item.href === "/work" && workNew.unread && (
+                          <ReminderDot className="-right-0.5 -top-0.5" />
+                        )}
 
                         {item.href === "/trips" && tripsReminder.needed && (
                           <ReminderDot className="-right-0.5 -top-0.5" />

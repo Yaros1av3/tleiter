@@ -92,7 +92,9 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/");
+    // после входа возвращаем туда, куда человек шёл (например, по ссылке на проект)
+    const next = new URLSearchParams(window.location.search).get("next");
+    router.push(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
     router.refresh();
   }
 
@@ -101,7 +103,8 @@ export default function LoginPage() {
   }
 
   function goToRegister() {
-    router.push("/register");
+    const next = new URLSearchParams(window.location.search).get("next");
+    router.push(next ? `/register?next=${encodeURIComponent(next)}` : "/register");
   }
 
   return (
