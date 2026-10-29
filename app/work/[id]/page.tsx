@@ -1662,6 +1662,12 @@ export default function WorkProjectPage() {
                         {item.title}
                       </p>
 
+                      {item.description && (
+                        <p className="mt-1 whitespace-pre-line break-words text-[12px] leading-[1.45] text-[#6f6a5c]">
+                          {item.description}
+                        </p>
+                      )}
+
                       {item.deadline && (
                         <p className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-[#8f897a]">
                           <Clock3 size={11} />
@@ -2128,7 +2134,7 @@ export default function WorkProjectPage() {
               </div>
 
               {selectedItem.description && (
-                <p className="mt-4 text-sm leading-6 text-[#6e7574]">
+                <p className="mt-4 whitespace-pre-line text-sm leading-6 text-[#6e7574]">
                   {
                     selectedItem.description
                   }
