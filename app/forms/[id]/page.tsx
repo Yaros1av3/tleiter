@@ -301,6 +301,93 @@ export default function FormDetailPage() {
     }
   }
 
+  /* Создаёт карточку подростка из ответа и привязывает к ней все его ответы */
+  async function addToTeens(row: ResponseRow) {
+    if (row.teen_id || !row.birth_date) return false;
+
+    const norm = (value: string) => value.trim().toLowerCase();
+
+    // вдруг такой подросток уже есть (то же имя и дата рождения) — тогда просто привязываем
+    const existing = await supabase
+      .from("teens")
+      .select("id, first_name, last_name")
+      .eq("birth_date", row.birth_date);
+
+    let teenId: number | null =
+      (existing.data ?? []).find(
+        (teen) =>
+          norm(teen.first_name as string) === norm(row.first_name) &&
+          norm(teen.last_name as string) === norm(row.last_name),
+      )?.id ?? null;
+
+    if (teenId === null) {
+      const created = await supabase
+        .from("teens")
+        .insert({
+          first_name: row.first_name.trim(),
+          last_name: row.last_name.trim(),
+          birth_date: row.birth_date,
+          phone: row.phone || null,
+          parent1_name: row.parent_name || null,
+          parent1_phone: row.parent_phone || null,
+          notes: row.email ? `E-Mail: ${row.email}` : null,
+          in_teen_chat: false,
+          in_parent_chat: false,
+          gender: null,
+          languages: row.lang === "de" || row.lang === "ru" ? [row.lang] : [],
+          is_active: true,
+        })
+        .select("id")
+        .single();
+
+      if (created.error || !created.data) {
+        console.error("Create teen error:", created.error);
+        toast.error(
+          isRu ? "Не удалось добавить в подростки." : "Konnte nicht zu den Teens hinzugefügt werden.",
+        );
+        return false;
+      }
+
+      teenId = created.data.id as number;
+    }
+
+    // привязываем этот ответ и другие ответы этого же подростка в других формах
+    const link = await supabase
+      .from("form_responses")
+      .update({ teen_id: teenId })
+      .is("teen_id", null)
+      .eq("first_name", row.first_name)
+      .eq("last_name", row.last_name)
+      .eq("birth_date", row.birth_date);
+
+    if (link.error) {
+      console.error("Link teen error:", link.error);
+      toast.error(isRu ? "Карточка создана, но привязать ответ не удалось." : "Karte erstellt, Antwort aber nicht verknüpft.");
+      return false;
+    }
+
+    setResponses((current) =>
+      current.map((item) =>
+        !item.teen_id &&
+        item.first_name === row.first_name &&
+        item.last_name === row.last_name &&
+        item.birth_date === row.birth_date
+          ? { ...item, teen_id: teenId }
+          : item,
+      ),
+    );
+
+    setTeenBirth((current) => ({ ...current, [teenId as number]: row.birth_date as string }));
+
+    toast.success(
+      isRu
+        ? `${row.first_name} добавлен(а) в подростки.`
+        : `${row.first_name} wurde zu den Teens hinzugefügt.`,
+    );
+
+    return true;
+  }
+
   async function deleteResponse(row: ResponseRow) {
     const { error } = await supabase.from("form_responses").delete().eq("id", row.id);
     if (error) {
@@ -526,6 +613,7 @@ export default function FormDetailPage() {
               isRu={isRu}
               lang={lang}
               onDelete={deleteResponse}
+              onAddTeen={addToTeens}
               onAdd={addManual}
               onExport={exportCsv}
             />
@@ -1123,6 +1211,7 @@ function AnswersTab({
   isRu,
   lang,
   onDelete,
+  onAddTeen,
   onAdd,
   onExport,
 }: {
@@ -1132,9 +1221,11 @@ function AnswersTab({
   isRu: boolean;
   lang: "de" | "ru";
   onDelete: (row: ResponseRow) => void;
+  onAddTeen: (row: ResponseRow) => Promise<boolean>;
   onAdd: (first: string, last: string, came: boolean) => Promise<boolean>;
   onExport: () => void;
 }) {
+  const [addingId, setAddingId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [confirmId, setConfirmId] = useState<number | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
@@ -1143,6 +1234,15 @@ function AnswersTab({
   const list = responses.filter(
     (row) => !q || `${row.first_name} ${row.last_name}`.toLowerCase().includes(q),
   );
+
+  const found = responses.filter((row) => row.teen_id).length;
+  const fresh = responses.filter((row) => !row.teen_id && row.source !== "manual").length;
+
+  async function addTeen(row: ResponseRow) {
+    setAddingId(row.id);
+    await onAddTeen(row);
+    setAddingId(null);
+  }
 
   return (
     <div className="space-y-3">
@@ -1171,6 +1271,14 @@ function AnswersTab({
           className={`${inputCls} !pl-10`}
         />
       </div>
+
+      {responses.length > 0 && (
+        <p className="px-1 text-[12px] font-semibold text-neutral-500">
+          {isRu
+            ? `Найдено в базе: ${found} · Новых: ${fresh}`
+            : `In Datenbank gefunden: ${found} · Neu: ${fresh}`}
+        </p>
+      )}
 
       {list.length === 0 ? (
         <div className="rounded-[20px] border border-dashed border-neutral-300 px-5 py-10 text-center text-[14px] text-neutral-400">
@@ -1207,6 +1315,11 @@ function AnswersTab({
                           {birth ? ` · ${calcAge(birth)}` : ""}
                         </span>
                       )}
+                      {!row.teen_id && row.source !== "manual" && (
+                        <span className="rounded-full bg-[#fff4d1] px-2 py-0.5 text-[10px] font-bold text-[#9a6b00]">
+                          {isRu ? "новый" : "neu"}
+                        </span>
+                      )}
                       {row.source === "manual" && (
                         <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-500">
                           {isRu ? "вручную" : "manuell"}
@@ -1224,6 +1337,19 @@ function AnswersTab({
                       {filled.length > 0 && (isRu ? " · показать ответы" : " · Antworten zeigen")}
                     </div>
                   </button>
+
+                  {!row.teen_id && row.birth_date && (
+                    <button
+                      type="button"
+                      disabled={addingId === row.id}
+                      onClick={() => addTeen(row)}
+                      aria-label={isRu ? "Добавить в подростки" : "Zu Teens hinzufügen"}
+                      title={isRu ? "Добавить в подростки" : "Zu Teens hinzufügen"}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ffc93c] text-[#1b2431] active:scale-95 disabled:opacity-50"
+                    >
+                      <UserPlus size={16} />
+                    </button>
+                  )}
 
                   {confirmId === row.id ? (
                     <div className="flex gap-1.5">
@@ -1308,6 +1434,18 @@ function AnswersTab({
                           </dd>
                         </div>
                       ))
+                    )}
+
+                    {!row.teen_id && row.birth_date && (
+                      <button
+                        type="button"
+                        disabled={addingId === row.id}
+                        onClick={() => addTeen(row)}
+                        className="mt-1 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#1b2431] text-[13px] font-bold text-[#ffc93c] active:scale-[0.99] disabled:opacity-50"
+                      >
+                        <UserPlus size={16} />
+                        {isRu ? "Добавить в подростки" : "Zu Teens hinzufügen"}
+                      </button>
                     )}
                   </dl>
                 )}
