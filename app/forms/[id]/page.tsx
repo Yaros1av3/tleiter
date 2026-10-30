@@ -23,6 +23,7 @@ import {
 
 import DatePicker from "@/components/DatePicker";
 import EventIcon from "@/components/EventIcon";
+import HeroScene from "@/components/HeroScene";
 import TimePicker from "@/components/TimePicker";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -516,9 +517,10 @@ export default function FormDetailPage() {
         </button>
 
         <div
-          className={`overflow-hidden rounded-[24px] bg-gradient-to-br ${theme.hero} p-5 text-white`}
+          className={`relative overflow-hidden rounded-[24px] bg-gradient-to-br ${theme.hero} p-5 text-white`}
         >
-          <div className="flex items-start justify-between gap-3">
+          <HeroScene scene={theme.scene} />
+          <div className="relative flex items-start justify-between gap-3">
             <div className="min-w-0">
               <EventIcon name={draft.emoji} size={34} />
               <h1 className="mt-2 break-words text-[24px] font-extrabold leading-tight tracking-[-0.03em]">
@@ -715,17 +717,26 @@ function EditTab({
         </div>
 
         <label className={`${label} mt-4`}>{isRu ? "Цвет страницы" : "Farbe"}</label>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4">
           {Object.entries(THEMES).map(([key, value]) => (
             <button
               key={key}
               type="button"
               onClick={() => patch({ theme: key })}
               aria-label={value.name}
-              className={`h-10 flex-1 rounded-xl bg-gradient-to-br ${value.hero} transition ${
-                draft.theme === key ? "ring-2 ring-[#111820] ring-offset-2" : ""
-              }`}
-            />
+              className="text-left"
+            >
+              <span
+                className={`relative block h-16 overflow-hidden rounded-xl bg-gradient-to-br ${value.hero} transition ${
+                  draft.theme === key ? "ring-2 ring-[#111820] ring-offset-2" : ""
+                }`}
+              >
+                <HeroScene scene={value.scene} />
+              </span>
+              <span className="mt-1 block truncate text-[11px] font-semibold text-neutral-500">
+                {value.name}
+              </span>
+            </button>
           ))}
         </div>
       </div>

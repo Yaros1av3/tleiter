@@ -74,8 +74,53 @@ export const QUESTION_TYPES: {
 /* Цветовые темы страницы мероприятия */
 export const THEMES: Record<
   string,
-  { name: string; hero: string; accent: string; soft: string; ring: string; text: string }
+  { name: string; hero: string; accent: string; soft: string; ring: string; text: string; scene?: string }
 > = {
+  christmas: {
+    name: "Рождество",
+    hero: "from-[#0b3b2e] via-[#14513f] to-[#6d1d2a]",
+    accent: "bg-[#c0392b] text-white",
+    soft: "bg-red-50 text-red-800",
+    ring: "focus:border-red-400 focus:ring-red-100",
+    text: "text-red-700",
+    scene: "christmas",
+  },
+  winter: {
+    name: "Зима",
+    hero: "from-[#5ea0e8] via-[#3f7fd0] to-[#27508f]",
+    accent: "bg-sky-700 text-white",
+    soft: "bg-sky-50 text-sky-800",
+    ring: "focus:border-sky-400 focus:ring-sky-100",
+    text: "text-sky-700",
+    scene: "winter",
+  },
+  camp: {
+    name: "Лагерь",
+    hero: "from-[#f6a34a] via-[#d9693a] to-[#3b4a2f]",
+    accent: "bg-orange-600 text-white",
+    soft: "bg-orange-50 text-orange-800",
+    ring: "focus:border-orange-400 focus:ring-orange-100",
+    text: "text-orange-700",
+    scene: "camp",
+  },
+  party: {
+    name: "Праздник",
+    hero: "from-fuchsia-500 via-purple-500 to-indigo-600",
+    accent: "bg-fuchsia-600 text-white",
+    soft: "bg-fuchsia-50 text-fuchsia-800",
+    ring: "focus:border-fuchsia-400 focus:ring-fuchsia-100",
+    text: "text-fuchsia-700",
+    scene: "party",
+  },
+  sea: {
+    name: "Море",
+    hero: "from-cyan-400 via-sky-500 to-blue-700",
+    accent: "bg-cyan-700 text-white",
+    soft: "bg-cyan-50 text-cyan-800",
+    ring: "focus:border-cyan-400 focus:ring-cyan-100",
+    text: "text-cyan-700",
+    scene: "sea",
+  },
   tlight: {
     name: "TLight",
     hero: "from-[#1b2431] via-[#1b2431] to-[#3a4a63]",
@@ -91,6 +136,7 @@ export const THEMES: Record<
     soft: "bg-orange-50 text-orange-700",
     ring: "focus:border-orange-400 focus:ring-orange-100",
     text: "text-orange-600",
+    scene: "sun",
   },
   sky: {
     name: "Небо",
@@ -99,6 +145,7 @@ export const THEMES: Record<
     soft: "bg-sky-50 text-sky-700",
     ring: "focus:border-sky-400 focus:ring-sky-100",
     text: "text-sky-600",
+    scene: "clouds",
   },
   emerald: {
     name: "Лес",
@@ -107,6 +154,7 @@ export const THEMES: Record<
     soft: "bg-emerald-50 text-emerald-700",
     ring: "focus:border-emerald-400 focus:ring-emerald-100",
     text: "text-emerald-600",
+    scene: "forest",
   },
   rose: {
     name: "Закат",
@@ -115,6 +163,7 @@ export const THEMES: Record<
     soft: "bg-rose-50 text-rose-700",
     ring: "focus:border-rose-400 focus:ring-rose-100",
     text: "text-rose-600",
+    scene: "sunset",
   },
   violet: {
     name: "Ночь",
@@ -123,6 +172,7 @@ export const THEMES: Record<
     soft: "bg-violet-50 text-violet-700",
     ring: "focus:border-violet-400 focus:ring-violet-100",
     text: "text-violet-600",
+    scene: "stars",
   },
 };
 
@@ -247,3 +297,119 @@ export const STANDARD_FIELDS: {
   { key: "parent_name", ru: "Имя родителя", de: "Name der Eltern", required: true },
   { key: "parent_phone", ru: "Телефон родителя", de: "Handynummer der Eltern", required: true },
 ];
+
+
+/* =====================================================================
+   КАЛЕНДАРЬ: файл .ics (iPhone, Android, Outlook) и ссылка для Google
+===================================================================== */
+
+type CalendarForm = {
+  slug: string;
+  title_de: string;
+  title_ru: string;
+  desc_de: string;
+  desc_ru: string;
+  event_date: string | null;
+  event_time: string;
+  location: string;
+};
+
+const EVENT_HOURS = 2; // сколько длится событие в календаре (время окончания в форме не задаётся)
+
+function icsEscape(value: string) {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\r?\n/g, "\\n");
+}
+
+function plusDay(date: string) {
+  const d = new Date(`${date}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10).replace(/-/g, "");
+}
+
+function startEnd(form: CalendarForm) {
+  if (!form.event_date) return null;
+
+  const day = form.event_date.replace(/-/g, "");
+  const match = /^(\d{1,2}):(\d{2})/.exec(form.event_time || "");
+
+  if (!match) {
+    return { allDay: true as const, start: day, end: plusDay(form.event_date) };
+  }
+
+  const startH = Number(match[1]);
+  const startM = match[2];
+  const endH = startH + EVENT_HOURS;
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  // если событие заканчивается после полуночи — переносим на следующий день
+  const endDay = endH >= 24 ? plusDay(form.event_date) : day;
+
+  return {
+    allDay: false as const,
+    start: `${day}T${pad(startH)}${startM}00`,
+    end: `${endDay}T${pad(endH % 24)}${startM}00`,
+  };
+}
+
+export function canAddToCalendar(form: CalendarForm) {
+  return Boolean(form.event_date);
+}
+
+export function buildIcs(form: CalendarForm, lang: "de" | "ru") {
+  const range = startEnd(form);
+  if (!range) return "";
+
+  const title = pickText(form.title_de, form.title_ru, lang);
+  const description = pickText(form.desc_de, form.desc_ru, lang);
+
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//TLight//Event//DE",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${form.slug}-${range.start}@tlight`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`,
+    range.allDay ? `DTSTART;VALUE=DATE:${range.start}` : `DTSTART:${range.start}`,
+    range.allDay ? `DTEND;VALUE=DATE:${range.end}` : `DTEND:${range.end}`,
+    `SUMMARY:${icsEscape(title)}`,
+    description ? `DESCRIPTION:${icsEscape(description)}` : "",
+    form.location ? `LOCATION:${icsEscape(form.location)}` : "",
+    "BEGIN:VALARM",
+    "TRIGGER:-P1D",
+    "ACTION:DISPLAY",
+    `DESCRIPTION:${icsEscape(title)}`,
+    "END:VALARM",
+    "BEGIN:VALARM",
+    "TRIGGER:-PT2H",
+    "ACTION:DISPLAY",
+    `DESCRIPTION:${icsEscape(title)}`,
+    "END:VALARM",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].filter(Boolean);
+
+  return lines.join("\r\n");
+}
+
+export function googleCalendarUrl(form: CalendarForm, lang: "de" | "ru") {
+  const range = startEnd(form);
+  if (!range) return "";
+
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: pickText(form.title_de, form.title_ru, lang),
+    dates: `${range.start}/${range.end}`,
+    details: pickText(form.desc_de, form.desc_ru, lang),
+    location: form.location || "",
+  });
+
+  if (!range.allDay) params.set("ctz", "Europe/Berlin");
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}

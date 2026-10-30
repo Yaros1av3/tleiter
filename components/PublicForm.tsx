@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Check, Clock3, MapPin, Users } from "lucide-react";
 
 import EventIcon from "@/components/EventIcon";
+import HeroScene from "@/components/HeroScene";
+import TicketCard from "@/components/TicketCard";
 import {
   formatEventDate,
   hasCyrillic,
@@ -434,8 +436,14 @@ export default function PublicForm({ slug }: { slug: string }) {
         <div
           className={`relative overflow-hidden bg-gradient-to-br ${theme.hero} px-5 pb-14 pt-5 text-white`}
         >
-          <div className="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10" />
-          <div className="absolute -bottom-14 -left-8 h-40 w-40 rounded-full bg-white/10" />
+          {theme.scene ? (
+            <HeroScene scene={theme.scene} />
+          ) : (
+            <>
+              <div className="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/10" />
+              <div className="absolute -bottom-14 -left-8 h-40 w-40 rounded-full bg-white/10" />
+            </>
+          )}
 
           <div className="relative flex justify-end">
             <div className="flex rounded-full bg-white/20 p-1 backdrop-blur">
@@ -481,7 +489,8 @@ export default function PublicForm({ slug }: { slug: string }) {
             </div>
           ) : (
             <>
-              {/* INFO CARD */}
+              {/* INFO CARD (после записи вместо неё показываем карточку-билет) */}
+              {!done && (
               <div className="rounded-[26px] bg-white p-5 shadow-[0_10px_30px_rgba(17,24,32,0.08)]">
                 <div className="flex flex-wrap gap-2">
                   {dateLabel && (
@@ -523,29 +532,16 @@ export default function PublicForm({ slug }: { slug: string }) {
                   </div>
                 )}
               </div>
+              )}
 
               {/* STATE */}
               {done ? (
-                <div className="mt-4 rounded-[26px] bg-white p-7 text-center shadow-[0_10px_30px_rgba(17,24,32,0.08)]">
-                  <div
-                    className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${theme.accent}`}
-                  >
-                    <Check size={32} strokeWidth={3} />
-                  </div>
-                  <h2 className="mt-4 text-[22px] font-extrabold tracking-[-0.02em]">
-                    {t.doneTitle}
-                  </h2>
-                  <p className="mt-2 text-[15px] text-neutral-500">
-                    {t.doneText}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={reset}
-                    className="mt-5 text-[13px] font-semibold text-neutral-400 underline underline-offset-4"
-                  >
-                    {t.another}
-                  </button>
-                </div>
+                <TicketCard
+                  form={form}
+                  name={`${firstName.trim()} ${lastName.trim()}`.trim()}
+                  lang={lang}
+                  onAnother={reset}
+                />
               ) : form.closed || form.full ? (
                 <div className="mt-4 rounded-[26px] bg-white p-6 text-center text-[15px] font-semibold text-neutral-500 shadow-sm">
                   {form.full && !form.closed ? t.full : t.closed}
