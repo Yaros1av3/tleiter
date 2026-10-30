@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     .select("id")
     .eq("project_id", project.id)
     .is("assigned_to", null)
-    .neq("status", "completed");
+    .eq("status", "open");
 
   const freeIds = (freeItems ?? []).map((row) => row.id as number);
 

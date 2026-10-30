@@ -419,6 +419,7 @@ export default function TeamPage() {
 
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
+  const [itemTakers, setItemTakers] = useState<Record<number, number[]>>({});
   const [projects, setProjects] = useState<WorkProject[]>([]);
   const [scheduleEntries, setScheduleEntries] = useState<
     ScheduleEntry[]
@@ -515,6 +516,7 @@ export default function TeamPage() {
       projectsResponse,
       scheduleEntriesResponse,
       scheduleMembersResponse,
+      takersResponse,
     ] = await Promise.all([
       supabase
         .from("team_members")
@@ -545,7 +547,21 @@ export default function TeamPage() {
         .select(
           "id,schedule_entry_id,team_member_id",
         ),
+      supabase
+        .from("work_item_members")
+        .select("item_id, member_id"),
     ]);
+
+    {
+      const map: Record<number, number[]> = {};
+
+      for (const row of takersResponse.data ?? []) {
+        const key = row.item_id as number;
+        (map[key] ??= []).push(row.member_id as number);
+      }
+
+      setItemTakers(map);
+    }
 
     if (membersResponse.error) {
       console.error(
@@ -707,7 +723,8 @@ export default function TeamPage() {
   function getMemberTasks(memberId: number) {
     return workItems.filter(
       (item) =>
-        item.assigned_to === memberId &&
+        (item.assigned_to === memberId ||
+          (itemTakers[item.id] ?? []).includes(memberId)) &&
         item.status !== "completed",
     );
   }
@@ -715,7 +732,8 @@ export default function TeamPage() {
   function getCompletedMemberTasks(memberId: number) {
     return workItems.filter(
       (item) =>
-        item.assigned_to === memberId &&
+        (item.assigned_to === memberId ||
+          (itemTakers[item.id] ?? []).includes(memberId)) &&
         item.status === "completed",
     );
   }

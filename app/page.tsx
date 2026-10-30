@@ -31,6 +31,8 @@ import { useTripsReminder } from "@/lib/useTripsReminder";
 import Avatar from "@/components/Avatar";
 import { useIdeasUnread } from "@/lib/useIdeasUnread";
 import { useWorkUnread } from "@/lib/useWorkUnread";
+import { useMyWorkTasks } from "@/lib/useMyWorkTasks";
+import CancelServiceButton, { useMyMember } from "@/components/CancelServiceButton";
 import { useMyTeenBirthdays } from "@/lib/useMyTeenBirthdays";
 import { shortDays } from "@/lib/birthdays";
 import { useReplacementRequests } from "@/lib/useReplacementRequests";
@@ -244,6 +246,8 @@ export default function Home() {
   const tripsReminder = useTripsReminder();
   const ideas = useIdeasUnread();
   const workNew = useWorkUnread();
+  const myTasks = useMyWorkTasks();
+  const myService = useMyMember();
   const myTeenBirthdays = useMyTeenBirthdays();
   const replacementRequests = useReplacementRequests();
 
@@ -1024,9 +1028,9 @@ export default function Home() {
                       );
 
                     return (
+                      <div key={entry.id}>
                       <button
                         type="button"
-                        key={entry.id}
                         onClick={() =>
                           openService(entry)
                         }
@@ -1140,12 +1144,91 @@ export default function Home() {
                           </div>
                         </div>
                       </button>
+
+                      {myService.me &&
+                        members.some(
+                          (member) =>
+                            member.id === myService.me?.memberId,
+                        ) && (
+                          <CancelServiceButton
+                            entry={entry}
+                            me={myService.me}
+                            requested={myService.requested.has(
+                              String(entry.id),
+                            )}
+                            isRu={isRu}
+                            onChanged={myService.reload}
+                          />
+                        )}
+                      </div>
                     );
                   },
                 )}
               </div>
             )}
           </section>
+
+          {/* =====================================================
+              MY PROJECT TASKS
+          ====================================================== */}
+          {myTasks.length > 0 && (
+            <section className="mt-6">
+              <h2 className="mb-3 text-[19px] font-bold tracking-[-0.04em] text-neutral-950">
+                {isRu ? "Мои задачи" : "Meine Aufgaben"}
+              </h2>
+
+              <div className="divide-y divide-[#ece6d6] overflow-hidden rounded-[20px] border border-[#e9e3d3] bg-white">
+                {myTasks.slice(0, 6).map((task) => (
+                  <button
+                    type="button"
+                    key={task.id}
+                    onClick={() => router.push(`/work/${task.project_id}`)}
+                    className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition active:bg-[#fffdf8]"
+                  >
+                    <span
+                      className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                        task.status === "in_progress"
+                          ? "bg-[#ffc93c]"
+                          : "bg-[#c4bda9]"
+                      }`}
+                    />
+
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-semibold text-[#1b2431]">
+                        {task.title}
+                      </span>
+
+                      <span className="block truncate text-[12px] text-[#8f897a]">
+                        {task.project_title}
+                        {task.deadline
+                          ? ` · ${new Date(`${task.deadline}T12:00:00`).toLocaleDateString(
+                              isRu ? "ru-RU" : "de-DE",
+                              { day: "2-digit", month: "short" },
+                            )}`
+                          : ""}
+                      </span>
+                    </span>
+
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                        task.status === "in_progress"
+                          ? "bg-[#fff4d1] text-[#9a6b00]"
+                          : "bg-[#f3efe3] text-[#6f6a5c]"
+                      }`}
+                    >
+                      {task.status === "in_progress"
+                        ? isRu
+                          ? "В работе"
+                          : "In Arbeit"
+                        : isRu
+                          ? "Открыто"
+                          : "Offen"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* =====================================================
               VERSE OF THE DAY

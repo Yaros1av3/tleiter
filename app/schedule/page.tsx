@@ -27,6 +27,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 
+import { notifyEvent } from "@/lib/notify";
 import { supabase } from "@/lib/supabase";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
@@ -813,6 +814,13 @@ export default function SchedulePage() {
     setReplaceBusy(false);
     setReplaceTarget(null);
 
+    void notifyEvent({
+      type: "replacement-found",
+      entryId: entry.id,
+      oldMemberId: memberId,
+      newMemberId,
+    });
+
     toast.success(isRu ? "Замена поставлена." : "Ersatz eingetragen.");
 
     await loadData(true);
@@ -1198,6 +1206,13 @@ export default function SchedulePage() {
   async function saveEntry() {
     if (!isAdmin) return;
 
+    // кто стоял в плане до сохранения — чтобы уведомить только о изменениях
+    const prevMemberIds: number[] = editingEntry
+      ? entryMembers
+          .filter((item) => item.schedule_entry_id === editingEntry.id)
+          .map((item) => item.team_member_id)
+      : [];
+
     if (
       !form.schedule_date ||
       saving
@@ -1398,6 +1413,20 @@ export default function SchedulePage() {
 
         setSaving(false);
         return;
+      }
+    }
+
+    if (entryId) {
+      const added = form.member_ids.filter((id) => !prevMemberIds.includes(id));
+      const removed = prevMemberIds.filter((id) => !form.member_ids.includes(id));
+
+      if (added.length > 0 || removed.length > 0) {
+        void notifyEvent({
+          type: "schedule-change",
+          entryId,
+          added,
+          removed,
+        });
       }
     }
 

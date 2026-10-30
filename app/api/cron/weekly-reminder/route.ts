@@ -18,17 +18,31 @@ export const dynamic = "force-dynamic";
  *     кто «не служит», и тех, кто уже ответил на все воскресенья);
  *  3) за 5 дней до конца месяца — повторное напоминание тем, кто всё ещё не ответил.
  *
- * Ручной тест: ?force=1 (+ &only=weekly или &only=availability). Секрет нужен всегда.
+ *  5) каждый день 16:00 — срок задач проектов: «завтра» и «сегодня»;
+ *  6) в воскресенье в 8:00 — «сегодня служишь»;
+ *  4) по понедельникам — напоминает о задачах проектов, которые всё ещё «в работе».
+ *
+ * Ручной тест: ?force=1 (+ &only=weekly, &only=availability или &only=tasks). Секрет нужен всегда.
  */
 
 const REMINDER_TIMEZONE = "Europe/Berlin";
-const REMINDER_HOUR = 16;
+/*
+ * Два запуска в сутки (06:00 и 14:00 UTC). В Берлине это:
+ *   зимой  — 07:00 и 15:00,
+ *   летом  — 08:00 и 16:00.
+ * Утренние дела идут при 7–8 часах, вечерние — при 15–16.
+ */
+const MORNING_HOURS = [7, 8]; // утреннее напоминание «сегодня служишь»
+const EVENING_HOURS = [15, 16];
 const WEEKLY_WEEKDAY = 2; // вторник
+const TASKS_WEEKDAY = 1; // понедельник — напоминание о задачах проектов «в работе»
 
 /* За сколько дней до конца месяца напоминать про «Когда могу служить» */
 const AVAILABILITY_FIRST_DAYS_BEFORE_END = 13;
 /* Повтор для не ответивших; поставь null, чтобы отключить */
 const AVAILABILITY_REPEAT_DAYS_BEFORE_END: number | null = 5;
+/* Последнее личное напоминание не ответившим; null — отключить */
+const AVAILABILITY_FINAL_DAYS_BEFORE_END: number | null = 2;
 
 type SubscriptionRow = {
   user_id: string;
@@ -229,6 +243,7 @@ async function runAvailability(
   supabase: Supabase,
   berlin: { year: number; month: number },
   repeat: boolean,
+  final = false,
 ) {
   const nextMonthIndex = berlin.month; // month 1..12 → индекс следующего месяца
   const nextYear = nextMonthIndex === 12 ? berlin.year + 1 : berlin.year;
@@ -276,6 +291,26 @@ async function runAvailability(
     new Date(Date.UTC(nextYear, monthIndex, 1)),
   );
 
+  if (final) {
+    const { data: names } = await supabase
+      .from("team_members")
+      .select("user_id, first_name")
+      .in("user_id", pending.length > 0 ? pending : ["00000000-0000-0000-0000-000000000000"]);
+
+    const nameById = new Map(
+      (names ?? []).map((row) => [row.user_id as string, row.first_name as string]),
+    );
+
+    const finalResult = await sendToUsers(supabase, pending, {}, (userId) => ({
+      title: "TLight — осталось 2 дня",
+      body: `${nameById.get(userId) ?? ""}, до конца месяца 2 дня, а воскресенья на ${ruMonth} ещё не отмечены. Отметь, пожалуйста · Trage deine Sonntage für ${deMonth} ein`.trim(),
+      url: "/availability",
+      tag: `availability-final-${nextYear}-${pad(monthIndex + 1)}`,
+    }));
+
+    return { month: `${nextYear}-${pad(monthIndex + 1)}`, recipients: pending.length, final: true, ...finalResult };
+  }
+
   const result = await sendToUsers(supabase, pending, {
     title: repeat
       ? "TLight — Ты ещё не отметил(а) воскресенья"
@@ -286,6 +321,247 @@ async function runAvailability(
   });
 
   return { month: `${nextYear}-${pad(monthIndex + 1)}`, recipients: pending.length, repeat, ...result };
+}
+
+/* ---------- 5) Срок задач проектов: завтра / сегодня ---------- */
+
+async function runDeadlines(
+  supabase: Supabase,
+  berlin: { year: number; month: number; day: number },
+) {
+  const today = `${berlin.year}-${pad(berlin.month)}-${pad(berlin.day)}`;
+  const tomorrowDate = new Date(Date.UTC(berlin.year, berlin.month - 1, berlin.day + 1));
+  const tomorrow = `${tomorrowDate.getUTCFullYear()}-${pad(tomorrowDate.getUTCMonth() + 1)}-${pad(tomorrowDate.getUTCDate())}`;
+
+  const { data: projects } = await supabase
+    .from("work_projects")
+    .select("id")
+    .in("status", ["planned", "active"]);
+
+  const projectIds = (projects ?? []).map((project) => project.id as number);
+
+  if (projectIds.length === 0) return { sent: 0, note: "no active projects" };
+
+  const { data: items } = await supabase
+    .from("work_items")
+    .select("id, title, project_id, assigned_to, deadline")
+    .neq("status", "completed")
+    .in("deadline", [today, tomorrow])
+    .in("project_id", projectIds);
+
+  const list = items ?? [];
+
+  if (list.length === 0) return { sent: 0, note: "no deadlines" };
+
+  const { data: takers } = await supabase
+    .from("work_item_members")
+    .select("item_id, member_id")
+    .in("item_id", list.map((item) => item.id));
+
+  const owners = new Map<number, Set<number>>();
+
+  for (const item of list) {
+    owners.set(item.id as number, new Set(item.assigned_to ? [item.assigned_to as number] : []));
+  }
+
+  for (const row of takers ?? []) owners.get(row.item_id as number)?.add(row.member_id as number);
+
+  const memberIds = Array.from(new Set(Array.from(owners.values()).flatMap((set) => Array.from(set))));
+
+  if (memberIds.length === 0) return { sent: 0, note: "no owners" };
+
+  const { data: members } = await supabase
+    .from("team_members")
+    .select("id, first_name, user_id")
+    .in("id", memberIds)
+    .not("user_id", "is", null);
+
+  const byUser = new Map<string, { name: string; today: string[]; tomorrow: string[]; projectIds: Set<number>; firstProject: number }>();
+
+  for (const member of members ?? []) {
+    const mine = list.filter((item) => owners.get(item.id as number)?.has(member.id as number));
+    if (mine.length === 0) continue;
+
+    byUser.set(member.user_id as string, {
+      name: member.first_name as string,
+      today: mine.filter((item) => item.deadline === today).map((item) => item.title as string),
+      tomorrow: mine.filter((item) => item.deadline === tomorrow).map((item) => item.title as string),
+      projectIds: new Set(mine.map((item) => item.project_id as number)),
+      firstProject: mine[0].project_id as number,
+    });
+  }
+
+  const result = await sendToUsers(supabase, Array.from(byUser.keys()), {}, (userId) => {
+    const info = byUser.get(userId)!;
+    const parts: string[] = [];
+
+    if (info.today.length > 0) parts.push(`сегодня срок: ${info.today.slice(0, 3).join(", ")}`);
+    if (info.tomorrow.length > 0) parts.push(`завтра срок: ${info.tomorrow.slice(0, 3).join(", ")}`);
+
+    return {
+      title: info.today.length > 0 ? "TLight — срок задачи сегодня" : "TLight — срок задачи завтра",
+      body: `${info.name}, ${parts.join("; ")}.`,
+      url: info.projectIds.size === 1 ? `/work/${info.firstProject}` : "/work",
+      tag: `work-deadline-${today}`,
+    };
+  });
+
+  return { recipients: byUser.size, ...result };
+}
+
+/* ---------- 6) Утро воскресенья: «сегодня служишь» ---------- */
+
+async function runSundayMorning(
+  supabase: Supabase,
+  berlin: { year: number; month: number; day: number },
+) {
+  const today = `${berlin.year}-${pad(berlin.month)}-${pad(berlin.day)}`;
+
+  const { data: entries } = await supabase
+    .from("schedule_entries")
+    .select("id, service_time")
+    .eq("schedule_date", today);
+
+  const list = entries ?? [];
+
+  if (list.length === 0) return { sent: 0, note: "no entries today" };
+
+  const { data: rows } = await supabase
+    .from("schedule_entry_members")
+    .select("schedule_entry_id, team_member_id")
+    .in("schedule_entry_id", list.map((entry) => entry.id));
+
+  const timeByEntry = new Map(
+    list.map((entry) => [
+      entry.id as number,
+      String(entry.service_time).slice(0, 5).replace("13:00", "12:30"),
+    ]),
+  );
+
+  const timesByMember = new Map<number, string[]>();
+
+  for (const row of rows ?? []) {
+    const time = timeByEntry.get(row.schedule_entry_id as number);
+    if (!time) continue;
+    timesByMember.set(row.team_member_id as number, [
+      ...(timesByMember.get(row.team_member_id as number) ?? []),
+      time,
+    ]);
+  }
+
+  if (timesByMember.size === 0) return { sent: 0, note: "no members" };
+
+  const { data: members } = await supabase
+    .from("team_members")
+    .select("id, first_name, user_id")
+    .in("id", Array.from(timesByMember.keys()))
+    .not("user_id", "is", null);
+
+  const byUser = new Map<string, { name: string; times: string[] }>();
+
+  for (const member of members ?? []) {
+    byUser.set(member.user_id as string, {
+      name: member.first_name as string,
+      times: (timesByMember.get(member.id as number) ?? []).sort(),
+    });
+  }
+
+  const result = await sendToUsers(supabase, Array.from(byUser.keys()), {}, (userId) => {
+    const info = byUser.get(userId)!;
+
+    return {
+      title: "TLight — сегодня служение",
+      body: `${info.name}, сегодня ты служишь (${info.times.join(", ")}). Хорошего служения!`,
+      url: "/schedule",
+      tag: `sunday-morning-${today}`,
+    };
+  });
+
+  return { recipients: byUser.size, ...result };
+}
+
+/* ---------- 4) Напоминание о задачах проектов, которые «в работе» ---------- */
+
+async function runTasks(supabase: Supabase) {
+  const { data: projects } = await supabase
+    .from("work_projects")
+    .select("id, title")
+    .in("status", ["planned", "active"]);
+
+  const projectById = new Map(
+    (projects ?? []).map((project) => [project.id as number, project.title as string]),
+  );
+
+  if (projectById.size === 0) return { sent: 0, note: "no active projects" };
+
+  const { data: items } = await supabase
+    .from("work_items")
+    .select("id, title, project_id, assigned_to")
+    .eq("status", "in_progress")
+    .in("project_id", Array.from(projectById.keys()));
+
+  const list = items ?? [];
+
+  if (list.length === 0) return { sent: 0, note: "no tasks in progress" };
+
+  const { data: takers } = await supabase
+    .from("work_item_members")
+    .select("item_id, member_id")
+    .in("item_id", list.map((item) => item.id));
+
+  // задача → все ответственные (назначенный + записавшиеся)
+  const ownersByItem = new Map<number, Set<number>>();
+
+  for (const item of list) {
+    const set = new Set<number>();
+    if (item.assigned_to) set.add(item.assigned_to as number);
+    ownersByItem.set(item.id as number, set);
+  }
+
+  for (const row of takers ?? []) {
+    ownersByItem.get(row.item_id as number)?.add(row.member_id as number);
+  }
+
+  const memberIds = Array.from(
+    new Set(Array.from(ownersByItem.values()).flatMap((set) => Array.from(set))),
+  );
+
+  if (memberIds.length === 0) return { sent: 0, note: "no owners" };
+
+  const { data: members } = await supabase
+    .from("team_members")
+    .select("id, first_name, user_id")
+    .in("id", memberIds)
+    .not("user_id", "is", null);
+
+  const byUser = new Map<string, { name: string; titles: string[]; projectId: number; projects: Set<number> }>();
+
+  for (const member of members ?? []) {
+    const mine = list.filter((item) => ownersByItem.get(item.id as number)?.has(member.id as number));
+    if (mine.length === 0) continue;
+
+    byUser.set(member.user_id as string, {
+      name: member.first_name as string,
+      titles: mine.map((item) => item.title as string),
+      projectId: mine[0].project_id as number,
+      projects: new Set(mine.map((item) => item.project_id as number)),
+    });
+  }
+
+  const result = await sendToUsers(supabase, Array.from(byUser.keys()), {}, (userId) => {
+    const info = byUser.get(userId)!;
+    const shown = info.titles.slice(0, 3).join(", ");
+    const more = info.titles.length > 3 ? ` +${info.titles.length - 3}` : "";
+
+    return {
+      title: "TLight — задачи в работе",
+      body: `${info.name}, не забудь про свои задачи: ${shown}${more}. Отметь, когда будет готово.`,
+      url: info.projects.size === 1 ? `/work/${info.projectId}` : "/work",
+      tag: "work-in-progress",
+    };
+  });
+
+  return { recipients: byUser.size, ...result };
 }
 
 export async function GET(request: NextRequest) {
@@ -304,12 +580,18 @@ export async function GET(request: NextRequest) {
   const force = request.nextUrl.searchParams.get("force") === "1";
   const only = request.nextUrl.searchParams.get("only");
 
-  if (!force && berlin.hour !== REMINDER_HOUR) {
+  const isEvening = EVENING_HOURS.includes(berlin.hour);
+  const isMorning = MORNING_HOURS.includes(berlin.hour);
+
+  if (!force && !isEvening && !isMorning) {
     return NextResponse.json({
       skipped: true,
-      note: `Berlin hour is ${berlin.hour}, waiting for ${REMINDER_HOUR}`,
+      note: `Berlin hour is ${berlin.hour}, waiting for ${MORNING_HOURS.join("/")} or ${EVENING_HOURS.join("/")}`,
     });
   }
+
+  // вечерние напоминания (16:00) идут при isEvening или ручном запуске
+  const evening = force || isEvening;
 
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
@@ -329,8 +611,20 @@ export async function GET(request: NextRequest) {
 
   const output: Record<string, unknown> = { berlinDate: `${berlin.year}-${pad(berlin.month)}-${pad(berlin.day)}` };
 
-  if (only === "weekly" || (!only && weekday === WEEKLY_WEEKDAY)) {
+  if (only === "sunday" || (!only && isMorning && weekday === 0)) {
+    output.sunday = await runSundayMorning(supabase, berlin);
+  }
+
+  if (only === "deadlines" || (!only && evening)) {
+    output.deadlines = await runDeadlines(supabase, berlin);
+  }
+
+  if (only === "weekly" || (!only && evening && weekday === WEEKLY_WEEKDAY)) {
     output.weekly = await runWeekly(supabase, berlin);
+  }
+
+  if (only === "tasks" || (!only && evening && weekday === TASKS_WEEKDAY)) {
+    output.tasks = await runTasks(supabase);
   }
 
   const isFirst = daysLeft === AVAILABILITY_FIRST_DAYS_BEFORE_END;
@@ -338,8 +632,17 @@ export async function GET(request: NextRequest) {
     AVAILABILITY_REPEAT_DAYS_BEFORE_END !== null &&
     daysLeft === AVAILABILITY_REPEAT_DAYS_BEFORE_END;
 
-  if (only === "availability" || (!only && (isFirst || isRepeat))) {
-    output.availability = await runAvailability(supabase, berlin, !isFirst && isRepeat);
+  const isFinal =
+    AVAILABILITY_FINAL_DAYS_BEFORE_END !== null &&
+    daysLeft === AVAILABILITY_FINAL_DAYS_BEFORE_END;
+
+  if (only === "availability" || (!only && evening && (isFirst || isRepeat || isFinal))) {
+    output.availability = await runAvailability(
+      supabase,
+      berlin,
+      !isFirst && isRepeat,
+      isFinal && !isFirst && !isRepeat,
+    );
   }
 
   return NextResponse.json(output);

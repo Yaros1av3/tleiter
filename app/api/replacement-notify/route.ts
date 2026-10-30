@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 /*
  * Вызывается из приложения, когда служитель нажал «Не смогу, нужна замена».
  * Проверяет, что запрос действительно создан этим человеком (или админом),
- * и отправляет push всем админам (включая секретаря, которая сама не служит).
+ * и отправляет push админам (включая секретаря) и всем служителям команды —
+ * чтобы желающие могли взять замену.
  */
 export async function POST(request: NextRequest) {
   const token = request.headers
@@ -73,18 +74,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  const adminIds = (admins ?? [])
-    .map((row) => row.id as string)
-    .filter((id) => id !== userData.user.id);
+  /* админы + все служители с аккаунтом (кроме тех, кто «не служит») и сам отправитель не получает */
+  const [{ data: teamUsers }, { data: exemptRows }] = await Promise.all([
+    supabase
+      .from("team_members")
+      .select("user_id")
+      .eq("status", "active")
+      .not("user_id", "is", null),
+    supabase.from("availability_exempt").select("user_id"),
+  ]);
 
-  if (adminIds.length === 0) {
-    return NextResponse.json({ sent: 0, note: "no admins" });
+  const exemptIds = new Set((exemptRows ?? []).map((row) => row.user_id as string));
+  const adminSet = new Set((admins ?? []).map((row) => row.id as string));
+
+  const recipientIds = Array.from(
+    new Set([
+      ...Array.from(adminSet),
+      ...(teamUsers ?? [])
+        .map((row) => row.user_id as string)
+        .filter((id) => !exemptIds.has(id)),
+    ]),
+  ).filter((id) => id !== userData.user.id);
+
+  if (recipientIds.length === 0) {
+    return NextResponse.json({ sent: 0, note: "no recipients" });
   }
 
   const { data: subs } = await supabase
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth")
-    .in("user_id", adminIds);
+    .in("user_id", recipientIds);
 
   webpush.setVapidDetails(subject, publicKey, privateKey);
 
@@ -94,7 +113,7 @@ export async function POST(request: NextRequest) {
 
   const payload = JSON.stringify({
     title: "TLight — нужна замена",
-    body: `${member.first_name} ${member.last_name} не сможет служить ${d}.${m}.${y} (${time}).${reason}`,
+    body: `${member.first_name} ${member.last_name} не сможет служить ${d}.${m}.${y} (${time}).${reason} Можешь заменить? Открой расписание.`,
     url: `/schedule?date=${entry.schedule_date}`,
     tag: `replacement-${body.entryId}-${body.memberId}`,
   });

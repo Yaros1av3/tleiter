@@ -27,6 +27,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { markWorkSeen } from "@/lib/useWorkUnread";
+import { notifyEvent } from "@/lib/notify";
 
 type Project = {
   id: number;
@@ -485,6 +486,8 @@ export default function WorkProjectPage() {
   const [checklists, setChecklists] =
     useState<ChecklistItem[]>([]);
 
+  const [statFilter, setStatFilter] =
+    useState<"all" | "open" | "in_progress" | "completed">("all");
   const [takers, setTakers] =
     useState<Record<number, number[]>>({});
   const [myMemberId, setMyMemberId] =
@@ -823,7 +826,7 @@ export default function WorkProjectPage() {
   const joinable = items.filter(
     (item) =>
       item.assigned_to === null &&
-      item.status !== "completed"
+      item.status === "open"
   );
 
   // из них те, на которые пока никто не записался
@@ -840,6 +843,51 @@ export default function WorkProjectPage() {
     return ids
       .map((id) => getMember(id)?.first_name)
       .filter(Boolean) as string[];
+  }
+
+  function claimChip(item: WorkItem) {
+    if (myMemberId === null) return null;
+
+    const mine = isMine(item);
+    const canClaim =
+      item.status === "open" &&
+      item.assigned_to === null &&
+      !mine;
+
+    if (!mine && !canClaim) return null;
+    if (mine && item.status === "completed") return null;
+
+    return (
+      <span
+        role="button"
+        tabIndex={0}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (mine) void releaseItem(item.id);
+          else void claimItem(item.id);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.stopPropagation();
+            if (mine) void releaseItem(item.id);
+            else void claimItem(item.id);
+          }
+        }}
+        className={`mt-3 inline-flex h-9 items-center rounded-full px-4 text-[12px] font-bold active:scale-95 ${
+          mine
+            ? "border border-[#e9e3d3] text-[#6f6a5c]"
+            : "bg-[#1b2431] text-[#ffc93c]"
+        } ${claimBusy !== null ? "opacity-50" : ""}`}
+      >
+        {mine
+          ? isRuLang
+            ? "Отказаться"
+            : "Abgeben"
+          : isRuLang
+            ? "Беру"
+            : "Übernehmen"}
+      </span>
+    );
   }
 
   function isMine(item: WorkItem) {
@@ -865,6 +913,8 @@ export default function WorkProjectPage() {
           : "Eintragen nicht möglich. Bitte versuche es noch einmal."
       );
     } else {
+      void notifyEvent({ type: "task-claimed", itemId });
+
       setNotifyInfo(
         isRuLang
           ? "Готово, задача записана на тебя."
@@ -1133,6 +1183,10 @@ export default function WorkProjectPage() {
       return;
     }
 
+    if (status === "completed" && item.status !== "completed") {
+      void notifyEvent({ type: "task-done", itemId: item.id });
+    }
+
     setItems((current) =>
       current.map((entry) =>
         entry.id === item.id
@@ -1223,6 +1277,20 @@ export default function WorkProjectPage() {
 
     const updatedItem =
       data as WorkItem;
+
+    if (
+      updatedItem.assigned_to &&
+      updatedItem.assigned_to !== selectedItem.assigned_to
+    ) {
+      void notifyEvent({ type: "task-assigned", itemId: updatedItem.id });
+    }
+
+    if (
+      updatedItem.status === "completed" &&
+      selectedItem.status !== "completed"
+    ) {
+      void notifyEvent({ type: "task-done", itemId: updatedItem.id });
+    }
 
     setItems((current) =>
       current
@@ -1435,6 +1503,10 @@ export default function WorkProjectPage() {
     const createdItem =
       data as WorkItem;
 
+    if (createdItem.assigned_to) {
+      void notifyEvent({ type: "task-assigned", itemId: createdItem.id });
+    }
+
     setItems((current) =>
       [
         ...current,
@@ -1457,6 +1529,11 @@ export default function WorkProjectPage() {
     setNewTaskOpen(false);
     setSaving(false);
   }
+
+  const visibleItems =
+    statFilter === "all"
+      ? items
+      : items.filter((item) => item.status === statFilter);
 
   const openItems = items.filter(
     (item) =>
@@ -1682,119 +1759,53 @@ export default function WorkProjectPage() {
             </p>
           )}
 
-          {joinable.length > 0 && (
-            <section className="mt-4 overflow-hidden rounded-[24px] border border-[#e9e3d3] bg-white">
-              <div className="flex items-center gap-3 border-b border-[#ece6d6] bg-[#fff4d1] px-4 py-3">
-                <Hand size={18} className="text-[#9a6b00]" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-bold text-[#1b2431]">
-                    {isRuLang ? "Запишись на задачу" : "Für Aufgabe eintragen"} · {joinable.length}
-                  </p>
-                  <p className="text-[12px] text-[#9a6b00]">
-                    {isRuLang
-                      ? `Без исполнителя: ${openRoles.length}. Одну задачу могут взять несколько человек`
-                      : `Ohne Person: ${openRoles.length}. Mehrere Personen können eine Aufgabe übernehmen`}
-                  </p>
-                </div>
-              </div>
-
-              <div className="divide-y divide-[#ece6d6]">
-                {joinable.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-3 px-4 py-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="break-words text-[14px] font-semibold text-[#1b2431]">
-                        {item.title}
-                      </p>
-
-                      {item.description && (
-                        <p className="mt-1 whitespace-pre-line break-words text-[12px] leading-[1.45] text-[#6f6a5c]">
-                          {item.description}
-                        </p>
-                      )}
-
-                      {(takers[item.id] ?? []).length > 0 && (
-                        <p className="mt-1.5 flex flex-wrap gap-1">
-                          {ownerNames(item).map((name, index) => (
-                            <span
-                              key={`${item.id}-${index}`}
-                              className="rounded-full bg-[#fff4d1] px-2.5 py-1 text-[11px] font-semibold text-[#9a6b00]"
-                            >
-                              {name}
-                            </span>
-                          ))}
-                        </p>
-                      )}
-
-                      {item.deadline && (
-                        <p className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-[#8f897a]">
-                          <Clock3 size={11} />
-                          {formatDate(item.deadline, language, text.noDate)}
-                        </p>
-                      )}
-                    </div>
-
-                    {myMemberId !== null ? (
-                      isMine(item) ? (
-                        <button
-                          type="button"
-                          onClick={() => releaseItem(item.id)}
-                          disabled={claimBusy !== null}
-                          className="h-10 shrink-0 rounded-full border border-[#e9e3d3] px-4 text-[12px] font-semibold text-[#6f6a5c] active:scale-95 disabled:opacity-50"
-                        >
-                          {isRuLang ? "Отказаться" : "Abgeben"}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => claimItem(item.id)}
-                          disabled={claimBusy !== null}
-                          className="h-10 shrink-0 rounded-full bg-[#1b2431] px-5 text-[13px] font-bold text-[#ffc93c] active:scale-95 disabled:opacity-50"
-                        >
-                          {isRuLang ? "Беру" : "Übernehmen"}
-                        </button>
-                      )
-                    ) : (
-                      <span className="max-w-[120px] text-right text-[11px] leading-4 text-[#8f897a]">
-                        {isRuLang
-                          ? "Нужна карточка в «Команде»"
-                          : "Karte im Bereich „Team“ nötig"}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
           <section className="mt-4 grid grid-cols-4 gap-2">
             {[
               {
+                key: "all" as const,
                 label: text.total,
                 value: stats.total,
                 color: "text-[#1b2431]",
               },
               {
+                key: "open" as const,
                 label: text.open,
                 value: stats.open,
                 color: "text-[#1b2431]",
               },
               {
+                key: "in_progress" as const,
                 label: text.progress,
                 value: stats.progress,
                 color: "text-[#d97706]",
               },
               {
+                key: "completed" as const,
                 label: text.finished,
                 value: stats.completed,
                 color: "text-[#16a34a]",
               },
             ].map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-[20px] border border-[#e7e5dc] bg-white p-3"
+              <button
+                type="button"
+                key={stat.key}
+                onClick={() => {
+                  setStatFilter(stat.key);
+                  setView("overview");
+                  setTimeout(() => {
+                    document
+                      .getElementById("task-list")
+                      ?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                      });
+                  }, 50);
+                }}
+                className={`rounded-[20px] border bg-white p-3 text-left transition active:scale-[0.97] ${
+                  statFilter === stat.key
+                    ? "border-[#1b2431] ring-2 ring-[#ffc93c]/60"
+                    : "border-[#e7e5dc]"
+                }`}
               >
                 <p className="text-[10px] font-bold uppercase tracking-wide text-[#a1a4a0]">
                   {stat.label}
@@ -1805,7 +1816,7 @@ export default function WorkProjectPage() {
                 >
                   {stat.value}
                 </p>
-              </div>
+              </button>
             ))}
           </section>
 
@@ -1840,7 +1851,7 @@ export default function WorkProjectPage() {
           </div>
 
           {view === "overview" && (
-            <section className="mt-6">
+            <section id="task-list" className="mt-6 scroll-mt-4">
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#a1a4a0]">
@@ -1858,8 +1869,31 @@ export default function WorkProjectPage() {
                 />
               </div>
 
+              {statFilter !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => setStatFilter("all")}
+                  className="mb-3 inline-flex h-9 items-center gap-2 rounded-full bg-[#fff4d1] px-4 text-[12px] font-bold text-[#9a6b00] active:scale-95"
+                >
+                  {statFilter === "open"
+                    ? text.open
+                    : statFilter === "in_progress"
+                      ? text.progress
+                      : text.finished}
+                  {" · "}
+                  {visibleItems.length}
+                  <X size={14} />
+                </button>
+              )}
+
+              {visibleItems.length === 0 && (
+                <div className="rounded-[20px] border border-dashed border-[#d5d5cd] bg-white px-4 py-7 text-center text-xs font-semibold text-[#989c99]">
+                  {isRuLang ? "Здесь пока ничего нет" : "Hier ist noch nichts"}
+                </div>
+              )}
+
               <div className="space-y-3">
-                {items.map((item) => {
+                {visibleItems.map((item) => {
                   const member =
                     getMember(
                       item.assigned_to
@@ -1912,6 +1946,12 @@ export default function WorkProjectPage() {
                             />
                           </div>
 
+                          {item.description && (
+                            <p className="mt-1.5 line-clamp-2 whitespace-pre-line text-[12px] leading-[1.45] text-[#6f6a5c]">
+                              {item.description}
+                            </p>
+                          )}
+
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <span
                               className={`text-[11px] font-bold ${priorityConfig[item.priority].className}`}
@@ -1956,6 +1996,8 @@ export default function WorkProjectPage() {
                               </span>
                             )}
                           </div>
+
+                          {claimChip(item)}
 
                           {itemChecklist.length >
                             0 && (
@@ -2131,6 +2173,8 @@ export default function WorkProjectPage() {
                                     )}
                                   </div>
                                 )}
+
+                                {claimChip(item)}
                               </button>
                             )
                           )}
@@ -2288,6 +2332,7 @@ export default function WorkProjectPage() {
 
                   {myMemberId !== null &&
                     selectedItem.assigned_to === null &&
+                    selectedItem.status === "open" &&
                     !isMine(selectedItem) && (
                       <button
                         type="button"

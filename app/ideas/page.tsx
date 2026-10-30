@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import Avatar from "@/components/Avatar";
+import { notifyEvent } from "@/lib/notify";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/ToastProvider";
@@ -154,7 +155,11 @@ export default function IdeasPage() {
 
     setSending(true);
 
-    const { error } = await supabase.from("team_ideas").insert({ body });
+    const { data: created, error } = await supabase
+      .from("team_ideas")
+      .insert({ body })
+      .select("id")
+      .single();
 
     setSending(false);
 
@@ -164,6 +169,10 @@ export default function IdeasPage() {
         isRu ? "Не удалось отправить идею." : "Idee konnte nicht gesendet werden.",
       );
       return;
+    }
+
+    if (created?.id) {
+      void notifyEvent({ type: "idea-new", ideaId: created.id });
     }
 
     setText("");
@@ -237,6 +246,11 @@ export default function IdeasPage() {
       console.error("Reaction error:", error);
       toast.error(isRu ? "Не удалось сохранить реакцию." : "Reaktion konnte nicht gespeichert werden.");
       await load();
+      return;
+    }
+
+    if (!mine) {
+      void notifyEvent({ type: "idea-reaction", ideaId, emoji });
     }
   }
 
