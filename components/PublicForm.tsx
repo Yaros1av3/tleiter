@@ -82,6 +82,7 @@ const TEXT = {
     itsMe: "Ja, das bin ich",
     notMe: "Nein",
     hello: "Schön, dich zu sehen",
+    prefilled: "Wir haben deine Daten aus unserer Liste ergänzt. Bitte prüfe, ob alles stimmt – Änderungen kannst du einfach eintippen.",
     another: "Weitere Person anmelden",
   },
   ru: {
@@ -128,6 +129,7 @@ const TEXT = {
     itsMe: "Да, это я",
     notMe: "Нет",
     hello: "Рады тебя видеть",
+    prefilled: "Мы подставили твои данные из нашего списка. Проверь, всё ли верно: изменить можно, просто напечатав новое.",
     another: "Записать ещё одного человека",
   },
 };
@@ -158,6 +160,9 @@ export default function PublicForm({ slug }: { slug: string }) {
   );
   const [teenId, setTeenId] = useState<number | null>(null);
   const [declinedKey, setDeclinedKey] = useState("");
+  // значения, подставленные из базы (телефоны и почта скрыты точками)
+  const [dbFields, setDbFields] = useState<{ phone?: string; parent_phone?: string; email?: string }>({});
+  const [prefilled, setPrefilled] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -232,12 +237,23 @@ export default function PublicForm({ slug }: { slug: string }) {
       ? `${bYear}-${String(bMonth).padStart(2, "0")}-${String(bDay).padStart(2, "0")}`
       : "";
 
+  // имя изменили — прежнее подтверждение «это я» и подставленные значения больше не действуют
   useEffect(() => {
-    setMatch(null);
     setTeenId(null);
+    setPrefilled(false);
+    setPhone((value) => (dbFields.phone && value === dbFields.phone ? "" : value));
+    setParentPhone((value) => (dbFields.parent_phone && value === dbFields.parent_phone ? "" : value));
+    setEmail((value) => (dbFields.email && value === dbFields.email ? "" : value));
+    setDbFields({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nameKey]);
 
-    if (firstName.trim().length < 2 || lastName.trim().length < 2) return;
-    if (!isLatinName(firstName) || !isLatinName(lastName)) return;
+  // поиск в базе: при смене имени и при выборе даты рождения (подтверждение «это я» не сбрасывается)
+  useEffect(() => {
+    if (firstName.trim().length < 2 || lastName.trim().length < 2 || !isLatinName(firstName) || !isLatinName(lastName)) {
+      setMatch(null);
+      return;
+    }
 
     const timer = setTimeout(async () => {
       try {
@@ -271,6 +287,58 @@ export default function PublicForm({ slug }: { slug: string }) {
     () => (form ? formatEventDate(form.event_date, lang) : ""),
     [form, lang],
   );
+
+  /* «Да, это я» — подставляем данные из нашей базы */
+  async function confirmMe(id: number) {
+    setTeenId(id);
+
+    try {
+      const response = await fetch(`/api/forms/${slug}/prefill`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teen_id: id, first_name: firstName, last_name: lastName }),
+      });
+
+      if (!response.ok) return;
+
+      const data = (await response.json()) as {
+        birth_date: string | null;
+        phone: string | null;
+        parent_name: string | null;
+        parent_phone: string | null;
+        email: string | null;
+      };
+
+      if (data.birth_date && /^\d{4}-\d{2}-\d{2}$/.test(data.birth_date)) {
+        const [y, m, d] = data.birth_date.split("-");
+        setBYear(String(Number(y)));
+        setBMonth(String(Number(m)));
+        setBDay(String(Number(d)));
+      }
+
+      if (data.parent_name) setParentName(data.parent_name);
+
+      const fields: { phone?: string; parent_phone?: string; email?: string } = {};
+
+      if (data.phone) {
+        setPhone(data.phone);
+        fields.phone = data.phone;
+      }
+      if (data.parent_phone) {
+        setParentPhone(data.parent_phone);
+        fields.parent_phone = data.parent_phone;
+      }
+      if (data.email) {
+        setEmail(data.email);
+        fields.email = data.email;
+      }
+
+      setDbFields(fields);
+      setPrefilled(true);
+    } catch {
+      /* без автозаполнения форма тоже работает */
+    }
+  }
 
   function setAnswer(id: string, value: unknown) {
     setAnswers((current) => ({ ...current, [id]: value }));
@@ -321,7 +389,11 @@ export default function PublicForm({ slug }: { slug: string }) {
       return;
     }
 
-    if (!isPhone(phone)) {
+    const phoneFromDb = Boolean(dbFields.phone) && phone === dbFields.phone;
+    const parentPhoneFromDb = Boolean(dbFields.parent_phone) && parentPhone === dbFields.parent_phone;
+    const emailFromDb = Boolean(dbFields.email) && email === dbFields.email;
+
+    if (!phoneFromDb && !isPhone(phone)) {
       setError(t.errPhone);
       return;
     }
@@ -336,12 +408,12 @@ export default function PublicForm({ slug }: { slug: string }) {
       return;
     }
 
-    if (!isPhone(parentPhone)) {
+    if (!parentPhoneFromDb && !isPhone(parentPhone)) {
       setError(t.errParentPhone);
       return;
     }
 
-    if (!isEmail(email)) {
+    if (!emailFromDb && !isEmail(email)) {
       setError(t.errEmail);
       return;
     }
@@ -376,6 +448,11 @@ export default function PublicForm({ slug }: { slug: string }) {
           parent_name: parentName,
           parent_phone: parentPhone,
           email,
+          use_db: [
+            ...(phoneFromDb ? ["phone"] : []),
+            ...(parentPhoneFromDb ? ["parent_phone"] : []),
+            ...(emailFromDb ? ["email"] : []),
+          ],
           declined: declinedKey === nameKey,
           lang,
           website: honeypot,
@@ -617,10 +694,17 @@ export default function PublicForm({ slug }: { slug: string }) {
                       }`}
                     >
                       {teenId ? (
-                        <div className="flex items-center gap-2 text-[14px] font-bold text-emerald-700">
-                          <Check size={18} strokeWidth={3} />
-                          {t.hello}, {firstName.trim()}!
-                        </div>
+                        <>
+                          <div className="flex items-center gap-2 text-[14px] font-bold text-emerald-700">
+                            <Check size={18} strokeWidth={3} />
+                            {t.hello}, {firstName.trim()}!
+                          </div>
+                          {prefilled && (
+                            <p className="mt-2 text-[12px] leading-snug text-emerald-800/80">
+                              {t.prefilled}
+                            </p>
+                          )}
+                        </>
                       ) : (
                         <>
                           <div className="text-[14px] font-bold">
@@ -633,7 +717,7 @@ export default function PublicForm({ slug }: { slug: string }) {
                           <div className="mt-3 flex gap-2">
                             <button
                               type="button"
-                              onClick={() => setTeenId(match.id)}
+                              onClick={() => confirmMe(match.id)}
                               className={`h-10 rounded-full px-5 text-[13px] font-bold ${theme.accent}`}
                             >
                               {t.itsMe}
@@ -703,6 +787,7 @@ export default function PublicForm({ slug }: { slug: string }) {
                       autoComplete="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
+                      onFocus={(e) => e.target.select()}
                       maxLength={30}
                       placeholder="+49 …"
                       className={inputClass}
@@ -720,6 +805,7 @@ export default function PublicForm({ slug }: { slug: string }) {
                       autoComplete="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      onFocus={(e) => e.target.select()}
                       maxLength={120}
                       className={inputClass}
                     />
@@ -753,6 +839,7 @@ export default function PublicForm({ slug }: { slug: string }) {
                         inputMode="tel"
                         value={parentPhone}
                         onChange={(e) => setParentPhone(e.target.value)}
+                      onFocus={(e) => e.target.select()}
                         maxLength={30}
                         placeholder="+49 …"
                         className={inputClass}

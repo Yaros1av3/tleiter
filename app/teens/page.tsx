@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   GraduationCap,
+  Mail,
   MessageCircle,
   PartyPopper,
   Pencil,
@@ -31,6 +32,7 @@ type Teen = {
   last_name: string;
   birth_date: string;
   phone: string | null;
+  email?: string | null;
   parent1_name: string | null;
   parent1_phone: string | null;
   parent2_name: string | null;
@@ -313,6 +315,7 @@ export default function TeensPage() {
   const [lastName, setLastName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [parent1Name, setParent1Name] = useState("");
   const [parent1Phone, setParent1Phone] = useState("");
   const [parent2Name, setParent2Name] = useState("");
@@ -708,7 +711,7 @@ export default function TeensPage() {
               .toLocaleLowerCase();
 
           const phoneValue =
-            (teen.phone ?? "")
+            `${teen.phone ?? ""} ${teen.email ?? ""}`
               .toLocaleLowerCase();
 
           if (
@@ -953,6 +956,7 @@ export default function TeensPage() {
     setLastName("");
     setBirthDate("");
     setPhone("");
+    setEmail("");
     setParent1Name("");
     setParent1Phone("");
     setParent2Name("");
@@ -1020,6 +1024,7 @@ export default function TeensPage() {
     setBirthDate(
       teen.birth_date
     );
+    setEmail(teen.email ?? "");
     setPhone(
       teen.phone ?? ""
     );
@@ -1088,6 +1093,7 @@ export default function TeensPage() {
         birthDate,
       phone:
         cleanPhone || null,
+      email: email.trim() || null,
       parent1_name: parent1Name.trim() || null,
       parent1_phone: parent1Phone.trim() || null,
       parent2_name: parent2Name.trim() || null,
@@ -2228,6 +2234,22 @@ export default function TeensPage() {
               callLabel={isRu ? "Позвонить" : "Anrufen"}
             />
 
+            {selectedTeen.email && (
+              <div className="mt-2 rounded-2xl bg-neutral-50 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                  {isRu ? "Почта подростка" : "E-Mail Teenager"}
+                </p>
+
+                <a
+                  href={`mailto:${selectedTeen.email}`}
+                  className="mt-1 flex items-center gap-2 break-all text-sm font-semibold underline underline-offset-2"
+                >
+                  <Mail size={15} className="shrink-0" />
+                  {selectedTeen.email}
+                </a>
+              </div>
+            )}
+
             <ContactRow
               label={isRu ? "Родитель 1" : "Elternteil 1"}
               name={selectedTeen.parent1_name}
@@ -2643,6 +2665,21 @@ export default function TeensPage() {
                     )
                   }
                   placeholder="+49 ..."
+                  className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-neutral-700">
+                  {isRu ? "Почта" : "E-Mail"}
+                </label>
+
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="name@example.com"
+                  autoCapitalize="none"
                   className="h-11 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-sm outline-none focus:border-neutral-400 focus:bg-white"
                 />
               </div>

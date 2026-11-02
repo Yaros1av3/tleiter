@@ -196,3 +196,47 @@ export function uniqueMatch(matches: TeenMatch[]) {
   if (matches.length === 1) return matches[0];
   return matches[0].score < matches[1].score ? matches[0] : null;
 }
+
+
+/* =====================================================================
+   Данные подростка для автозаполнения формы («Да, это я»)
+===================================================================== */
+
+export type TeenPrefillRow = {
+  birth_date: string | null;
+  phone: string | null;
+  email: string | null;
+  parent1_name: string | null;
+  parent1_phone: string | null;
+  notes: string | null;
+};
+
+export async function loadTeenPrefill(teenId: number): Promise<TeenPrefillRow | null> {
+  const admin = getSupabaseAdmin();
+  const { data } = await admin
+    .from("teens")
+    .select("birth_date, phone, email, parent1_name, parent1_phone, notes")
+    .eq("id", teenId)
+    .maybeSingle();
+
+  return (data as TeenPrefillRow | null) ?? null;
+}
+
+/* почта подростка лежит в заметках как «E-Mail: ...» (поля для почты в карточке нет) */
+export function emailFromNotes(notes: string | null | undefined) {
+  const match = /e-?mail:\s*([^\s,;]+)/i.exec(notes ?? "");
+  return match ? match[1] : "";
+}
+
+/* телефон показываем наполовину скрытым: +49 ••• ••• 123 */
+export function maskPhone(value: string) {
+  const digits = value.replace(/\s+/g, "");
+  if (digits.length <= 6) return "••••••";
+  return `${digits.slice(0, 3)} ${"•".repeat(Math.max(digits.length - 6, 3))} ${digits.slice(-3)}`;
+}
+
+export function maskEmail(value: string) {
+  const [name, domain] = value.split("@");
+  if (!name || !domain) return "";
+  return `${name.slice(0, 1)}${"•".repeat(Math.max(name.length - 1, 3))}@${domain}`;
+}

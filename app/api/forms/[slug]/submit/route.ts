@@ -10,7 +10,9 @@ import {
 } from "@/lib/forms";
 import {
   countResponses,
+  emailFromNotes,
   findTeens,
+  loadTeenPrefill,
   uniqueMatch,
   ipHash,
   isClosed,
@@ -30,6 +32,7 @@ type Body = {
   parent_name?: string;
   parent_phone?: string;
   email?: string;
+  use_db?: string[]; // какие поля взять из нашей базы (телефоны и почта подставлены скрыто)
   declined?: boolean; // подросток нажал «Нет, это не я» — тогда не привязываем
   lang?: string;
   website?: string; // ловушка для ботов: настоящие люди её не видят и не заполняют
@@ -81,10 +84,36 @@ export async function POST(
 
   // стандартные поля: дата рождения, телефоны, родитель
   const birth = clean(body.birth_date, 10);
-  const phone = clean(body.phone, 30);
+  let phone = clean(body.phone, 30);
   const parentName = clean(body.parent_name, 80);
-  const parentPhone = clean(body.parent_phone, 30);
-  const email = clean(body.email, 120);
+  let parentPhone = clean(body.parent_phone, 30);
+  let email = clean(body.email, 120);
+
+  // «Да, это я»: скрытые значения (+49 ••• 123) заменяем настоящими из нашей базы
+  const useDb = Array.isArray(body.use_db) ? body.use_db : [];
+
+  if (useDb.length > 0 && typeof body.teen_id === "number" && !body.declined) {
+    try {
+      const candidates = await findTeens(first, last, null);
+
+      if (candidates.some((item) => item.id === body.teen_id)) {
+        const teen = await loadTeenPrefill(body.teen_id);
+
+        if (teen) {
+          if (useDb.includes("phone") && teen.phone) phone = clean(teen.phone, 30);
+          if (useDb.includes("parent_phone") && teen.parent1_phone) {
+            parentPhone = clean(teen.parent1_phone, 30);
+          }
+          if (useDb.includes("email")) {
+            const stored = (teen.email ?? "").trim() || emailFromNotes(teen.notes);
+            if (stored) email = clean(stored, 120);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Prefill from database error:", error);
+    }
+  }
 
   const invalid = (field: string) =>
     NextResponse.json({ error: "invalid", field }, { status: 422 });
@@ -226,6 +255,19 @@ export async function POST(
   if (error) {
     console.error("Form submit error:", error);
     return NextResponse.json({ error: "server" }, { status: 500 });
+  }
+
+  // привязанному подростку записываем почту в карточку, если там её ещё нет
+  if (teenId && email) {
+    try {
+      await admin
+        .from("teens")
+        .update({ email })
+        .eq("id", teenId)
+        .or("email.is.null,email.eq.");
+    } catch (emailError) {
+      console.error("Teen email update error:", emailError);
+    }
   }
 
   return NextResponse.json({ ok: true });
