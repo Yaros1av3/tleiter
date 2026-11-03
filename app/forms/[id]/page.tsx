@@ -295,6 +295,36 @@ export default function FormDetailPage() {
     toast.success(isRu ? "Сохранено" : "Gespeichert");
   }
 
+  /* Закрыть / снова открыть приём записей сразу, без отдельного «Сохранить» */
+  async function toggleOpen() {
+    if (!draft || saving) return;
+
+    const next = !draft.is_open;
+    setSaving(true);
+
+    const { error } = await supabase
+      .from("forms")
+      .update({ is_open: next })
+      .eq("id", draft.id);
+
+    setSaving(false);
+
+    if (error) {
+      console.error("Toggle open error:", error);
+      toast.error(isRu ? "Не удалось изменить." : "Änderung fehlgeschlagen.");
+      return;
+    }
+
+    setDraft((current) => (current ? { ...current, is_open: next } : current));
+    setSaved((current) => (current ? { ...current, is_open: next } : current));
+
+    toast.success(
+      next
+        ? isRu ? "Запись снова открыта." : "Anmeldung wieder offen."
+        : isRu ? "Запись закрыта." : "Anmeldung geschlossen.",
+    );
+  }
+
   async function removeForm() {
     if (!draft) return;
     const { error } = await supabase.from("forms").delete().eq("id", draft.id);
@@ -647,6 +677,18 @@ export default function FormDetailPage() {
               {isRu ? "Открыть" : "Öffnen"}
             </a>
           </div>
+
+          <button
+            type="button"
+            onClick={toggleOpen}
+            disabled={saving}
+            className="relative mt-2 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/40 text-[13px] font-bold text-white active:scale-[0.98] disabled:opacity-50"
+          >
+            <Lock size={14} />
+            {draft.is_open
+              ? isRu ? "Закрыть регистрацию" : "Anmeldung schließen"
+              : isRu ? "Открыть регистрацию снова" : "Anmeldung wieder öffnen"}
+          </button>
         </div>
 
         {/* tabs */}
