@@ -47,6 +47,31 @@ import {
 
 type Tab = "edit" | "answers" | "checkin" | "stats";
 
+type TeenInfo = {
+  is_active: boolean;
+  phone: string | null;
+  parent1_name: string | null;
+  parent1_phone: string | null;
+  email: string | null;
+};
+
+const digits = (value: string | null | undefined) => (value ?? "").replace(/\D/g, "");
+const same = (a: string | null | undefined, b: string | null | undefined) =>
+  (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
+
+/* что из регистрации отличается от карточки (только непустые значения регистрации) */
+function teenChanges(row: ResponseRow, teen: TeenInfo | undefined) {
+  const changes: Record<string, string> = {};
+  if (!teen) return changes;
+
+  if (row.phone && digits(row.phone) !== digits(teen.phone)) changes.phone = row.phone;
+  if (row.parent_name && !same(row.parent_name, teen.parent1_name)) changes.parent1_name = row.parent_name;
+  if (row.parent_phone && digits(row.parent_phone) !== digits(teen.parent1_phone)) changes.parent1_phone = row.parent_phone;
+  if (row.email && !same(row.email, teen.email)) changes.email = row.email;
+
+  return changes;
+}
+
 /* ---------- helpers ---------- */
 
 function optionLabel(q: FormQuestion, stored: string, lang: "de" | "ru") {
@@ -97,6 +122,7 @@ export default function FormDetailPage() {
   const [saved, setSaved] = useState<FormRow | null>(null);
   const [responses, setResponses] = useState<ResponseRow[]>([]);
   const [teenBirth, setTeenBirth] = useState<Record<number, string>>({});
+  const [teenInfo, setTeenInfo] = useState<Record<number, TeenInfo>>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("edit");
   const [saving, setSaving] = useState(false);
@@ -138,14 +164,23 @@ export default function FormDetailPage() {
     if (teenIds.length > 0) {
       const teens = await supabase
         .from("teens")
-        .select("id, birth_date")
+        .select("id, birth_date, is_active, phone, parent1_name, parent1_phone, email")
         .in("id", teenIds);
 
       const map: Record<number, string> = {};
-      for (const teen of (teens.data ?? []) as { id: number; birth_date: string }[]) {
+      const info: Record<number, TeenInfo> = {};
+      for (const teen of (teens.data ?? []) as (TeenInfo & { id: number; birth_date: string })[]) {
         map[teen.id] = teen.birth_date;
+        info[teen.id] = {
+          is_active: teen.is_active,
+          phone: teen.phone,
+          parent1_name: teen.parent1_name,
+          parent1_phone: teen.parent1_phone,
+          email: teen.email,
+        };
       }
       setTeenBirth(map);
+      setTeenInfo(info);
     }
 
     setLoading(false);
@@ -321,6 +356,11 @@ export default function FormDetailPage() {
           norm(teen.last_name as string) === norm(row.last_name),
       )?.id ?? null;
 
+    if (teenId !== null) {
+      // нашли существующую карточку — делаем активной и дополняем данными
+      await supabase.from("teens").update({ is_active: true }).eq("id", teenId);
+    }
+
     if (teenId === null) {
       const created = await supabase
         .from("teens")
@@ -380,11 +420,59 @@ export default function FormDetailPage() {
     );
 
     setTeenBirth((current) => ({ ...current, [teenId as number]: row.birth_date as string }));
+    setTeenInfo((current) => ({
+      ...current,
+      [teenId as number]: {
+        is_active: true,
+        phone: row.phone || null,
+        parent1_name: row.parent_name || null,
+        parent1_phone: row.parent_phone || null,
+        email: row.email || null,
+      },
+    }));
 
     toast.success(
       isRu
         ? `${row.first_name} добавлен(а) в подростки.`
         : `${row.first_name} wurde zu den Teens hinzugefügt.`,
+    );
+
+    return true;
+  }
+
+  /* Подросток уже в базе: делаем активным и обновляем карточку данными из регистрации */
+  async function syncTeen(row: ResponseRow) {
+    if (!row.teen_id) return false;
+
+    const teen = teenInfo[row.teen_id];
+    const changes = teenChanges(row, teen);
+
+    const { error } = await supabase
+      .from("teens")
+      .update({ ...changes, is_active: true })
+      .eq("id", row.teen_id);
+
+    if (error) {
+      console.error("Sync teen error:", error);
+      toast.error(isRu ? "Не удалось обновить карточку." : "Karte konnte nicht aktualisiert werden.");
+      return false;
+    }
+
+    setTeenInfo((current) => ({
+      ...current,
+      [row.teen_id as number]: {
+        is_active: true,
+        phone: changes.phone ?? teen?.phone ?? null,
+        parent1_name: changes.parent1_name ?? teen?.parent1_name ?? null,
+        parent1_phone: changes.parent1_phone ?? teen?.parent1_phone ?? null,
+        email: changes.email ?? teen?.email ?? null,
+      },
+    }));
+
+    toast.success(
+      isRu
+        ? `${row.first_name}: карточка обновлена, подросток активен.`
+        : `${row.first_name}: Karte aktualisiert, Teen ist aktiv.`,
     );
 
     return true;
@@ -613,10 +701,12 @@ export default function FormDetailPage() {
               form={draft}
               responses={responses}
               teenBirth={teenBirth}
+              teenInfo={teenInfo}
               isRu={isRu}
               lang={lang}
               onDelete={deleteResponse}
               onAddTeen={addToTeens}
+              onSyncTeen={syncTeen}
               onAdd={addManual}
               onExport={exportCsv}
             />
@@ -1220,20 +1310,24 @@ function AnswersTab({
   form,
   responses,
   teenBirth,
+  teenInfo,
   isRu,
   lang,
   onDelete,
   onAddTeen,
+  onSyncTeen,
   onAdd,
   onExport,
 }: {
   form: FormRow;
   responses: ResponseRow[];
   teenBirth: Record<number, string>;
+  teenInfo: Record<number, TeenInfo>;
   isRu: boolean;
   lang: "de" | "ru";
   onDelete: (row: ResponseRow) => void;
   onAddTeen: (row: ResponseRow) => Promise<boolean>;
+  onSyncTeen: (row: ResponseRow) => Promise<boolean>;
   onAdd: (first: string, last: string, came: boolean) => Promise<boolean>;
   onExport: () => void;
 }) {
@@ -1254,6 +1348,20 @@ function AnswersTab({
     setAddingId(row.id);
     await onAddTeen(row);
     setAddingId(null);
+  }
+
+  async function syncTeen(row: ResponseRow) {
+    setAddingId(row.id);
+    await onSyncTeen(row);
+    setAddingId(null);
+  }
+
+  // нужна ли синхронизация: подросток неактивен или данные из регистрации отличаются от карточки
+  function needsSync(row: ResponseRow) {
+    if (!row.teen_id) return false;
+    const teen = teenInfo[row.teen_id];
+    if (!teen) return false;
+    return !teen.is_active || Object.keys(teenChanges(row, teen)).length > 0;
   }
 
   return (
@@ -1327,6 +1435,11 @@ function AnswersTab({
                           {birth ? ` · ${calcAge(birth)}` : ""}
                         </span>
                       )}
+                      {row.teen_id && teenInfo[row.teen_id]?.is_active === false && (
+                        <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">
+                          {isRu ? "неактивен" : "inaktiv"}
+                        </span>
+                      )}
                       {!row.teen_id && row.source !== "manual" && (
                         <span className="rounded-full bg-[#fff4d1] px-2 py-0.5 text-[10px] font-bold text-[#9a6b00]">
                           {isRu ? "новый" : "neu"}
@@ -1349,6 +1462,19 @@ function AnswersTab({
                       {filled.length > 0 && (isRu ? " · показать ответы" : " · Antworten zeigen")}
                     </div>
                   </button>
+
+                  {needsSync(row) && (
+                    <button
+                      type="button"
+                      disabled={addingId === row.id}
+                      onClick={() => syncTeen(row)}
+                      aria-label={isRu ? "Активировать и обновить карточку" : "Aktivieren und Karte aktualisieren"}
+                      title={isRu ? "Активировать и обновить карточку" : "Aktivieren und Karte aktualisieren"}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ffc93c] text-[#1b2431] active:scale-95 disabled:opacity-50"
+                    >
+                      <UserPlus size={16} />
+                    </button>
+                  )}
 
                   {!row.teen_id && row.birth_date && (
                     <button
@@ -1446,6 +1572,24 @@ function AnswersTab({
                           </dd>
                         </div>
                       ))
+                    )}
+
+                    {needsSync(row) && (
+                      <button
+                        type="button"
+                        disabled={addingId === row.id}
+                        onClick={() => syncTeen(row)}
+                        className="mt-1 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#1b2431] text-[13px] font-bold text-[#ffc93c] active:scale-[0.99] disabled:opacity-50"
+                      >
+                        <UserPlus size={16} />
+                        {teenInfo[row.teen_id as number]?.is_active === false
+                          ? isRu
+                            ? "Сделать активным и обновить карточку"
+                            : "Aktivieren und Karte aktualisieren"
+                          : isRu
+                            ? "Обновить карточку данными из формы"
+                            : "Karte mit Formulardaten aktualisieren"}
+                      </button>
                     )}
 
                     {!row.teen_id && row.birth_date && (
