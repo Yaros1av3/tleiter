@@ -58,6 +58,7 @@ type WorkItem = {
     | "urgent";
   deadline: string | null;
   assigned_to: number | null;
+  assigned_name?: string | null;
 };
 
 type TeamMember = {
@@ -548,6 +549,11 @@ export default function WorkProjectPage() {
     setNewAssignee,
   ] = useState("");
 
+  const [newAssigneeName, setNewAssigneeName] =
+    useState("");
+  const [editAssigneeName, setEditAssigneeName] =
+    useState("");
+
   /* EDIT TASK */
   const [editTaskOpen, setEditTaskOpen] =
     useState(false);
@@ -826,6 +832,7 @@ export default function WorkProjectPage() {
   const joinable = items.filter(
     (item) =>
       item.assigned_to === null &&
+      !item.assigned_name &&
       item.status === "open"
   );
 
@@ -840,9 +847,13 @@ export default function WorkProjectPage() {
       ...(takers[item.id] ?? []),
     ];
 
-    return ids
+    const names = ids
       .map((id) => getMember(id)?.first_name)
       .filter(Boolean) as string[];
+
+    if (item.assigned_name) names.unshift(item.assigned_name);
+
+    return names;
   }
 
   function claimChip(item: WorkItem) {
@@ -852,6 +863,7 @@ export default function WorkProjectPage() {
     const canClaim =
       item.status === "open" &&
       item.assigned_to === null &&
+      !item.assigned_name &&
       !mine;
 
     if (!mine && !canClaim) return null;
@@ -1223,8 +1235,11 @@ export default function WorkProjectPage() {
     setEditAssignee(
       item.assigned_to
         ? String(item.assigned_to)
-        : ""
+        : item.assigned_name
+          ? "__other"
+          : ""
     );
+    setEditAssigneeName(item.assigned_name ?? "");
     setEditStatus(item.status);
 
     setEditTaskOpen(true);
@@ -1255,8 +1270,12 @@ export default function WorkProjectPage() {
           editDeadline || null,
         priority: editPriority,
         assigned_to:
-          editAssignee
+          editAssignee && editAssignee !== "__other"
             ? Number(editAssignee)
+            : null,
+        assigned_name:
+          editAssignee === "__other"
+            ? editAssigneeName.trim() || null
             : null,
         status: editStatus,
         updated_at:
@@ -1483,8 +1502,12 @@ export default function WorkProjectPage() {
         deadline:
           newDeadline || null,
         assigned_to:
-          newAssignee
+          newAssignee && newAssignee !== "__other"
             ? Number(newAssignee)
+            : null,
+        assigned_name:
+          newAssignee === "__other"
+            ? newAssigneeName.trim() || null
             : null,
         created_by: user.id,
       })
@@ -1526,6 +1549,7 @@ export default function WorkProjectPage() {
     setNewDeadline("");
     setNewPriority("normal");
     setNewAssignee("");
+    setNewAssigneeName("");
     setNewTaskOpen(false);
     setSaving(false);
   }
@@ -2332,6 +2356,7 @@ export default function WorkProjectPage() {
 
                   {myMemberId !== null &&
                     selectedItem.assigned_to === null &&
+                    !selectedItem.assigned_name &&
                     selectedItem.status === "open" &&
                     !isMine(selectedItem) && (
                       <button
@@ -2699,7 +2724,27 @@ export default function WorkProjectPage() {
                         </option>
                       )
                     )}
+                    <option value="__other">
+                      {isRuLang
+                        ? "Другой человек (вписать имя)"
+                        : "Andere Person (Name eintragen)"}
+                    </option>
                   </select>
+
+                  {editAssignee === "__other" && (
+                    <input
+                      value={editAssigneeName}
+                      onChange={(event) =>
+                        setEditAssigneeName(event.target.value)
+                      }
+                      placeholder={
+                        isRuLang
+                          ? "Имя ответственного"
+                          : "Name der verantwortlichen Person"
+                      }
+                      className="mt-2 h-12 w-full rounded-[18px] border border-[#e4e2d9] bg-white px-3 text-sm outline-none"
+                    />
+                  )}
                 </div>
 
                 <button
@@ -2897,7 +2942,27 @@ export default function WorkProjectPage() {
                         </option>
                       )
                     )}
+                    <option value="__other">
+                      {isRuLang
+                        ? "Другой человек (вписать имя)"
+                        : "Andere Person (Name eintragen)"}
+                    </option>
                   </select>
+
+                  {newAssignee === "__other" && (
+                    <input
+                      value={newAssigneeName}
+                      onChange={(event) =>
+                        setNewAssigneeName(event.target.value)
+                      }
+                      placeholder={
+                        isRuLang
+                          ? "Имя ответственного"
+                          : "Name der verantwortlichen Person"
+                      }
+                      className="mt-2 h-12 w-full rounded-[18px] border border-[#e4e2d9] bg-white px-3 text-sm outline-none"
+                    />
+                  )}
                 </div>
 
                 <button

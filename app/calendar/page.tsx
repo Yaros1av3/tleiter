@@ -97,7 +97,7 @@ const categories = [
   { id: "church", ru: "Церковь", de: "Gemeinde", dot: "bg-emerald-500" },
   { id: "lesson", ru: "Урок", de: "Unterricht", dot: "bg-amber-500" },
   { id: "important", ru: "Важное", de: "Wichtig", dot: "bg-red-500" },
-  { id: "work", ru: "Работа", de: "Arbeit", dot: "bg-slate-700" },
+  { id: "work", ru: "Проекты", de: "Projekte", dot: "bg-slate-700" },
   { id: "other", ru: "Другое", de: "Sonstiges", dot: "bg-neutral-400" },
 ] as const;
 
@@ -1120,7 +1120,7 @@ export default function CalendarPage() {
             <>
               <BriefcaseBusiness size={16} className="mx-auto text-neutral-500" />
               <span className="mt-1 text-[9px] font-bold uppercase tracking-wide text-neutral-500">
-                Deadline
+                {language === "ru" ? "Проект" : "Projekt"}
               </span>
             </>
           ) : (
@@ -1526,8 +1526,8 @@ export default function CalendarPage() {
         {/* FOOTNOTE */}
         <p className="mt-6 text-center text-[11px] leading-5 text-neutral-400">
           {language === "ru"
-            ? "Дедлайны задач и служения из расписания добавляются в календарь автоматически."
-            : "Aufgaben-Deadlines und Dienste aus dem Dienstplan erscheinen automatisch im Kalender."}
+            ? "Задачи проектов (по дедлайну) и служения из расписания добавляются в календарь автоматически."
+            : "Projektaufgaben (nach Deadline) und Dienste aus dem Dienstplan erscheinen automatisch im Kalender."}
           {" · "}
           {monthEvents.length} {language === "ru" ? "событий в месяце" : "Termine im Monat"}
         </p>
@@ -1772,7 +1772,7 @@ export default function CalendarPage() {
               <div className="min-w-0">
                 <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
                   <BriefcaseBusiness size={13} />
-                  {language === "ru" ? "Работа" : "Arbeit"}
+                  {language === "ru" ? "Проект" : "Projekt"}
                 </div>
                 <h2 className="text-xl font-semibold tracking-tight">{selectedWorkItem.title}</h2>
                 <p className="mt-1 text-sm text-neutral-500">
@@ -1827,7 +1827,7 @@ export default function CalendarPage() {
                 className="flex items-center justify-center gap-2 rounded-xl border border-neutral-200 px-4 py-3 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <BriefcaseBusiness size={15} />
-                {language === "ru" ? "Открыть работу" : "Arbeit öffnen"}
+                {language === "ru" ? "Открыть проект" : "Projekt öffnen"}
               </button>
             </div>
           </div>

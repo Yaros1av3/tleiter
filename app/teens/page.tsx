@@ -871,6 +871,44 @@ export default function TeensPage() {
     return age < 12 || age > 15;
   }).length;
 
+  const groupStats = (() => {
+    const inGroup = (
+      key: AgeFilter,
+      age: number
+    ) =>
+      key === "all"
+        ? age >= 12 && age <= 15
+        : key === "other"
+          ? age < 12 || age > 15
+          : key === "plus"
+            ? age >= 14 && age <= 15
+            : age === key;
+
+    const calc = (key: AgeFilter) => {
+      const list = teens.filter((teen) =>
+        inGroup(
+          key,
+          calculateAge(teen.birth_date)
+        )
+      );
+
+      return {
+        total: list.length,
+        active: list.filter(
+          (teen) => teen.is_active
+        ).length,
+      };
+    };
+
+    return {
+      all: calc("all"),
+      12: calc(12),
+      13: calc(13),
+      plus: calc("plus"),
+      other: calc("other"),
+    };
+  })();
+
   const boysCount = teens.filter(
     (teen) =>
       teen.is_active &&
@@ -1423,14 +1461,24 @@ export default function TeensPage() {
 
                   <p className="mt-0.5 text-[11px] text-neutral-400">
                     {isRu
-                      ? `${activeMainAgeCount} активных`
-                      : `${activeMainAgeCount} aktiv`}
+                      ? "активных из всех"
+                      : "aktiv von gesamt"}
                   </p>
                 </div>
 
-                <span className="text-xl font-bold tracking-tight text-neutral-950">
-                  {mainAgeCount}
-                </span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-3xl font-bold leading-none tracking-tight text-neutral-950">
+                    {activeMainAgeCount}
+                  </span>
+
+                  <span className="text-sm font-semibold text-neutral-400">
+                    {isRu ? "из" : "von"}
+                  </span>
+
+                  <span className="text-3xl font-bold leading-none tracking-tight text-neutral-400">
+                    {mainAgeCount}
+                  </span>
+                </div>
               </div>
 
               <div className="border-t border-neutral-100 px-4 py-2.5">
@@ -1535,13 +1583,40 @@ export default function TeensPage() {
                       ? "Все"
                       : "Alle"
                     : age === "other"
-                      ? `${isRu ? "Др. возраст" : "Andere"} · ${otherAgeCount}`
+                      ? `${isRu ? "Др. возраст" : "Andere"} · ${groupStats.other.total}`
                       : age === "plus"
-                        ? "Teenie+"
-                        : `${age}`}
+                        ? `Teenie+ · ${groupStats.plus.total}`
+                        : `${age} · ${groupStats[age].total}`}
                 </button>
               ))}
             </div>
+
+            {ageFilter !== "all" && (
+              <div className="mb-3 flex items-baseline gap-2 rounded-2xl bg-white px-4 py-3">
+                <span className="text-3xl font-bold leading-none tracking-tight text-neutral-950">
+                  {groupStats[ageFilter].total}
+                </span>
+
+                <span className="text-xs font-semibold text-neutral-500">
+                  {ageFilter === "plus"
+                    ? "Teenie+ (14–15)"
+                    : ageFilter === "other"
+                      ? isRu
+                        ? "другой возраст"
+                        : "anderes Alter"
+                      : isRu
+                        ? `${ageFilter} лет`
+                        : `${ageFilter} Jahre`}
+                  {isRu ? " · всего" : " · gesamt"}
+                </span>
+
+                <span className="ml-auto text-xs text-neutral-400">
+                  {isRu
+                    ? `${groupStats[ageFilter].active} активных`
+                    : `${groupStats[ageFilter].active} aktiv`}
+                </span>
+              </div>
+            )}
 
             {/* FILTER BUTTON */}
 
