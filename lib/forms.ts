@@ -52,6 +52,7 @@ export type ResponseRow = {
   parent_phone: string | null;
   answers: Record<string, unknown>;
   attendance: "registered" | "came" | "absent";
+  is_guest?: boolean | null;
   source: string;
   lang: string | null;
   created_at: string;

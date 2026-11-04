@@ -1025,6 +1025,136 @@ export default function WorkProjectPage() {
     );
   }
 
+  function renderPeoplePanel(selectedItem: WorkItem) {
+    return (
+                <div className="mt-2 rounded-[18px] border border-[#e6e4db] bg-white p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#a1a4a0]">
+                    {isRuLang ? "Исполнители" : "Beteiligte"}
+                  </p>
+
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {(takers[selectedItem.id] ?? []).map((memberId) => (
+                      <span
+                        key={`m-${memberId}`}
+                        className="inline-flex items-center gap-1 rounded-full bg-[#fff4d1] py-1 pl-3 pr-1.5 text-[12px] font-bold text-[#9a6b00]"
+                      >
+                        {getMember(memberId)?.first_name ?? "—"}
+                        <button
+                          type="button"
+                          aria-label={isRuLang ? "Убрать" : "Entfernen"}
+                          disabled={peopleBusy}
+                          onClick={() =>
+                            adminRemoveMember(selectedItem.id, memberId)
+                          }
+                          className="flex h-5 w-5 items-center justify-center rounded-full text-[#9a6b00] active:bg-black/10"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+
+                    {(
+                      items.find((entry) => entry.id === selectedItem.id)
+                        ?.extra_names ?? []
+                    ).map((name) => (
+                      <span
+                        key={`e-${name}`}
+                        className="inline-flex items-center gap-1 rounded-full bg-[#f0efe8] py-1 pl-3 pr-1.5 text-[12px] font-bold text-[#4a5050]"
+                      >
+                        {name}
+                        <button
+                          type="button"
+                          aria-label={isRuLang ? "Убрать" : "Entfernen"}
+                          disabled={peopleBusy}
+                          onClick={() =>
+                            adminRemoveExtraName(selectedItem, name)
+                          }
+                          className="flex h-5 w-5 items-center justify-center rounded-full text-[#4a5050] active:bg-black/10"
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+
+                    {(takers[selectedItem.id] ?? []).length === 0 &&
+                      (
+                        items.find((entry) => entry.id === selectedItem.id)
+                          ?.extra_names ?? []
+                      ).length === 0 && (
+                        <span className="text-[12px] text-[#a1a4a0]">
+                          {isRuLang ? "Пока никого" : "Noch niemand"}
+                        </span>
+                      )}
+                  </div>
+
+                  <div className="mt-3 flex gap-2">
+                    <select
+                      value={peoplePick}
+                      onChange={(event) => setPeoplePick(event.target.value)}
+                      className="h-10 min-w-0 flex-1 rounded-[14px] border border-[#e4e2d9] bg-white px-3 text-[13px] outline-none"
+                    >
+                      <option value="">
+                        {isRuLang ? "Добавить из команды..." : "Aus dem Team..."}
+                      </option>
+                      {team
+                        .filter(
+                          (member) =>
+                            !(takers[selectedItem.id] ?? []).includes(member.id)
+                        )
+                        .map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.first_name} {member.last_name}
+                          </option>
+                        ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      disabled={!peoplePick || peopleBusy}
+                      onClick={() => adminAddMember(selectedItem.id)}
+                      className="h-10 rounded-[14px] bg-[#1b2431] px-4 text-[12px] font-bold text-[#ffc93c] disabled:opacity-40"
+                    >
+                      {isRuLang ? "Добавить" : "Hinzufügen"}
+                    </button>
+                  </div>
+
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={extraName}
+                      onChange={(event) => setExtraName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void adminAddExtraName(selectedItem);
+                        }
+                      }}
+                      placeholder={
+                        isRuLang
+                          ? "Или впиши имя (не из приложения)"
+                          : "Oder Name eintragen (nicht in der App)"
+                      }
+                      className="h-10 min-w-0 flex-1 rounded-[14px] border border-[#e4e2d9] bg-white px-3 text-[13px] outline-none"
+                    />
+
+                    <button
+                      type="button"
+                      disabled={!extraName.trim() || peopleBusy}
+                      onClick={() => adminAddExtraName(selectedItem)}
+                      className="h-10 rounded-[14px] border border-[#e9e3d3] px-4 text-[12px] font-bold text-[#6f6a5c] disabled:opacity-40"
+                    >
+                      {isRuLang ? "Имя" : "Name"}
+                    </button>
+                  </div>
+
+                  <p className="mt-2 text-[11px] leading-4 text-[#a1a4a0]">
+                    {isRuLang
+                      ? "Добавленному из команды задача появится на главной странице."
+                      : "Wer aus dem Team hinzugefügt wird, sieht die Aufgabe auf der Startseite."}
+                  </p>
+                </div>
+    );
+  }
+
   async function releaseItem(itemId: number) {
     if (claimBusy !== null) return;
     setClaimBusy(itemId);
@@ -2456,133 +2586,7 @@ export default function WorkProjectPage() {
                 </div>
               </div>
 
-              {isAdmin && (
-                <div className="mt-2 rounded-[18px] border border-[#e6e4db] bg-white p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#a1a4a0]">
-                    {isRuLang ? "Исполнители" : "Beteiligte"}
-                  </p>
-
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {(takers[selectedItem.id] ?? []).map((memberId) => (
-                      <span
-                        key={`m-${memberId}`}
-                        className="inline-flex items-center gap-1 rounded-full bg-[#fff4d1] py-1 pl-3 pr-1.5 text-[12px] font-bold text-[#9a6b00]"
-                      >
-                        {getMember(memberId)?.first_name ?? "—"}
-                        <button
-                          type="button"
-                          aria-label={isRuLang ? "Убрать" : "Entfernen"}
-                          disabled={peopleBusy}
-                          onClick={() =>
-                            adminRemoveMember(selectedItem.id, memberId)
-                          }
-                          className="flex h-5 w-5 items-center justify-center rounded-full text-[#9a6b00] active:bg-black/10"
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-
-                    {(
-                      items.find((entry) => entry.id === selectedItem.id)
-                        ?.extra_names ?? []
-                    ).map((name) => (
-                      <span
-                        key={`e-${name}`}
-                        className="inline-flex items-center gap-1 rounded-full bg-[#f0efe8] py-1 pl-3 pr-1.5 text-[12px] font-bold text-[#4a5050]"
-                      >
-                        {name}
-                        <button
-                          type="button"
-                          aria-label={isRuLang ? "Убрать" : "Entfernen"}
-                          disabled={peopleBusy}
-                          onClick={() =>
-                            adminRemoveExtraName(selectedItem, name)
-                          }
-                          className="flex h-5 w-5 items-center justify-center rounded-full text-[#4a5050] active:bg-black/10"
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    ))}
-
-                    {(takers[selectedItem.id] ?? []).length === 0 &&
-                      (
-                        items.find((entry) => entry.id === selectedItem.id)
-                          ?.extra_names ?? []
-                      ).length === 0 && (
-                        <span className="text-[12px] text-[#a1a4a0]">
-                          {isRuLang ? "Пока никого" : "Noch niemand"}
-                        </span>
-                      )}
-                  </div>
-
-                  <div className="mt-3 flex gap-2">
-                    <select
-                      value={peoplePick}
-                      onChange={(event) => setPeoplePick(event.target.value)}
-                      className="h-10 min-w-0 flex-1 rounded-[14px] border border-[#e4e2d9] bg-white px-3 text-[13px] outline-none"
-                    >
-                      <option value="">
-                        {isRuLang ? "Добавить из команды..." : "Aus dem Team..."}
-                      </option>
-                      {team
-                        .filter(
-                          (member) =>
-                            !(takers[selectedItem.id] ?? []).includes(member.id)
-                        )
-                        .map((member) => (
-                          <option key={member.id} value={member.id}>
-                            {member.first_name} {member.last_name}
-                          </option>
-                        ))}
-                    </select>
-
-                    <button
-                      type="button"
-                      disabled={!peoplePick || peopleBusy}
-                      onClick={() => adminAddMember(selectedItem.id)}
-                      className="h-10 rounded-[14px] bg-[#1b2431] px-4 text-[12px] font-bold text-[#ffc93c] disabled:opacity-40"
-                    >
-                      {isRuLang ? "Добавить" : "Hinzufügen"}
-                    </button>
-                  </div>
-
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      value={extraName}
-                      onChange={(event) => setExtraName(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          void adminAddExtraName(selectedItem);
-                        }
-                      }}
-                      placeholder={
-                        isRuLang
-                          ? "Или впиши имя (не из приложения)"
-                          : "Oder Name eintragen (nicht in der App)"
-                      }
-                      className="h-10 min-w-0 flex-1 rounded-[14px] border border-[#e4e2d9] bg-white px-3 text-[13px] outline-none"
-                    />
-
-                    <button
-                      type="button"
-                      disabled={!extraName.trim() || peopleBusy}
-                      onClick={() => adminAddExtraName(selectedItem)}
-                      className="h-10 rounded-[14px] border border-[#e9e3d3] px-4 text-[12px] font-bold text-[#6f6a5c] disabled:opacity-40"
-                    >
-                      {isRuLang ? "Имя" : "Name"}
-                    </button>
-                  </div>
-
-                  <p className="mt-2 text-[11px] leading-4 text-[#a1a4a0]">
-                    {isRuLang
-                      ? "Добавленному из команды задача появится на главной странице."
-                      : "Wer aus dem Team hinzugefügt wird, sieht die Aufgabe auf der Startseite."}
-                  </p>
-                </div>
-              )}
+              {isAdmin && renderPeoplePanel(selectedItem)}
 
               <div className="mt-6">
                 <div className="mb-3 flex items-center justify-between">
@@ -2927,6 +2931,8 @@ export default function WorkProjectPage() {
                       )
                     )}
                   </select>
+
+                  {selectedItem && renderPeoplePanel(selectedItem)}
                 </div>
 
                 <button

@@ -319,6 +319,26 @@ export default function FormDetailPage() {
     toast.success(isRu ? "Сохранено" : "Gespeichert");
   }
 
+  /* Отметка «Гость» у записавшегося */
+  async function toggleGuest(row: ResponseRow) {
+    const next = !row.is_guest;
+
+    setResponses((current) =>
+      current.map((item) => (item.id === row.id ? { ...item, is_guest: next } : item)),
+    );
+
+    const { error } = await supabase
+      .from("form_responses")
+      .update({ is_guest: next })
+      .eq("id", row.id);
+
+    if (error) {
+      console.error("Guest toggle error:", error);
+      toast.error(isRu ? "Не удалось сохранить отметку." : "Markierung nicht gespeichert.");
+      load();
+    }
+  }
+
   /* Подписка на уведомления о новых регистрациях в этой форме */
   async function toggleNotify() {
     const {
@@ -812,6 +832,7 @@ export default function FormDetailPage() {
               onDelete={deleteResponse}
               onAddTeen={addToTeens}
               onSyncTeen={syncTeen}
+              onGuest={toggleGuest}
               onAdd={addManual}
               onExport={exportCsv}
             />
@@ -1421,6 +1442,7 @@ function AnswersTab({
   onDelete,
   onAddTeen,
   onSyncTeen,
+  onGuest,
   onAdd,
   onExport,
 }: {
@@ -1433,6 +1455,7 @@ function AnswersTab({
   onDelete: (row: ResponseRow) => void;
   onAddTeen: (row: ResponseRow) => Promise<boolean>;
   onSyncTeen: (row: ResponseRow) => Promise<boolean>;
+  onGuest: (row: ResponseRow) => void;
   onAdd: (first: string, last: string, came: boolean) => Promise<boolean>;
   onExport: () => void;
 }) {
@@ -1548,6 +1571,11 @@ function AnswersTab({
                       {!row.teen_id && row.source !== "manual" && (
                         <span className="rounded-full bg-[#fff4d1] px-2 py-0.5 text-[10px] font-bold text-[#9a6b00]">
                           {isRu ? "новый" : "neu"}
+                        </span>
+                      )}
+                      {row.is_guest && (
+                        <span className="rounded-full bg-[#1b2431] px-2 py-0.5 text-[10px] font-bold text-[#ffc93c]">
+                          {isRu ? "Гость" : "Gast"}
                         </span>
                       )}
                       {row.source === "manual" && (
@@ -1678,6 +1706,20 @@ function AnswersTab({
                         </div>
                       ))
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => onGuest(row)}
+                      className={`mt-1 flex h-11 w-full items-center justify-center rounded-xl border text-[13px] font-bold active:scale-[0.99] ${
+                        row.is_guest
+                          ? "border-[#1b2431] bg-[#1b2431] text-[#ffc93c]"
+                          : "border-neutral-200 bg-white text-neutral-700"
+                      }`}
+                    >
+                      {row.is_guest
+                        ? isRu ? "Гость (нажми, чтобы снять)" : "Gast (zum Entfernen tippen)"
+                        : isRu ? "Отметить как гостя" : "Als Gast markieren"}
+                    </button>
 
                     {needsSync(row) && (
                       <button
@@ -1840,8 +1882,15 @@ function CheckinTab({
                 }`}
               >
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[15px] font-bold">
-                    {row.first_name} {row.last_name}
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-[15px] font-bold">
+                      {row.first_name} {row.last_name}
+                    </span>
+                    {row.is_guest && (
+                      <span className="shrink-0 rounded-full bg-[#1b2431] px-2 py-0.5 text-[10px] font-bold text-[#ffc93c]">
+                        {isRu ? "Гость" : "Gast"}
+                      </span>
+                    )}
                   </div>
                   {birth && (
                     <div className="text-[11px] text-neutral-400">

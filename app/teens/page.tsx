@@ -43,7 +43,6 @@ type Teen = {
   gender: Gender | null;
   languages: TeenLanguage[];
   is_active: boolean;
-  is_guest?: boolean | null;
   created_at: string;
 };
 
@@ -332,7 +331,6 @@ export default function TeensPage() {
     useState<TeenLanguage[]>([]);
 
   const [isActive, setIsActive] = useState(true);
-  const [isGuest, setIsGuest] = useState(false);
 
   const currentYear = new Date().getFullYear();
 
@@ -867,12 +865,6 @@ export default function TeensPage() {
     }
   ).length;
 
-  const otherAgeCount = teens.filter((teen) => {
-    const age = calculateAge(teen.birth_date);
-
-    return age < 12 || age > 15;
-  }).length;
-
   const groupStats = (() => {
     const inGroup = (
       key: AgeFilter,
@@ -931,40 +923,6 @@ export default function TeensPage() {
         15
   ).length;
 
-  const ageCounts = {
-    12: teens.filter(
-      (teen) =>
-        teen.is_active &&
-        calculateAge(
-          teen.birth_date
-        ) === 12
-    ).length,
-
-    13: teens.filter(
-      (teen) =>
-        teen.is_active &&
-        calculateAge(
-          teen.birth_date
-        ) === 13
-    ).length,
-
-    14: teens.filter(
-      (teen) =>
-        teen.is_active &&
-        calculateAge(
-          teen.birth_date
-        ) === 14
-    ).length,
-
-    15: teens.filter(
-      (teen) =>
-        teen.is_active &&
-        calculateAge(
-          teen.birth_date
-        ) === 15
-    ).length,
-  };
-
   const activeFilterCount =
     (statusFilter !== "active"
       ? 1
@@ -1007,7 +965,6 @@ export default function TeensPage() {
     setGender("");
     setSelectedLanguages([]);
     setIsActive(true);
-    setIsGuest(false);
     setEditingTeen(null);
   }
 
@@ -1085,7 +1042,6 @@ export default function TeensPage() {
     setIsActive(
       teen.is_active
     );
-    setIsGuest(Boolean(teen.is_guest));
 
     setIsModalOpen(true);
   }
@@ -1149,7 +1105,6 @@ export default function TeensPage() {
         selectedLanguages,
       is_active:
         isActive,
-      is_guest: isGuest,
     };
 
     if (editingTeen) {
@@ -1486,29 +1441,69 @@ export default function TeensPage() {
                 </div>
               </div>
 
-              <div className="border-t border-neutral-100 px-4 py-2.5">
-                <div className="grid grid-cols-4">
-                  {[12, 13, 14, 15].map(
-                    (age) => (
-                      <div
-                        key={age}
-                        className="flex flex-col items-center"
-                      >
-                        <span className="text-[10px] font-semibold text-neutral-400">
-                          {age}
-                        </span>
+              <div className="grid grid-cols-4 gap-1.5 border-t border-neutral-100 p-2.5">
+                {(
+                  [
+                    { key: 12, label: "12" },
+                    { key: 13, label: "13" },
+                    { key: "plus", label: "Teenie+" },
+                    {
+                      key: "other",
+                      label: isRu ? "Др. возраст" : "Andere",
+                    },
+                  ] as { key: AgeFilter; label: string }[]
+                ).map((cell) => {
+                  const stat =
+                    groupStats[
+                      cell.key as 12 | 13 | "plus" | "other"
+                    ];
+                  const selected = ageFilter === cell.key;
 
-                        <span className="mt-0.5 text-sm font-bold text-neutral-800">
-                          {
-                            ageCounts[
-                              age as 12 | 13 | 14 | 15
-                            ]
-                          }
-                        </span>
-                      </div>
-                    )
-                  )}
-                </div>
+                  return (
+                    <button
+                      key={String(cell.key)}
+                      type="button"
+                      onClick={() =>
+                        setAgeFilter(
+                          selected ? "all" : cell.key
+                        )
+                      }
+                      className={`flex flex-col items-center rounded-2xl px-1 py-2 transition ${
+                        selected
+                          ? "bg-neutral-950 text-white"
+                          : cell.key === "plus"
+                            ? "bg-amber-50 text-neutral-900 ring-1 ring-inset ring-amber-200"
+                            : "bg-neutral-50 text-neutral-900"
+                      }`}
+                    >
+                      <span
+                        className={`text-[10px] font-bold ${
+                          selected
+                            ? "text-white/70"
+                            : cell.key === "plus"
+                              ? "text-orange-600"
+                              : "text-neutral-400"
+                        }`}
+                      >
+                        {cell.label}
+                      </span>
+
+                      <span className="mt-0.5 text-xl font-bold leading-none">
+                        {stat.active}
+                      </span>
+
+                      <span
+                        className={`mt-1 text-[10px] font-semibold ${
+                          selected
+                            ? "text-white/60"
+                            : "text-neutral-400"
+                        }`}
+                      >
+                        {isRu ? "из" : "von"} {stat.total}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="flex items-center gap-4 border-t border-neutral-100 px-4 py-2.5">
@@ -1520,10 +1515,10 @@ export default function TeensPage() {
                   ♀ {girlsCount}
                 </span>
 
-                <span className="ml-auto text-[10px] text-neutral-400">
+                <span className="ml-auto text-[11px] text-neutral-400">
                   {isRu
-                    ? `${activeCount} всего активных`
-                    : `${activeCount} insgesamt aktiv`}
+                    ? `неактивных: ${mainAgeCount - activeMainAgeCount}`
+                    : `inaktiv: ${mainAgeCount - activeMainAgeCount}`}
                 </span>
               </div>
             </section>
@@ -1588,40 +1583,14 @@ export default function TeensPage() {
                       ? "Все"
                       : "Alle"
                     : age === "other"
-                      ? `${isRu ? "Др. возраст" : "Andere"} · ${groupStats.other.total}`
+                      ? isRu ? "Др. возраст" : "Andere"
                       : age === "plus"
-                        ? `Teenie+ · ${groupStats.plus.total}`
-                        : `${age} · ${groupStats[age].total}`}
+                        ? "Teenie+"
+                        : `${age}`}
                 </button>
               ))}
             </div>
 
-            {ageFilter !== "all" && (
-              <div className="mb-3 flex items-baseline gap-2 rounded-2xl bg-white px-4 py-3">
-                <span className="text-3xl font-bold leading-none tracking-tight text-neutral-950">
-                  {groupStats[ageFilter].total}
-                </span>
-
-                <span className="text-xs font-semibold text-neutral-500">
-                  {ageFilter === "plus"
-                    ? "Teenie+ (14–15)"
-                    : ageFilter === "other"
-                      ? isRu
-                        ? "другой возраст"
-                        : "anderes Alter"
-                      : isRu
-                        ? `${ageFilter} лет`
-                        : `${ageFilter} Jahre`}
-                  {isRu ? " · всего" : " · gesamt"}
-                </span>
-
-                <span className="ml-auto text-xs text-neutral-400">
-                  {isRu
-                    ? `${groupStats[ageFilter].active} активных`
-                    : `${groupStats[ageFilter].active} aktiv`}
-                </span>
-              </div>
-            )}
 
             {/* FILTER BUTTON */}
 
@@ -1966,12 +1935,6 @@ export default function TeensPage() {
                                     : "bg-neutral-300"
                                 }`}
                               />
-
-                              {teen.is_guest && (
-                                <span className="shrink-0 rounded-full bg-[#fff4d1] px-2 py-0.5 text-[10px] font-bold text-[#9a6b00]">
-                                  {isRu ? "Гость" : "Gast"}
-                                </span>
-                              )}
                             </div>
 
                             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -2906,34 +2869,6 @@ export default function TeensPage() {
                       isActive
                         ? "left-6"
                         : "left-1"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between rounded-2xl bg-neutral-50 px-4 py-3">
-                <div>
-                  <p className="text-sm font-bold text-neutral-900">
-                    {isRu ? "Гость" : "Gast"}
-                  </p>
-
-                  <p className="mt-0.5 text-[10px] text-neutral-400">
-                    {isRu
-                      ? "Не из нашей группы, пришёл как гость."
-                      : "Nicht aus unserer Gruppe, kommt als Gast."}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsGuest((current) => !current)}
-                  className={`relative h-7 w-12 rounded-full ${
-                    isGuest ? "bg-neutral-950" : "bg-neutral-300"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${
-                      isGuest ? "left-6" : "left-1"
                     }`}
                   />
                 </button>
