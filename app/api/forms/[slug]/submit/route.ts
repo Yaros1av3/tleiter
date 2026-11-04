@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { configurePush, sendToUsers } from "@/lib/pushServer";
 import {
   isEmail,
   isLatinName,
@@ -268,6 +269,29 @@ export async function POST(
     } catch (emailError) {
       console.error("Teen email update error:", emailError);
     }
+  }
+
+  // уведомляем тех, кто подписался на эту форму
+  try {
+    if (configurePush()) {
+      const { data: subs } = await admin
+        .from("form_notify")
+        .select("user_id")
+        .eq("form_id", form.id);
+
+      const userIds = (subs ?? []).map((row) => row.user_id as string);
+
+      if (userIds.length > 0) {
+        await sendToUsers(admin, userIds, {
+          title: "TLight — новая запись",
+          body: `${first} ${last} записался(лась): «${form.title_ru || form.title_de}»`,
+          url: `/forms/${form.id}`,
+          tag: `form-${form.id}-${Date.now()}`,
+        });
+      }
+    }
+  } catch (notifyError) {
+    console.error("Form notify error:", notifyError);
   }
 
   return NextResponse.json({ ok: true });

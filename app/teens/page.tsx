@@ -43,6 +43,7 @@ type Teen = {
   gender: Gender | null;
   languages: TeenLanguage[];
   is_active: boolean;
+  is_guest?: boolean | null;
   created_at: string;
 };
 
@@ -331,6 +332,7 @@ export default function TeensPage() {
     useState<TeenLanguage[]>([]);
 
   const [isActive, setIsActive] = useState(true);
+  const [isGuest, setIsGuest] = useState(false);
 
   const currentYear = new Date().getFullYear();
 
@@ -1005,6 +1007,7 @@ export default function TeensPage() {
     setGender("");
     setSelectedLanguages([]);
     setIsActive(true);
+    setIsGuest(false);
     setEditingTeen(null);
   }
 
@@ -1082,6 +1085,7 @@ export default function TeensPage() {
     setIsActive(
       teen.is_active
     );
+    setIsGuest(Boolean(teen.is_guest));
 
     setIsModalOpen(true);
   }
@@ -1145,6 +1149,7 @@ export default function TeensPage() {
         selectedLanguages,
       is_active:
         isActive,
+      is_guest: isGuest,
     };
 
     if (editingTeen) {
@@ -1961,6 +1966,12 @@ export default function TeensPage() {
                                     : "bg-neutral-300"
                                 }`}
                               />
+
+                              {teen.is_guest && (
+                                <span className="shrink-0 rounded-full bg-[#fff4d1] px-2 py-0.5 text-[10px] font-bold text-[#9a6b00]">
+                                  {isRu ? "Гость" : "Gast"}
+                                </span>
+                              )}
                             </div>
 
                             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -2895,6 +2906,34 @@ export default function TeensPage() {
                       isActive
                         ? "left-6"
                         : "left-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between rounded-2xl bg-neutral-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-bold text-neutral-900">
+                    {isRu ? "Гость" : "Gast"}
+                  </p>
+
+                  <p className="mt-0.5 text-[10px] text-neutral-400">
+                    {isRu
+                      ? "Не из нашей группы, пришёл как гость."
+                      : "Nicht aus unserer Gruppe, kommt als Gast."}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsGuest((current) => !current)}
+                  className={`relative h-7 w-12 rounded-full ${
+                    isGuest ? "bg-neutral-950" : "bg-neutral-300"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${
+                      isGuest ? "left-6" : "left-1"
                     }`}
                   />
                 </button>

@@ -7,6 +7,8 @@ import {
   ArrowLeft,
   ArrowUp,
   BarChart3,
+  Bell,
+  BellOff,
   Check,
   Copy,
   Download,
@@ -54,6 +56,12 @@ type TeenInfo = {
   parent1_phone: string | null;
   email: string | null;
 };
+
+/* по алфавиту: имя, затем фамилия */
+const byName = (a: { first_name: string; last_name: string }, b: { first_name: string; last_name: string }) =>
+  `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`, "de", {
+    sensitivity: "base",
+  });
 
 const digits = (value: string | null | undefined) => (value ?? "").replace(/\D/g, "");
 const same = (a: string | null | undefined, b: string | null | undefined) =>
@@ -123,6 +131,7 @@ export default function FormDetailPage() {
   const [responses, setResponses] = useState<ResponseRow[]>([]);
   const [teenBirth, setTeenBirth] = useState<Record<number, string>>({});
   const [teenInfo, setTeenInfo] = useState<Record<number, TeenInfo>>({});
+  const [notifyOn, setNotifyOn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("edit");
   const [saving, setSaving] = useState(false);
@@ -156,6 +165,21 @@ export default function FormDetailPage() {
 
     const rows = (responsesResult.data ?? []) as ResponseRow[];
     setResponses(rows);
+
+    const {
+      data: { user: me },
+    } = await supabase.auth.getUser();
+
+    if (me) {
+      const mine = await supabase
+        .from("form_notify")
+        .select("form_id")
+        .eq("form_id", formId)
+        .eq("user_id", me.id)
+        .maybeSingle();
+
+      setNotifyOn(Boolean(mine.data));
+    }
 
     const teenIds = Array.from(
       new Set(rows.map((row) => row.teen_id).filter((id): id is number => id != null)),
@@ -293,6 +317,34 @@ export default function FormDetailPage() {
     setDraft(next);
     setSaved(next);
     toast.success(isRu ? "Сохранено" : "Gespeichert");
+  }
+
+  /* Подписка на уведомления о новых регистрациях в этой форме */
+  async function toggleNotify() {
+    const {
+      data: { user: me },
+    } = await supabase.auth.getUser();
+
+    if (!me || !draft) return;
+
+    const next = !notifyOn;
+
+    const { error } = next
+      ? await supabase.from("form_notify").insert({ form_id: draft.id, user_id: me.id })
+      : await supabase.from("form_notify").delete().eq("form_id", draft.id).eq("user_id", me.id);
+
+    if (error) {
+      console.error("Form notify toggle error:", error);
+      toast.error(isRu ? "Не удалось изменить." : "Änderung fehlgeschlagen.");
+      return;
+    }
+
+    setNotifyOn(next);
+    toast.success(
+      next
+        ? isRu ? "Будешь получать уведомления о новых записях." : "Du bekommst Meldungen zu neuen Anmeldungen."
+        : isRu ? "Уведомления выключены." : "Meldungen ausgeschaltet.",
+    );
   }
 
   /* Закрыть / снова открыть приём записей сразу, без отдельного «Сохранить» */
@@ -566,7 +618,7 @@ export default function FormDetailPage() {
           ? isRu ? "не пришёл" : "nicht da"
           : "";
 
-    const rows = responses.map((row) => [
+    const rows = [...responses].sort(byName).map((row) => [
       row.first_name,
       row.last_name,
       attendanceLabel(row.attendance),
@@ -677,6 +729,17 @@ export default function FormDetailPage() {
               {isRu ? "Открыть" : "Öffnen"}
             </a>
           </div>
+
+          <button
+            type="button"
+            onClick={toggleNotify}
+            className="relative mt-2 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/40 text-[13px] font-bold text-white active:scale-[0.98]"
+          >
+            {notifyOn ? <Bell size={14} /> : <BellOff size={14} />}
+            {notifyOn
+              ? isRu ? "Уведомления о записях включены" : "Meldungen bei Anmeldung: an"
+              : isRu ? "Получать уведомления о записях" : "Bei Anmeldung benachrichtigen"}
+          </button>
 
           <button
             type="button"
@@ -1379,9 +1442,9 @@ function AnswersTab({
   const [openId, setOpenId] = useState<number | null>(null);
 
   const q = query.trim().toLowerCase();
-  const list = responses.filter(
-    (row) => !q || `${row.first_name} ${row.last_name}`.toLowerCase().includes(q),
-  );
+  const list = responses
+    .filter((row) => !q || `${row.first_name} ${row.last_name}`.toLowerCase().includes(q))
+    .sort(byName);
 
   const found = responses.filter((row) => row.teen_id).length;
   const fresh = responses.filter((row) => !row.teen_id && row.source !== "manual").length;
@@ -1686,9 +1749,7 @@ function CheckinTab({
   const list = responses
     .filter((row) => filter === "all" || row.attendance === filter)
     .filter((row) => !q || `${row.first_name} ${row.last_name}`.toLowerCase().includes(q))
-    .sort((a, b) =>
-      `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`),
-    );
+    .sort(byName);
 
   const chips: { key: typeof filter; label: string; count: number }[] = [
     { key: "all", label: isRu ? "Все" : "Alle", count: responses.length },

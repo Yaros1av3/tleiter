@@ -53,6 +53,54 @@ export async function POST(request: NextRequest) {
 
   let sent = 0;
 
+  /* ---------- админ добавил человека в задачу ---------- */
+  if (body.type === "task-member-added") {
+    const itemId = Number(body.itemId);
+    const memberId = Number(body.memberId);
+
+    const admins = await getAdminIds(supabase);
+
+    if (!admins.includes(caller.id)) {
+      return NextResponse.json({ sent: 0 });
+    }
+
+    const { data: link } = await supabase
+      .from("work_item_members")
+      .select("item_id")
+      .eq("item_id", itemId)
+      .eq("member_id", memberId)
+      .maybeSingle();
+
+    if (!link) return NextResponse.json({ sent: 0 });
+
+    const { data: item } = await supabase
+      .from("work_items")
+      .select("id, title, project_id")
+      .eq("id", itemId)
+      .maybeSingle();
+
+    if (!item) return NextResponse.json({ sent: 0 });
+
+    const { data: project } = await supabase
+      .from("work_projects")
+      .select("title")
+      .eq("id", item.project_id)
+      .maybeSingle();
+
+    const member = await userIdOfMember(supabase, memberId);
+
+    if (member.userId && member.userId !== caller.id) {
+      sent += await sendToUsers(supabase, [member.userId], {
+        title: "TLight — тебе задача",
+        body: `${member.firstName}, тебя добавили в задачу «${item.title}» (${project?.title ?? ""}).`,
+        url: `/work/${item.project_id}`,
+        tag: `task-added-${item.id}-${memberId}`,
+      });
+    }
+
+    return NextResponse.json({ sent });
+  }
+
   /* ---------- 1–2) поставили в служение / сняли ---------- */
   if (body.type === "schedule-change") {
     const entryId = Number(body.entryId);
