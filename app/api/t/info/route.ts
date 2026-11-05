@@ -22,16 +22,22 @@ export async function GET() {
       .gte("schedule_date", today)
       .order("schedule_date", { ascending: true })
       .order("service_time", { ascending: true })
-      .limit(6);
+      .limit(30);
 
     if (entriesError) {
       throw new Error(`schedule_entries: ${entriesError.message}`);
     }
 
-    const first = entries?.[0];
-    const lessonRows = first
-      ? (entries ?? []).filter((entry) => entry.schedule_date === first.schedule_date)
-      : [];
+    // для каждого служения (10:00 и 12:30) берём ближайший урок
+    const firstByTime = new Map<string, string>();
+    for (const entry of entries ?? []) {
+      const key = String(entry.service_time);
+      if (!firstByTime.has(key)) firstByTime.set(key, entry.schedule_date as string);
+    }
+
+    const lessonRows = (entries ?? []).filter(
+      (entry) => firstByTime.get(String(entry.service_time)) === entry.schedule_date,
+    );
 
     const ids = lessonRows.map((entry) => entry.id as number);
 
@@ -57,10 +63,9 @@ export async function GET() {
           .in("id", memberIds);
 
         for (const member of members ?? []) {
-          const last = String(member.last_name ?? "").trim();
           names.set(
             member.id as number,
-            `${String(member.first_name ?? "").trim()}${last ? ` ${last.charAt(0)}.` : ""}`,
+            `${String(member.first_name ?? "").trim()} ${String(member.last_name ?? "").trim()}`.trim(),
           );
         }
       }

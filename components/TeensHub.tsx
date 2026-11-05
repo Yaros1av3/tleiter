@@ -1,22 +1,23 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   Bell,
   BellRing,
   CalendarDays,
   Check,
+  ChevronDown,
   ExternalLink,
   Loader2,
-  Link2,
   MapPin,
   Share,
+  User,
   Users,
 } from "lucide-react";
 
 type Lang = "de" | "ru";
+type Service = "10:00" | "12:30";
 
 type Lesson = {
   id: number;
@@ -40,20 +41,20 @@ type TeenEvent = {
   link_url: string | null;
 };
 
-import { supabase } from "@/lib/supabase";
-
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
+
+/* 10:00 — немецкое служение, 12:30 — русское */
+const LANG_OF: Record<Service, Lang> = { "10:00": "de", "12:30": "ru" };
 
 const TEXT = {
   de: {
-    label: "TLight Teens",
     next: "Nächster Unterricht",
-    noLesson: "Noch kein Unterricht geplant.",
+    noLesson: "Für dieses Treffen ist noch kein Unterricht geplant.",
     topicOpen: "Thema folgt",
     serving: "Es dienen",
     nobody: "Wird noch festgelegt",
     imComing: "Ich komme",
-    nameHint: "Trag deinen Namen ein",
+    nameHint: "Trag dich kurz ein, dann wissen wir, dass du kommst.",
     first: "Vorname",
     last: "Nachname",
     confirm: "Eintragen",
@@ -76,18 +77,16 @@ const TEXT = {
     nameError: "Bitte Vor- und Nachname eintragen.",
     loadError: "Konnte nicht geladen werden.",
     retry: "Nochmal",
-    today: "Heute",
     locale: "de-DE",
   },
   ru: {
-    label: "TLight Teens",
     next: "Ближайший урок",
-    noLesson: "Урок пока не запланирован.",
+    noLesson: "Для этой встречи урок пока не запланирован.",
     topicOpen: "Тема скоро появится",
     serving: "Служат",
     nobody: "Пока не назначены",
     imComing: "Я буду",
-    nameHint: "Впиши своё имя",
+    nameHint: "Впиши себя, чтобы мы знали, что ты придёшь.",
     first: "Имя",
     last: "Фамилия",
     confirm: "Отметиться",
@@ -110,7 +109,6 @@ const TEXT = {
     nameError: "Впиши имя и фамилию.",
     loadError: "Не удалось загрузить.",
     retry: "Ещё раз",
-    today: "Сегодня",
     locale: "ru-RU",
   },
 } as const;
@@ -149,12 +147,12 @@ function isIosBrowser() {
 }
 
 export default function TeensHub() {
-  const [lang, setLang] = useState<Lang>("de");
+  // undefined — ещё читаем из памяти, null — служение не выбрано (показываем выбор)
+  const [service, setService] = useState<Service | null | undefined>(undefined);
   const [lessons, setLessons] = useState<Lesson[] | null>(null);
   const [events, setEvents] = useState<TeenEvent[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadDetail, setLoadDetail] = useState("");
-  const [isTeam, setIsTeam] = useState(false);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -168,16 +166,19 @@ export default function TeensHub() {
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMessage, setPushMessage] = useState("");
 
+  const lang: Lang = service ? LANG_OF[service] : "de";
   const t = TEXT[lang];
 
   const load = useCallback(async () => {
     try {
       const response = await fetch("/api/t/info", { cache: "no-store" });
+
       if (!response.ok) {
         const failure = (await response.json().catch(() => null)) as { detail?: string } | null;
         setLoadDetail(failure?.detail ?? "");
         throw new Error("load");
       }
+
       const data = (await response.json()) as { lessons: Lesson[]; events: TeenEvent[] };
       setLessons(data.lessons);
       setEvents(data.events);
@@ -195,14 +196,8 @@ export default function TeensHub() {
   }, []);
 
   useEffect(() => {
-    const savedLang = safeGet("teens-lang");
-    setLang(
-      savedLang === "ru" || savedLang === "de"
-        ? savedLang
-        : navigator.language.toLowerCase().startsWith("ru")
-          ? "ru"
-          : "de",
-    );
+    const saved = safeGet("teens-service");
+    setService(saved === "10:00" || saved === "12:30" ? saved : null);
 
     setFirstName(safeGet("teens-first") ?? "");
     setLastName(safeGet("teens-last") ?? "");
@@ -219,18 +214,32 @@ export default function TeensHub() {
         .catch(() => undefined);
     }
 
-    // залогиненным служителям показываем ссылки на редактирование
-    supabase.auth
-      .getSession()
-      .then(({ data }) => setIsTeam(Boolean(data.session)))
-      .catch(() => undefined);
-
     load();
   }, [load]);
 
-  function changeLang(next: Lang) {
-    setLang(next);
-    safeSet("teens-lang", next);
+  async function chooseService(next: Service) {
+    setService(next);
+    safeSet("teens-service", next);
+    setNameError(false);
+    window.scrollTo?.({ top: 0 });
+
+    // если уже подписан — обновляем язык уведомлений
+    try {
+      if ("serviceWorker" in navigator) {
+        const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+        const subscription = await registration?.pushManager.getSubscription();
+
+        if (subscription) {
+          await fetch("/api/t/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ subscription: subscription.toJSON(), lang: LANG_OF[next] }),
+          });
+        }
+      }
+    } catch {
+      /* язык уведомлений обновится при следующей подписке */
+    }
   }
 
   async function rsvp(lesson: Lesson, going: boolean) {
@@ -262,8 +271,8 @@ export default function TeensHub() {
       });
 
       if (!response.ok) {
-        setNameError(response.status === 422);
-        if (response.status !== 422) setPushMessage(t.error);
+        if (response.status === 422) setNameError(true);
+        else setPushMessage(t.error);
         setBusyId(null);
         return;
       }
@@ -380,20 +389,29 @@ export default function TeensHub() {
 
   const card = "rounded-[22px] border border-[#e9e3d3] bg-white";
 
-  return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto overflow-x-hidden bg-[#faf8f3] text-[#1b2431] [overflow-wrap:anywhere]">
-      <div className="mx-auto w-full max-w-[520px] px-4 pb-16 pt-[max(1.25rem,env(safe-area-inset-top))]">
-        {/* шапка */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Image
-              src="/tlite-logo.png"
-              alt="TLight"
-              width={44}
-              height={44}
-              priority
-              className="h-11 w-11 shrink-0 rounded-[13px]"
-            />
+  const logo = (
+    <Image
+      src="/tlite-logo.png"
+      alt="TLight"
+      width={44}
+      height={44}
+      priority
+      className="h-11 w-11 shrink-0 rounded-[13px]"
+    />
+  );
+
+  /* ---------- пока читаем выбор ---------- */
+  if (service === undefined) {
+    return <div className="fixed inset-0 z-[60] bg-[#faf8f3]" />;
+  }
+
+  /* ---------- выбор служения ---------- */
+  if (service === null) {
+    return (
+      <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#faf8f3] text-[#1b2431]">
+        <div className="mx-auto flex min-h-full w-full max-w-[520px] flex-col justify-center px-5 py-10">
+          <div className="flex items-center gap-3">
+            {logo}
             <div>
               <div className="text-[19px] font-extrabold leading-none tracking-[-0.03em]">TLight</div>
               <div className="mt-1 text-[9px] font-bold uppercase leading-none tracking-[0.16em] text-[#9a9585]">
@@ -402,43 +420,92 @@ export default function TeensHub() {
             </div>
           </div>
 
-          <div className="flex rounded-full bg-white p-1 ring-1 ring-[#e9e3d3]">
-            {(["de", "ru"] as Lang[]).map((code) => (
+          <h1 className="mt-10 text-[28px] font-extrabold leading-tight tracking-[-0.03em]">
+            Welchen Gottesdienst besuchst du?
+          </h1>
+          <p className="mt-2 text-[16px] font-semibold leading-snug text-[#8a8678]">
+            Какое служение ты посещаешь?
+          </p>
+
+          <div className="mt-8 space-y-3">
+            {(
+              [
+                { time: "10:00" as Service, name: "Deutsch", hint: "Gottesdienst auf Deutsch" },
+                { time: "12:30" as Service, name: "Русский", hint: "Служение на русском языке" },
+              ] as const
+            ).map((option) => (
               <button
-                key={code}
+                key={option.time}
                 type="button"
-                onClick={() => changeLang(code)}
-                className={`h-7 min-w-9 rounded-full px-3 text-[11px] font-bold uppercase transition ${
-                  lang === code ? "bg-[#1b2431] text-[#ffc93c]" : "text-[#8a8678]"
-                }`}
+                onClick={() => chooseService(option.time)}
+                className="group flex w-full items-center gap-4 rounded-[24px] bg-[#1b2431] p-4 text-left text-white shadow-[0_10px_30px_rgba(27,36,49,0.18)] transition active:scale-[0.99]"
               >
-                {code}
+                <span className="flex h-16 w-[88px] shrink-0 items-center justify-center rounded-2xl bg-[#ffc93c] text-[24px] font-extrabold tracking-[-0.04em] text-[#1b2431]">
+                  {option.time}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[22px] font-extrabold leading-none">{option.name}</span>
+                  <span className="mt-1.5 block text-[13px] font-medium text-white/60">{option.hint}</span>
+                </span>
               </button>
             ))}
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {isTeam && (
-          <div className="mt-4 flex flex-wrap items-center gap-1.5 rounded-2xl bg-[#1b2431] px-3 py-2.5">
-            <span className="mr-1 text-[11px] font-bold uppercase tracking-wide text-[#ffc93c]">
-              {lang === "ru" ? "Команде" : "Team"}
-            </span>
-            {[
-              { href: "/schedule", label: lang === "ru" ? "Расписание" : "Dienstplan" },
-              { href: "/calendar", label: lang === "ru" ? "События" : "Termine" },
-              { href: "/rsvp", label: lang === "ru" ? "Кто придёт" : "Anmeldungen" },
-            ].map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="inline-flex h-7 items-center gap-1 rounded-full bg-white/12 px-3 text-[11px] font-bold text-white active:bg-white/20"
-              >
-                <Link2 size={11} />
-                {item.label}
-              </Link>
-            ))}
+  const myLessons = (lessons ?? []).filter((lesson) => lesson.time === service);
+
+  const nameInput = (
+    id: string,
+    label: string,
+    value: string,
+    onChange: (next: string) => void,
+    autoComplete: string,
+  ) => (
+    <label htmlFor={id} className="block">
+      <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#9a6b00]">
+        {label}
+      </span>
+      <span className="flex h-[52px] items-center gap-3 rounded-2xl border border-[#eadfb8] bg-white px-4 shadow-[0_2px_8px_rgba(154,107,0,0.06)] transition focus-within:border-[#1b2431] focus-within:ring-[3px] focus-within:ring-[#ffc93c]/50">
+        <User size={17} className="shrink-0 text-[#c4b377]" />
+        <input
+          id={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          autoComplete={autoComplete}
+          className="h-full min-w-0 flex-1 bg-transparent text-[17px] font-semibold text-[#1b2431] outline-none placeholder:font-medium placeholder:text-[#c9c2a8]"
+        />
+      </span>
+    </label>
+  );
+
+  return (
+    <div className="fixed inset-0 z-[60] overflow-y-auto overflow-x-hidden bg-[#faf8f3] text-[#1b2431] [overflow-wrap:anywhere]">
+      <div className="mx-auto w-full max-w-[520px] px-4 pb-16 pt-[max(1.25rem,env(safe-area-inset-top))]">
+        {/* шапка */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            {logo}
+            <div>
+              <div className="text-[19px] font-extrabold leading-none tracking-[-0.03em]">TLight</div>
+              <div className="mt-1 text-[9px] font-bold uppercase leading-none tracking-[0.16em] text-[#9a9585]">
+                Teens
+              </div>
+            </div>
           </div>
-        )}
+
+          <button
+            type="button"
+            onClick={() => setService(null)}
+            className="flex h-10 items-center gap-1.5 rounded-full bg-white pl-4 pr-3 text-[13px] font-extrabold ring-1 ring-[#e9e3d3] active:scale-[0.97]"
+          >
+            {service}
+            <span className="text-[#9a9585]">{lang === "ru" ? "RU" : "DE"}</span>
+            <ChevronDown size={14} className="text-[#9a9585]" />
+          </button>
+        </div>
 
         {lessons === null ? (
           <div className="mt-16 flex justify-center">
@@ -466,14 +533,15 @@ export default function TeensHub() {
               {t.next}
             </p>
 
-            {lessons.length === 0 ? (
+            {myLessons.length === 0 ? (
               <div className={`${card} px-5 py-8 text-center text-[14px] text-[#8a8678]`}>
                 {t.noLesson}
               </div>
             ) : (
               <div className="space-y-3">
-                {lessons.map((lesson) => {
+                {myLessons.map((lesson) => {
                   const done = marked[lesson.id];
+                  const lessonTitle = title(lesson);
 
                   return (
                     <div key={lesson.id} className="overflow-hidden rounded-[26px] bg-[#1b2431] text-white">
@@ -487,8 +555,12 @@ export default function TeensHub() {
                           </span>
                         </div>
 
-                        <h1 className="mt-3 text-[24px] font-extrabold leading-tight tracking-[-0.02em]">
-                          {title(lesson) || t.topicOpen}
+                        <h1
+                          className={`mt-3 font-extrabold leading-tight tracking-[-0.02em] ${
+                            lessonTitle.length > 60 ? "text-[19px]" : "text-[24px]"
+                          }`}
+                        >
+                          {lessonTitle || t.topicOpen}
                         </h1>
 
                         {(lesson.bible_text || lesson.series) && (
@@ -510,7 +582,7 @@ export default function TeensHub() {
                           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/50">
                             {t.serving}
                           </p>
-                          <p className="mt-1 text-[14px] font-semibold">
+                          <p className="mt-1 text-[15px] font-semibold leading-snug">
                             {lesson.serving.length > 0 ? lesson.serving.join(", ") : t.nobody}
                           </p>
                         </div>
@@ -537,33 +609,25 @@ export default function TeensHub() {
                           </div>
                         ) : (
                           <>
-                            <p className="text-[13px] font-bold">{t.imComing}</p>
-                            <div className="mt-2 grid grid-cols-2 gap-2">
-                              <input
-                                value={firstName}
-                                onChange={(event) => setFirstName(event.target.value)}
-                                placeholder={t.first}
-                                autoComplete="given-name"
-                                className="h-11 min-w-0 rounded-xl border border-[#e9e3d3] bg-white px-3 text-[15px] outline-none focus:border-[#1b2431]"
-                              />
-                              <input
-                                value={lastName}
-                                onChange={(event) => setLastName(event.target.value)}
-                                placeholder={t.last}
-                                autoComplete="family-name"
-                                className="h-11 min-w-0 rounded-xl border border-[#e9e3d3] bg-white px-3 text-[15px] outline-none focus:border-[#1b2431]"
-                              />
+                            <p className="text-[16px] font-extrabold">{t.imComing}</p>
+                            <p className="mb-3 mt-0.5 text-[12px] leading-4 text-[#9a6b00]">{t.nameHint}</p>
+
+                            <div className="space-y-2.5">
+                              {nameInput(`first-${lesson.id}`, t.first, firstName, setFirstName, "given-name")}
+                              {nameInput(`last-${lesson.id}`, t.last, lastName, setLastName, "family-name")}
                             </div>
+
                             {nameError && (
                               <p className="mt-2 text-[12px] font-semibold text-red-600">{t.nameError}</p>
                             )}
+
                             <button
                               type="button"
                               disabled={busyId === lesson.id}
                               onClick={() => rsvp(lesson, true)}
-                              className="mt-2 flex h-11 w-full items-center justify-center rounded-xl bg-[#1b2431] text-[14px] font-bold text-[#ffc93c] active:scale-[0.99] disabled:opacity-50"
+                              className="mt-3 flex h-[52px] w-full items-center justify-center rounded-2xl bg-[#1b2431] text-[16px] font-extrabold text-[#ffc93c] shadow-[0_6px_16px_rgba(27,36,49,0.22)] active:scale-[0.99] disabled:opacity-50"
                             >
-                              {busyId === lesson.id ? <Loader2 size={16} className="animate-spin" /> : t.confirm}
+                              {busyId === lesson.id ? <Loader2 size={18} className="animate-spin" /> : t.confirm}
                             </button>
                           </>
                         )}
