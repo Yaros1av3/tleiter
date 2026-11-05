@@ -22,6 +22,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { useToast } from "@/components/ToastProvider";
+import { notifyEvent } from "@/lib/notify";
 import { pad, dateKey, localDateFromKey } from "@/lib/dates";
 import TimePicker from "@/components/TimePicker";
 import {
@@ -43,6 +44,8 @@ type Event = {
   category: string;
   series_id: string | null;
   recurrence: Recurrence;
+  show_teens?: boolean | null;
+  link_url?: string | null;
   source?: "event" | "work" | "schedule";
   source_id?: number;
 };
@@ -89,6 +92,8 @@ type EventForm = {
   category: string;
   recurrence: Recurrence;
   recurrenceUntil: string;
+  showTeens: boolean;
+  linkUrl: string;
 };
 
 const categories = [
@@ -122,6 +127,8 @@ const emptyForm: EventForm = {
   category: "other",
   recurrence: "none",
   recurrenceUntil: "",
+  showTeens: false,
+  linkUrl: "",
 };
 
 function eventDateKey(value: string) {
@@ -488,7 +495,7 @@ export default function CalendarPage() {
       supabase
         .from("events")
         .select(
-          "id,title,description,start_at,end_at,location,category,series_id,recurrence"
+          "id,title,description,start_at,end_at,location,category,series_id,recurrence,show_teens,link_url"
         )
         .lt("start_at", rangeEnd.toISOString())
         .gt("end_at", rangeStart.toISOString())
@@ -589,6 +596,8 @@ export default function CalendarPage() {
       category: event.category,
       recurrence: event.recurrence ?? "none",
       recurrenceUntil: "",
+      showTeens: Boolean(event.show_teens),
+      linkUrl: event.link_url ?? "",
     });
 
     setEditorOpen(true);
@@ -605,7 +614,7 @@ export default function CalendarPage() {
     setSelectedScheduleEntry(null);
   };
 
-  const updateForm = (field: keyof EventForm, value: string) => {
+  const updateForm = (field: keyof EventForm, value: string | boolean) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
@@ -719,9 +728,14 @@ export default function CalendarPage() {
       category: form.category,
       series_id: seriesId,
       recurrence: form.recurrence,
+      show_teens: form.showTeens,
+      link_url: form.linkUrl.trim() || null,
     }));
 
-    const { error } = await supabase.from("events").insert(rows);
+    const { data: createdRows, error } = await supabase
+      .from("events")
+      .insert(rows)
+      .select("id");
 
     if (error) {
       console.error("Create event error:", error);
@@ -732,6 +746,11 @@ export default function CalendarPage() {
       );
       setSaving(false);
       return;
+    }
+
+    // новое событие для подростков — один раз сообщаем им
+    if (form.showTeens && createdRows && createdRows.length > 0) {
+      void notifyEvent({ type: "teen-event", eventId: createdRows[0].id });
     }
 
     setSaving(false);
@@ -759,6 +778,8 @@ export default function CalendarPage() {
         end_at: validated.end.toISOString(),
         location: form.location.trim() || null,
         category: form.category,
+        show_teens: form.showTeens,
+        link_url: form.linkUrl.trim() || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", selectedEvent.id)
@@ -774,6 +795,10 @@ export default function CalendarPage() {
       );
       setSaving(false);
       return;
+    }
+
+    if (form.showTeens && !selectedEvent.show_teens) {
+      void notifyEvent({ type: "teen-event", eventId: selectedEvent.id });
     }
 
     setSaving(false);
@@ -834,6 +859,8 @@ export default function CalendarPage() {
             end_at: newEnd.toISOString(),
             location: form.location.trim() || null,
             category: form.category,
+            show_teens: form.showTeens,
+            link_url: form.linkUrl.trim() || null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", event.id);
@@ -1963,6 +1990,43 @@ export default function CalendarPage() {
                     : "z. B. Gemeinde Berlin"
                 }
               />
+
+              <button
+                type="button"
+                onClick={() => updateForm("showTeens", !form.showTeens)}
+                className="flex w-full items-center justify-between rounded-xl bg-neutral-50 px-4 py-3 text-left"
+              >
+                <span>
+                  <span className="block text-[14px] font-semibold">
+                    {language === "ru" ? "Показывать подросткам" : "Teens anzeigen"}
+                  </span>
+                  <span className="block text-[11px] text-neutral-400">
+                    {language === "ru"
+                      ? "Появится на странице подростков и придёт им уведомление"
+                      : "Erscheint auf der Teens-Seite, Teens bekommen eine Meldung"}
+                  </span>
+                </span>
+                <span
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+                    form.showTeens ? "bg-neutral-950" : "bg-neutral-300"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                      form.showTeens ? "left-[22px]" : "left-0.5"
+                    }`}
+                  />
+                </span>
+              </button>
+
+              {form.showTeens && (
+                <Field
+                  label={language === "ru" ? "Ссылка для записи (необязательно)" : "Link zur Anmeldung (optional)"}
+                  value={form.linkUrl}
+                  onChange={(value) => updateForm("linkUrl", value)}
+                  placeholder="https://..."
+                />
+              )}
 
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">

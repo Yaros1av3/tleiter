@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { sendToTeens } from "@/lib/teenPush";
 import {
   berlinToday,
   configurePush,
@@ -52,6 +53,40 @@ export async function POST(request: NextRequest) {
   }
 
   let sent = 0;
+
+  /* ---------- новое событие для подростков ---------- */
+  if (body.type === "teen-event") {
+    const admins = await getAdminIds(supabase);
+
+    if (!admins.includes(caller.id)) {
+      return NextResponse.json({ sent: 0 });
+    }
+
+    const { data: event } = await supabase
+      .from("events")
+      .select("id, title, start_at, location, show_teens")
+      .eq("id", Number(body.eventId))
+      .maybeSingle();
+
+    if (!event || !event.show_teens) return NextResponse.json({ sent: 0 });
+
+    const when = (locale: string) =>
+      new Date(event.start_at as string).toLocaleDateString(locale, {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        timeZone: "Europe/Berlin",
+      });
+
+    sent += await sendToTeens(supabase, (lang) => ({
+      title: lang === "ru" ? "TLight Teens — новое событие" : "TLight Teens — neuer Termin",
+      body: `${event.title} · ${when(lang === "ru" ? "ru-RU" : "de-DE")}`,
+      url: "/t",
+      tag: `teen-event-${event.id}`,
+    }));
+
+    return NextResponse.json({ sent });
+  }
 
   /* ---------- админ добавил человека в задачу ---------- */
   if (body.type === "task-member-added") {

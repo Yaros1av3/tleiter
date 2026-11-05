@@ -475,6 +475,55 @@ export default function Home() {
       );
   }, [nextScheduleDate, upcomingSchedule]);
 
+  /* подростки, отметившиеся на ближайший урок (показываем тем, кто служит) */
+  const [teenRsvps, setTeenRsvps] = useState<
+    Record<number, { id: number; first_name: string; last_name: string }[]>
+  >({});
+
+  const nextEntryIds = nextServiceEntries.map((entry) => entry.id).join(",");
+
+  useEffect(() => {
+    if (!nextEntryIds) {
+      setTeenRsvps({});
+      return;
+    }
+
+    let cancelled = false;
+
+    supabase
+      .from("lesson_rsvp")
+      .select("id, schedule_entry_id, first_name, last_name")
+      .in("schedule_entry_id", nextEntryIds.split(",").map(Number))
+      .then(({ data, error }) => {
+        if (cancelled || error) return;
+
+        const grouped: Record<number, { id: number; first_name: string; last_name: string }[]> = {};
+
+        for (const row of data ?? []) {
+          const key = row.schedule_entry_id as number;
+          (grouped[key] ??= []).push({
+            id: row.id as number,
+            first_name: row.first_name as string,
+            last_name: row.last_name as string,
+          });
+        }
+
+        for (const list of Object.values(grouped)) {
+          list.sort((a, b) =>
+            `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`, "de", {
+              sensitivity: "base",
+            }),
+          );
+        }
+
+        setTeenRsvps(grouped);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [nextEntryIds]);
+
   const calendarPreview = useMemo(() => {
     const dates: string[] = [];
 
@@ -657,6 +706,14 @@ export default function Home() {
         ? "Общие проекты команды"
         : "Gemeinsame Projekte",
       icon: BriefcaseBusiness,
+    },
+    {
+      href: "/rsvp",
+      label: isRu ? "Страница подростков" : "Teens-Seite",
+      description: isRu
+        ? "Что видят подростки и кто придёт"
+        : "Was Teens sehen und wer kommt",
+      icon: ClipboardList,
     },
     {
       href: "/birthdays",
@@ -1159,6 +1216,35 @@ export default function Home() {
                             isRu={isRu}
                             onChanged={myService.reload}
                           />
+                        )}
+
+                      {myService.me &&
+                        members.some(
+                          (member) =>
+                            member.id === myService.me?.memberId,
+                        ) && (
+                          <button
+                            type="button"
+                            onClick={() => router.push("/rsvp")}
+                            className="mt-2 w-full rounded-[18px] border border-[#e9e3d3] bg-[#fff4d1] px-3.5 py-3 text-left active:scale-[0.995]"
+                          >
+                            <span className="flex items-center justify-between gap-2">
+                              <span className="text-[12px] font-bold text-[#9a6b00]">
+                                {isRu ? "Подростки отметились" : "Teens haben sich eingetragen"}
+                              </span>
+                              <span className="rounded-full bg-[#1b2431] px-2.5 py-0.5 text-[12px] font-extrabold text-[#ffc93c]">
+                                {(teenRsvps[entry.id] ?? []).length}
+                              </span>
+                            </span>
+
+                            {(teenRsvps[entry.id] ?? []).length > 0 && (
+                              <span className="mt-1.5 block text-[13px] font-semibold leading-5 text-[#1b2431]">
+                                {(teenRsvps[entry.id] ?? [])
+                                  .map((teen) => `${teen.first_name} ${teen.last_name.charAt(0)}.`)
+                                  .join(", ")}
+                              </span>
+                            )}
+                          </button>
                         )}
                       </div>
                     );

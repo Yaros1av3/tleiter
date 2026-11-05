@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import webpush from "web-push";
 
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { sendToTeens } from "@/lib/teenPush";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -564,6 +565,40 @@ async function runTasks(supabase: Supabase) {
   return { recipients: byUser.size, ...result };
 }
 
+/* суббота вечером: подросткам — напоминание про завтрашний урок и его тему */
+async function runTeensSaturday(
+  supabase: Supabase,
+  berlin: { year: number; month: number; day: number },
+) {
+  const tomorrow = new Date(Date.UTC(berlin.year, berlin.month - 1, berlin.day + 1));
+  const date = `${tomorrow.getUTCFullYear()}-${pad(tomorrow.getUTCMonth() + 1)}-${pad(tomorrow.getUTCDate())}`;
+
+  const { data: lessons } = await supabase
+    .from("schedule_entries")
+    .select("service_time, title_de, title_ru, bible_text")
+    .eq("entry_type", "lesson")
+    .eq("schedule_date", date)
+    .order("service_time", { ascending: true });
+
+  const lesson = lessons?.[0];
+
+  if (!lesson) return { sent: 0, note: "no lesson tomorrow" };
+
+  const sent = await sendToTeens(supabase, (lang) => {
+    const topic =
+      (lang === "ru" ? lesson.title_ru || lesson.title_de : lesson.title_de || lesson.title_ru) || "";
+
+    return {
+      title: lang === "ru" ? "TLight Teens — завтра урок" : "TLight Teens — morgen Unterricht",
+      body: `${lesson.service_time}${topic ? ` · ${topic}` : ""}${lesson.bible_text ? ` (${lesson.bible_text})` : ""}`,
+      url: "/t",
+      tag: `teens-lesson-${date}`,
+    };
+  });
+
+  return { sent };
+}
+
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = request.headers.get("authorization");
@@ -621,6 +656,10 @@ export async function GET(request: NextRequest) {
 
   if (only === "weekly" || (!only && evening && weekday === WEEKLY_WEEKDAY)) {
     output.weekly = await runWeekly(supabase, berlin);
+  }
+
+  if (only === "teens" || (!only && evening && weekday === 6)) {
+    output.teens = await runTeensSaturday(supabase, berlin);
   }
 
   if (only === "tasks" || (!only && evening && weekday === TASKS_WEEKDAY)) {

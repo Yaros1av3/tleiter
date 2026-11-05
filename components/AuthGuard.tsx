@@ -41,7 +41,11 @@ export default function AuthGuard({
 }: AuthGuardProps) {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/f/")) {
+  if (
+    pathname.startsWith("/f/") ||
+    pathname === "/t" ||
+    pathname.startsWith("/t/")
+  ) {
     return <>{children}</>;
   }
 
