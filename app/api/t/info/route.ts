@@ -17,7 +17,7 @@ export async function GET() {
 
     const { data: entries, error: entriesError } = await supabase
       .from("schedule_entries")
-      .select("id, schedule_date, service_time, title_de, title_ru, bible_text, series")
+      .select("id, schedule_date, service_time, title_de, title_ru, bible_text, series, teen_title_de, teen_title_ru, teen_text_de, teen_text_ru")
       .eq("entry_type", "lesson")
       .gte("schedule_date", today)
       .order("schedule_date", { ascending: true })
@@ -107,6 +107,10 @@ export async function GET() {
           title_ru: entry.title_ru,
           bible_text: entry.bible_text,
           series: entry.series,
+          teen_title_de: entry.teen_title_de,
+          teen_title_ru: entry.teen_title_ru,
+          teen_text_de: entry.teen_text_de,
+          teen_text_ru: entry.teen_text_ru,
           serving: serving.get(entry.id as number) ?? [],
           going: going.get(entry.id as number) ?? 0,
         })),

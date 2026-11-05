@@ -3,6 +3,7 @@ import webpush from "web-push";
 
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendToTeens } from "@/lib/teenPush";
+import { shortTitle } from "@/lib/shortTitle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -586,7 +587,7 @@ async function runTeensSaturday(
 
   const sent = await sendToTeens(supabase, (lang) => {
     const topic =
-      (lang === "ru" ? lesson.title_ru || lesson.title_de : lesson.title_de || lesson.title_ru) || "";
+      shortTitle(lang === "ru" ? lesson.title_ru || lesson.title_de : lesson.title_de || lesson.title_ru);
 
     return {
       title: lang === "ru" ? "TLight Teens — завтра урок" : "TLight Teens — morgen Unterricht",

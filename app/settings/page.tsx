@@ -477,6 +477,27 @@ export default function SettingsPage() {
                   : "USER"}
               </span>
             </div>
+
+            {profile?.role === "admin" && (
+              <button
+                type="button"
+                onClick={() => router.push("/roles")}
+                className="flex w-full items-center justify-between border-t border-[#f0ebdc] px-5 py-4 text-left active:bg-[#fffdf8]"
+              >
+                <span>
+                  <span className="block text-[15px] font-semibold text-[#2a2a26]">
+                    {language === "ru" ? "Роли и доступ" : "Rollen und Zugriff"}
+                  </span>
+                  <span className="mt-0.5 block text-[12px] text-[#7f796a]">
+                    {language === "ru"
+                      ? "Назначить админов"
+                      : "Admins ernennen"}
+                  </span>
+                </span>
+
+                <ChevronRight size={18} className="text-[#b8b2a0]" />
+              </button>
+            )}
           </div>
         </section>
 

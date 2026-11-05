@@ -11,10 +11,15 @@ import {
   ExternalLink,
   Loader2,
   MapPin,
+  Download,
   Share,
   User,
   Users,
+  X,
 } from "lucide-react";
+
+import TeensInstall from "@/components/TeensInstall";
+import { shortTitle } from "@/lib/shortTitle";
 
 type Lang = "de" | "ru";
 type Service = "10:00" | "12:30";
@@ -27,6 +32,10 @@ type Lesson = {
   title_ru: string | null;
   bible_text: string | null;
   series: string | null;
+  teen_title_de: string | null;
+  teen_title_ru: string | null;
+  teen_text_de: string | null;
+  teen_text_ru: string | null;
   serving: string[];
   going: number;
 };
@@ -64,6 +73,10 @@ const TEXT = {
     events: "Nächste Termine",
     noEvents: "Zurzeit keine Termine.",
     register: "Anmelden",
+    installBanner: "App auf dem Handy installieren",
+    installSub: "So bekommst du Benachrichtigungen.",
+    installHow: "Wie?",
+    installOpen: "Wie installieren?",
     notify: "Benachrichtigungen",
     notifyText: "Wir sagen dir Bescheid, wenn ein Unterricht ansteht oder ein neuer Termin dazukommt.",
     enable: "Einschalten",
@@ -96,6 +109,10 @@ const TEXT = {
     events: "Ближайшие события",
     noEvents: "Пока нет событий.",
     register: "Записаться",
+    installBanner: "Установи приложение на телефон",
+    installSub: "Так будут приходить уведомления.",
+    installHow: "Как?",
+    installOpen: "Как установить?",
     notify: "Уведомления",
     notifyText: "Мы напомним про урок и расскажем, когда появится новое событие.",
     enable: "Включить",
@@ -146,6 +163,11 @@ function isIosBrowser() {
   return ios && !standalone;
 }
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: string }>;
+};
+
 export default function TeensHub() {
   // undefined — ещё читаем из памяти, null — служение не выбрано (показываем выбор)
   const [service, setService] = useState<Service | null | undefined>(undefined);
@@ -165,6 +187,11 @@ export default function TeensHub() {
   const [subscribed, setSubscribed] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMessage, setPushMessage] = useState("");
+
+  const [standalone, setStandalone] = useState(true);
+  const [bannerHidden, setBannerHidden] = useState(false);
+  const [installOpen, setInstallOpen] = useState(false);
+  const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
 
   const lang: Lang = service ? LANG_OF[service] : "de";
   const t = TEXT[lang];
@@ -196,8 +223,28 @@ export default function TeensHub() {
   }, []);
 
   useEffect(() => {
+    // ?service=10:00 или ?service=12:30 — предпросмотр для команды (без запоминания)
+    const forced = new URLSearchParams(window.location.search).get("service");
     const saved = safeGet("teens-service");
-    setService(saved === "10:00" || saved === "12:30" ? saved : null);
+
+    if (forced === "10:00" || forced === "12:30") {
+      setService(forced);
+    } else {
+      setService(saved === "10:00" || saved === "12:30" ? saved : null);
+    }
+
+    setStandalone(
+      window.matchMedia?.("(display-mode: standalone)").matches ||
+        Boolean((window.navigator as unknown as { standalone?: boolean }).standalone),
+    );
+    setBannerHidden(safeGet("teens-install-hidden") === "1");
+
+    const onPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallEvent(event as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener("beforeinstallprompt", onPrompt);
 
     setFirstName(safeGet("teens-first") ?? "");
     setLastName(safeGet("teens-last") ?? "");
@@ -215,11 +262,26 @@ export default function TeensHub() {
     }
 
     load();
+
+    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
   }, [load]);
+
+  async function runInstallPrompt() {
+    if (!installEvent) return;
+
+    await installEvent.prompt();
+    setInstallEvent(null);
+    setInstallOpen(false);
+  }
 
   async function chooseService(next: Service) {
     setService(next);
-    safeSet("teens-service", next);
+
+    // предпросмотр команды (?service=) ничего не запоминает
+    if (!new URLSearchParams(window.location.search).get("service")) {
+      safeSet("teens-service", next);
+    }
+
     setNameError(false);
     window.scrollTo?.({ top: 0 });
 
@@ -385,7 +447,12 @@ export default function TeensHub() {
   };
 
   const title = (lesson: Lesson) =>
-    (lang === "ru" ? lesson.title_ru || lesson.title_de : lesson.title_de || lesson.title_ru) || "";
+    (lang === "ru"
+      ? lesson.teen_title_ru || shortTitle(lesson.title_ru || lesson.title_de)
+      : lesson.teen_title_de || shortTitle(lesson.title_de || lesson.title_ru)) || "";
+
+  const teenText = (lesson: Lesson) =>
+    (lang === "ru" ? lesson.teen_text_ru : lesson.teen_text_de) || "";
 
   const card = "rounded-[22px] border border-[#e9e3d3] bg-white";
 
@@ -507,6 +574,36 @@ export default function TeensHub() {
           </button>
         </div>
 
+        {!standalone && !bannerHidden && (
+          <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[#ffc93c] p-3 text-[#1b2431]">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1b2431] text-[#ffc93c]">
+              <Download size={18} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] font-extrabold leading-tight">{t.installBanner}</p>
+              <p className="text-[12px] font-medium leading-4 text-[#1b2431]/70">{t.installSub}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setInstallOpen(true)}
+              className="h-9 shrink-0 rounded-full bg-[#1b2431] px-4 text-[12px] font-bold text-[#ffc93c] active:scale-95"
+            >
+              {t.installHow}
+            </button>
+            <button
+              type="button"
+              aria-label="close"
+              onClick={() => {
+                setBannerHidden(true);
+                safeSet("teens-install-hidden", "1");
+              }}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#1b2431]/60 active:bg-black/10"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
+
         {lessons === null ? (
           <div className="mt-16 flex justify-center">
             <Loader2 size={24} className="animate-spin text-[#8a8678]" />
@@ -562,6 +659,12 @@ export default function TeensHub() {
                         >
                           {lessonTitle || t.topicOpen}
                         </h1>
+
+                        {teenText(lesson) && (
+                          <p className="mt-2.5 whitespace-pre-line text-[14px] leading-6 text-white/80">
+                            {teenText(lesson)}
+                          </p>
+                        )}
 
                         {(lesson.bible_text || lesson.series) && (
                           <div className="mt-3 flex flex-wrap gap-1.5">
@@ -718,6 +821,13 @@ export default function TeensHub() {
                     {t.iosTitle}
                   </p>
                   <p className="mt-1 text-[12px] leading-5 text-[#5c5a50]">{t.iosSteps}</p>
+                  <button
+                    type="button"
+                    onClick={() => setInstallOpen(true)}
+                    className="mt-2 h-9 rounded-full bg-[#1b2431] px-4 text-[12px] font-bold text-[#ffc93c]"
+                  >
+                    {t.installOpen}
+                  </button>
                 </div>
               ) : !supported ? (
                 <p className="mt-3 text-[12px] text-[#8a8678]">{t.unsupported}</p>
@@ -746,6 +856,15 @@ export default function TeensHub() {
           </>
         )}
       </div>
+
+      {installOpen && (
+        <TeensInstall
+          lang={lang}
+          canPrompt={Boolean(installEvent)}
+          onPrompt={runInstallPrompt}
+          onClose={() => setInstallOpen(false)}
+        />
+      )}
     </div>
   );
 }
