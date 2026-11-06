@@ -3,11 +3,13 @@
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import {
+  BookOpen,
   Bell,
   BellRing,
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronRight,
   ExternalLink,
   Loader2,
   MapPin,
@@ -48,6 +50,7 @@ type TeenEvent = {
   end_at: string;
   location: string | null;
   link_url: string | null;
+  form: { slug: string; open: boolean } | null;
 };
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
@@ -72,7 +75,10 @@ const TEXT = {
     coming: "kommen",
     events: "Nächste Termine",
     noEvents: "Zurzeit keine Termine.",
-    register: "Anmelden",
+    register: "Zur Anmeldung",
+    regOpen: "Anmeldung offen",
+    regClosed: "Anmeldung geschlossen",
+    tapHint: "Tippen zum Anmelden",
     installBanner: "App auf dem Handy installieren",
     installSub: "So bekommst du Benachrichtigungen.",
     installHow: "Wie?",
@@ -109,6 +115,9 @@ const TEXT = {
     events: "Ближайшие события",
     noEvents: "Пока нет событий.",
     register: "Записаться",
+    regOpen: "Запись открыта",
+    regClosed: "Запись закрыта",
+    tapHint: "Нажми, чтобы записаться",
     installBanner: "Установи приложение на телефон",
     installSub: "Так будут приходить уведомления.",
     installHow: "Как?",
@@ -604,6 +613,25 @@ export default function TeensHub() {
           </div>
         )}
 
+        {/* Bibel-Challenge */}
+        <a
+          href="/t/bc"
+          className="mt-4 flex items-center gap-3 rounded-[22px] bg-[#1b2431] p-3.5 text-white shadow-[0_10px_30px_rgba(27,36,49,0.18)] active:scale-[0.99]"
+        >
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#ffc93c] text-[#1b2431]">
+            <BookOpen size={22} strokeWidth={2.2} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[16px] font-extrabold leading-tight">Bibel-Challenge</span>
+            <span className="mt-0.5 block text-[12px] leading-4 text-white/65">
+              {lang === "ru"
+                ? "Читай каждый день, собирай баллы, получай призы"
+                : "Täglich lesen, Punkte sammeln, Preise gewinnen"}
+            </span>
+          </span>
+          <ChevronRight size={18} className="shrink-0 text-[#ffc93c]" />
+        </a>
+
         {lessons === null ? (
           <div className="mt-16 flex justify-center">
             <Loader2 size={24} className="animate-spin text-[#8a8678]" />
@@ -757,48 +785,87 @@ export default function TeensHub() {
               <div className={`${card} px-5 py-7 text-center text-[14px] text-[#8a8678]`}>{t.noEvents}</div>
             ) : (
               <div className="space-y-3">
-                {events.map((event) => (
-                  <div key={event.id} className={`${card} p-4`}>
-                    <div className="flex gap-3.5">
-                      <div className="flex h-[58px] w-[54px] shrink-0 flex-col items-center justify-center rounded-2xl bg-[#fff4d1] text-[#9a6b00]">
-                        <span className="text-[20px] font-extrabold leading-none">{eventDay(event.start_at)}</span>
-                        <span className="mt-1 text-[10px] font-bold uppercase">{eventMonth(event.start_at)}</span>
-                      </div>
+                {events.map((event) => {
+                  const href = event.form ? `/f/${event.form.slug}` : event.link_url;
+                  const registrationOpen = event.form ? event.form.open : Boolean(event.link_url);
 
-                      <div className="min-w-0 flex-1">
-                        <h2 className="text-[17px] font-extrabold leading-snug tracking-[-0.01em]">
-                          {event.title}
-                        </h2>
-                        <p className="mt-0.5 flex items-center gap-1.5 text-[12px] font-semibold capitalize text-[#8a8678]">
-                          <CalendarDays size={12} />
-                          {eventWhen(event)}
-                        </p>
-                        {event.location && (
-                          <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#8a8678]">
-                            <MapPin size={12} className="shrink-0" />
-                            {event.location}
+                  const body = (
+                    <>
+                      <div className="flex gap-3.5">
+                        <div className="flex h-[58px] w-[54px] shrink-0 flex-col items-center justify-center rounded-2xl bg-[#fff4d1] text-[#9a6b00]">
+                          <span className="text-[20px] font-extrabold leading-none">{eventDay(event.start_at)}</span>
+                          <span className="mt-1 text-[10px] font-bold uppercase">{eventMonth(event.start_at)}</span>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <h2 className="text-[17px] font-extrabold leading-snug tracking-[-0.01em]">
+                            {event.title}
+                          </h2>
+                          <p className="mt-0.5 flex items-center gap-1.5 text-[12px] font-semibold capitalize text-[#8a8678]">
+                            <CalendarDays size={12} />
+                            {eventWhen(event)}
                           </p>
+                          {event.location && (
+                            <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#8a8678]">
+                              <MapPin size={12} className="shrink-0" />
+                              {event.location}
+                            </p>
+                          )}
+                        </div>
+
+                        {href && registrationOpen && (
+                          <ChevronRight size={20} className="mt-1 shrink-0 text-[#c4b377]" />
                         )}
                       </div>
+
+                      {event.description && (
+                        <p className="mt-3 whitespace-pre-line text-[13px] leading-5 text-[#5c5a50]">
+                          {event.description}
+                        </p>
+                      )}
+
+                      {event.form && (
+                        <div
+                          className={`mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl text-[14px] font-bold ${
+                            event.form.open
+                              ? "bg-[#ffc93c] text-[#1b2431]"
+                              : "bg-[#f0ede3] text-[#9a9585]"
+                          }`}
+                        >
+                          {event.form.open ? (
+                            <>
+                              {t.register}
+                              <ExternalLink size={14} />
+                            </>
+                          ) : (
+                            t.regClosed
+                          )}
+                        </div>
+                      )}
+
+                      {!event.form && event.link_url && (
+                        <div className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ffc93c] text-[14px] font-bold text-[#1b2431]">
+                          {t.register}
+                          <ExternalLink size={14} />
+                        </div>
+                      )}
+                    </>
+                  );
+
+                  return href && registrationOpen ? (
+                    <a
+                      key={event.id}
+                      href={href}
+                      className={`${card} block p-4 transition active:scale-[0.99]`}
+                    >
+                      {body}
+                    </a>
+                  ) : (
+                    <div key={event.id} className={`${card} p-4`}>
+                      {body}
                     </div>
-
-                    {event.description && (
-                      <p className="mt-3 whitespace-pre-line text-[13px] leading-5 text-[#5c5a50]">
-                        {event.description}
-                      </p>
-                    )}
-
-                    {event.link_url && (
-                      <a
-                        href={event.link_url}
-                        className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#ffc93c] text-[14px] font-bold text-[#1b2431] active:scale-[0.99]"
-                      >
-                        {t.register}
-                        <ExternalLink size={14} />
-                      </a>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
