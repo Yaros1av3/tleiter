@@ -48,7 +48,7 @@ const T = {
   },
 } as const;
 
-const card = "rounded-[22px] border border-[#e9e3d3] bg-white";
+const card = "rounded-2xl border border-[#e9e3d3] bg-white";
 
 function Ava({ url, name, size }: { url: string | null; name: string; size: number }) {
   if (url) {
@@ -93,23 +93,24 @@ export function AwardsGrid({
     return <p className="text-[13px] text-[#8a8678]">{t.noAwards}</p>;
   }
   return (
-    <div className="grid grid-cols-2 gap-2.5">
+    <div className="flex flex-wrap gap-2">
       {awards.map((a, i) => {
         const def = AWARDS[a.kind as AwardKind];
         if (!def) return null;
         const Icon = ICON[a.kind as AwardKind];
         return (
-          <div key={`${a.kind}-${a.season}-${i}`} className="rounded-2xl bg-[#fff4d1] p-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1b2431] text-[#ffc93c]">
-              <Icon className="h-5 w-5" />
+          <div
+            key={`${a.kind}-${a.season}-${i}`}
+            className="flex items-center gap-2 rounded-full bg-[#fff4d1] py-1 pl-1 pr-3"
+            title={lang === "ru" ? def.descRu : def.descDe}
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1b2431] text-[#ffc93c]">
+              <Icon className="h-3.5 w-3.5" />
             </span>
-            <p className="mt-2 text-[14px] font-extrabold leading-tight">
+            <span className="text-[12px] font-extrabold leading-tight">
               {lang === "ru" ? def.ru : def.de}
-            </p>
-            <p className="mt-0.5 text-[11px] leading-snug text-[#9a6b00]">
-              {lang === "ru" ? def.descRu : def.descDe}
-            </p>
-            {a.season && <p className="mt-1 text-[11px] font-bold text-[#9a6b00]">{a.season}</p>}
+              {a.season && <span className="ml-1.5 font-bold text-[#9a6b00]">{a.season}</span>}
+            </span>
           </div>
         );
       })}
@@ -131,8 +132,8 @@ export function MyAwards({ lang }: { lang: Lang }) {
 
   if (p === undefined) return null;
   return (
-    <div className={`${card} p-4`}>
-      <p className="mb-3 text-[14px] font-extrabold">{t.awards}</p>
+    <div className={`${card} p-3.5`}>
+      <p className="mb-2 text-[13px] font-extrabold">{t.awards}</p>
       <AwardsGrid awards={p?.awards ?? []} lang={lang} />
     </div>
   );
@@ -193,7 +194,7 @@ export default function BcRanking({ lang }: { lang: Lang }) {
   }
 
   return (
-    <div className="mt-3 space-y-2">
+    <div className="mt-1 space-y-1.5 pb-4">
       {rows.map((r) => {
         const top = r.position <= 3 && r.points > 0;
         return (
@@ -201,21 +202,21 @@ export default function BcRanking({ lang }: { lang: Lang }) {
             key={r.id}
             type="button"
             onClick={() => openPlayer(r.id)}
-            className={`flex w-full items-center gap-3 rounded-[20px] border p-3 text-left active:scale-[0.99] ${
+            className={`flex w-full items-center gap-2.5 rounded-2xl border px-2.5 py-2 text-left active:scale-[0.99] ${
               r.me ? "border-[#ffc93c] bg-[#fff4d1]" : "border-[#e9e3d3] bg-white"
             }`}
           >
             <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[14px] font-extrabold ${
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold ${
                 top ? "bg-[#1b2431] text-[#ffc93c]" : "bg-[#f1ede1] text-[#8a8678]"
               }`}
             >
               {r.position}
             </span>
-            <Ava url={r.avatar_url} name={r.nickname} size={44} />
+            <Ava url={r.avatar_url} name={r.nickname} size={38} />
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5">
-                <span className="truncate text-[15px] font-extrabold">{r.nickname}</span>
+                <span className="truncate text-[14px] font-extrabold">{r.nickname}</span>
                 {r.me && (
                   <span className="shrink-0 rounded-full bg-[#1b2431] px-2 py-0.5 text-[10px] font-extrabold text-[#ffc93c]">
                     {t.you}
@@ -225,7 +226,7 @@ export default function BcRanking({ lang }: { lang: Lang }) {
               <span className="block truncate text-[12px] text-[#8a8678]">{r.rank}</span>
             </span>
             <span className="shrink-0 text-right">
-              <span className="block text-[18px] font-extrabold leading-none">{r.points}</span>
+              <span className="block text-[16px] font-extrabold leading-none">{r.points}</span>
               <span className="mt-0.5 block text-[10px] text-[#8a8678]">{t.points}</span>
             </span>
             {opening === r.id && <Loader2 className="h-4 w-4 animate-spin text-[#8a8678]" />}

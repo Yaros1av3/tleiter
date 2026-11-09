@@ -8,6 +8,7 @@ import {
   BookOpen,
   Camera,
   Check,
+  ChevronDown,
   Eye,
   EyeOff,
   Loader2,
@@ -278,20 +279,20 @@ export default function BcApp() {
     <Image
       src="/tlite-logo.png"
       alt="TLight"
-      width={44}
-      height={44}
-      className="h-11 w-11 shrink-0 rounded-[13px]"
+      width={36}
+      height={36}
+      className="h-9 w-9 shrink-0 rounded-[11px]"
     />
   );
 
   const langSwitch = (
-    <div className="flex h-10 items-center rounded-full bg-white p-1 ring-1 ring-[#e9e3d3]">
+    <div className="flex h-9 items-center rounded-full bg-white p-0.5 ring-1 ring-[#e9e3d3]">
       {(["de", "ru"] as Lang[]).map((l) => (
         <button
           key={l}
           type="button"
           onClick={() => changeLang(l)}
-          className={`h-8 rounded-full px-3 text-[12px] font-extrabold uppercase transition ${
+          className={`h-8 rounded-full px-2.5 text-[11px] font-extrabold uppercase transition ${
             lang === l ? "bg-[#1b2431] text-[#ffc93c]" : "text-[#8a8678]"
           }`}
         >
@@ -307,15 +308,15 @@ export default function BcApp() {
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-[#faf8f3] text-[#1b2431] [overflow-wrap:anywhere]">
-      <header className="mx-auto flex w-full max-w-[520px] items-center gap-3 px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
+      <header className="mx-auto flex w-full max-w-[520px] items-center gap-2.5 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
         {logo}
-        <h1 className="min-w-0 flex-1 truncate text-[19px] font-extrabold tracking-[-0.02em]">
+        <h1 className="min-w-0 flex-1 truncate text-[17px] font-extrabold tracking-[-0.02em]">
           {t.title}
         </h1>
         {langSwitch}
       </header>
 
-      <main className="mx-auto w-full max-w-[520px] flex-1 overflow-y-auto overflow-x-hidden px-4 pb-6">
+      <main className="mx-auto w-full max-w-[520px] flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4">
         {!loggedIn ? (
           <AuthFlow lang={lang} onDone={loadMe} />
         ) : tab === "profile" ? (
@@ -328,7 +329,7 @@ export default function BcApp() {
       </main>
 
       {loggedIn && (
-        <nav className="border-t border-[#e9e3d3] bg-white pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <nav className="border-t border-[#e9e3d3] bg-white pb-[max(0.25rem,env(safe-area-inset-bottom))]">
           <div className="mx-auto grid max-w-[520px] grid-cols-3">
             {(
               [
@@ -341,16 +342,16 @@ export default function BcApp() {
                 key={key}
                 type="button"
                 onClick={() => setTab(key)}
-                className={`flex flex-col items-center gap-1 py-2.5 text-[11px] font-bold ${
+                className={`flex flex-col items-center gap-0.5 py-1.5 text-[10px] font-bold ${
                   tab === key ? "text-[#1b2431]" : "text-[#a8a393]"
                 }`}
               >
                 <span
-                  className={`flex h-8 w-14 items-center justify-center rounded-full transition ${
+                  className={`flex h-7 w-12 items-center justify-center rounded-full transition ${
                     tab === key ? "bg-[#ffc93c]" : ""
                   }`}
                 >
-                  <Icon className="h-[19px] w-[19px]" strokeWidth={2.1} />
+                  <Icon className="h-[18px] w-[18px]" strokeWidth={2.1} />
                 </span>
                 {label}
               </button>
@@ -722,7 +723,7 @@ function AuthFlow({ lang, onDone }: { lang: Lang; onDone: () => void }) {
   );
 }
 
-/* ---------- вкладка "Сегодня" (пока заготовка) ---------- */
+/* ---------- вкладка "Сегодня" ---------- */
 
 function Today({ me, lang, onChanged }: { me: Me; lang: Lang; onChanged: () => void }) {
   const t = T[lang];
@@ -733,35 +734,29 @@ function Today({ me, lang, onChanged }: { me: Me; lang: Lang; onChanged: () => v
       : 100;
 
   return (
-    <div className="mt-2 space-y-3">
-      <div className="overflow-hidden rounded-[26px] bg-[#1b2431] p-5 text-white">
+    <div className="space-y-2.5 pb-4 pt-1">
+      <div className="rounded-2xl bg-[#1b2431] p-3.5 text-white">
         <div className="flex items-center gap-3">
-          <Avatar url={p.avatar_url} name={p.nickname} size={52} />
-          <div className="min-w-0">
-            <p className="text-[13px] text-white/60">{t.hello}</p>
-            <p className="truncate text-[19px] font-extrabold">{p.nickname}</p>
+          <Avatar url={p.avatar_url} name={p.nickname} size={40} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px] font-extrabold leading-tight">{p.nickname}</p>
+            {me.rank && <p className="text-[12px] font-semibold text-[#ffc93c]">{me.rank.name}</p>}
+          </div>
+          <div className="text-right">
+            <p className="text-[26px] font-extrabold leading-none text-[#ffc93c]">{me.points}</p>
+            <p className="mt-0.5 text-[10px] text-white/55">{t.points}</p>
           </div>
         </div>
-        <div className="mt-5 flex items-end justify-between">
-          <div>
-            <p className="text-[44px] font-extrabold leading-none text-[#ffc93c]">{me.points}</p>
-            <p className="mt-1 text-[13px] text-white/60">{t.points}</p>
-          </div>
-          {me.rank && (
-            <span className="rounded-full bg-[#ffc93c] px-3.5 py-1.5 text-[13px] font-extrabold text-[#1b2431]">
-              {me.rank.name}
-            </span>
-          )}
-        </div>
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/15">
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/15">
           <div className="h-full rounded-full bg-[#ffc93c]" style={{ width: `${pct}%` }} />
         </div>
-        <p className="mt-2 text-[12px] text-white/60">
+        <p className="mt-1.5 text-[11px] text-white/55">
           {me.nextRank
             ? `${me.nextRank.min - me.points} ${t.points} ${t.toNext} ${me.nextRank.name}`
             : t.topRank}
         </p>
       </div>
+
       <BcGift lang={lang} />
       {me.season ? <BcTasks lang={lang} onChanged={onChanged} /> : <Placeholder text={t.noSeason} />}
     </div>
@@ -769,6 +764,33 @@ function Today({ me, lang, onChanged }: { me: Me; lang: Lang; onChanged: () => v
 }
 
 /* ---------- профиль ---------- */
+
+function Section({
+  title,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[#e9e3d3] bg-white">
+      <button type="button" onClick={onToggle} className="flex w-full items-center justify-between px-4 py-3.5 text-left">
+        <span className="text-[14px] font-extrabold">{title}</span>
+        <ChevronDown className={`h-4 w-4 text-[#8a8678] transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div className="space-y-2.5 border-t border-[#f0ebdc] p-4">{children}</div>}
+    </div>
+  );
+}
+
+const smallInput =
+  "h-11 w-full rounded-xl border border-[#eadfb8] bg-white px-3.5 text-[15px] outline-none transition focus:border-[#1b2431] focus:ring-[3px] focus:ring-[#ffc93c]/50";
+const smallBtn =
+  "flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#1b2431] text-[14px] font-extrabold text-[#ffc93c] transition active:scale-[0.99] disabled:opacity-50";
 
 function Profile({
   me,
@@ -787,6 +809,7 @@ function Profile({
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
+  const [open, setOpen] = useState<"" | "nick" | "pw">("");
   const [nick, setNick] = useState(p.nickname);
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
@@ -835,6 +858,7 @@ function Profile({
     setBusy("");
     if (good) {
       flash("nick");
+      setOpen("");
       onChanged();
     } else setErr(data.error ?? "other");
   };
@@ -850,6 +874,7 @@ function Profile({
     if (good) {
       setOldPw("");
       setNewPw("");
+      setOpen("");
       flash("pw");
     } else setErr(data.error ?? "other");
   };
@@ -860,22 +885,18 @@ function Profile({
   };
 
   return (
-    <div className="mt-2 space-y-3">
-      <div className={`${card} flex flex-col items-center px-5 pb-5 pt-6`}>
-        <div className="relative">
-          <Avatar url={p.avatar_url} name={p.nickname} size={104} />
+    <div className="space-y-2.5 pb-4 pt-1">
+      <div className="flex items-center gap-3.5 rounded-2xl border border-[#e9e3d3] bg-white p-3.5">
+        <div className="relative shrink-0">
+          <Avatar url={p.avatar_url} name={p.nickname} size={68} />
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={busy === "avatar"}
-            className="absolute -bottom-1 -right-1 flex h-10 w-10 items-center justify-center rounded-full bg-[#1b2431] text-[#ffc93c] shadow-md active:scale-95"
+            className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-[#1b2431] text-[#ffc93c] shadow-md active:scale-95"
             aria-label={t.photo}
           >
-            {busy === "avatar" ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <Camera className="h-5 w-5" />
-            )}
+            {busy === "avatar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
           </button>
           <input
             ref={fileRef}
@@ -885,38 +906,37 @@ function Profile({
             onChange={(e) => onFile(e.target.files?.[0])}
           />
         </div>
-        <p className="mt-4 text-[20px] font-extrabold">{p.nickname}</p>
-        <p className="text-[13px] text-[#8a8678]">
-          {p.first_name} {p.last_name}
-          {p.is_guest ? ` · ${t.guest}` : ""}
-        </p>
-        {me.rank && (
-          <span className="mt-3 rounded-full bg-[#fff4d1] px-3.5 py-1 text-[12px] font-extrabold text-[#9a6b00]">
-            {me.rank.name} · {me.points} {t.points}
-          </span>
-        )}
-        {p.avatar_url && (
-          <button
-            type="button"
-            onClick={removeAvatar}
-            className="mt-3 flex items-center gap-1.5 text-[12px] font-bold text-[#8a8678]"
-          >
-            <Trash2 className="h-3.5 w-3.5" /> {t.removePhoto}
-          </button>
-        )}
-        {ok === "avatar" && (
-          <p className="mt-2 text-[12px] font-bold text-[#9a6b00]">{t.saved}</p>
-        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[18px] font-extrabold leading-tight">{p.nickname}</p>
+          <p className="truncate text-[12px] text-[#8a8678]">
+            {p.first_name} {p.last_name}
+            {p.is_guest ? ` · ${t.guest}` : ""}
+          </p>
+          {me.rank && (
+            <span className="mt-1.5 inline-block rounded-full bg-[#fff4d1] px-2.5 py-0.5 text-[11px] font-extrabold text-[#9a6b00]">
+              {me.rank.name} · {me.points} {t.points}
+            </span>
+          )}
+          {p.avatar_url && (
+            <button
+              type="button"
+              onClick={removeAvatar}
+              className="ml-2 inline-flex items-center gap-1 text-[11px] font-bold text-[#8a8678]"
+            >
+              <Trash2 className="h-3 w-3" /> {t.removePhoto}
+            </button>
+          )}
+          {ok === "avatar" && <span className="ml-2 text-[11px] font-bold text-[#9a6b00]">{t.saved}</span>}
+        </div>
       </div>
 
       <ErrorLine lang={lang} code={err} />
 
       <MyAwards lang={lang} />
 
-      <div className={`${card} space-y-3 p-4`}>
-        <p className="text-[14px] font-extrabold">{t.changeNick}</p>
+      <Section title={t.changeNick} open={open === "nick"} onToggle={() => setOpen(open === "nick" ? "" : "nick")}>
         <input
-          className={inputCls}
+          className={smallInput}
           value={nick}
           onChange={(e) => setNick(e.target.value)}
           autoCapitalize="none"
@@ -924,41 +944,29 @@ function Profile({
         />
         <button
           type="button"
-          className={ghostBtn}
+          className={smallBtn}
           disabled={busy === "nick" || nick === p.nickname || nick.length < 3}
           onClick={saveNick}
         >
-          {busy === "nick" ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : ok === "nick" ? (
-            t.saved
-          ) : (
-            t.save
-          )}
+          {busy === "nick" ? <Loader2 className="h-4 w-4 animate-spin" /> : t.save}
         </button>
-      </div>
+      </Section>
+      {ok === "nick" && <p className="px-1 text-[12px] font-bold text-[#9a6b00]">{t.saved}</p>}
 
-      <div className={`${card} space-y-3 p-4`}>
-        <p className="text-[14px] font-extrabold">{t.changePw}</p>
+      <Section title={t.changePw} open={open === "pw"} onToggle={() => setOpen(open === "pw" ? "" : "pw")}>
         <PasswordInput value={oldPw} onChange={setOldPw} placeholder={t.oldPw} autoComplete="current-password" />
         <PasswordInput value={newPw} onChange={setNewPw} placeholder={t.newPw} autoComplete="new-password" />
-        <button
-          type="button"
-          className={ghostBtn}
-          disabled={busy === "pw" || !oldPw || newPw.length < 6}
-          onClick={savePw}
-        >
-          {busy === "pw" ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : ok === "pw" ? (
-            t.saved
-          ) : (
-            t.save
-          )}
+        <button type="button" className={smallBtn} disabled={busy === "pw" || !oldPw || newPw.length < 6} onClick={savePw}>
+          {busy === "pw" ? <Loader2 className="h-4 w-4 animate-spin" /> : t.save}
         </button>
-      </div>
+      </Section>
+      {ok === "pw" && <p className="px-1 text-[12px] font-bold text-[#9a6b00]">{t.saved}</p>}
 
-      <button type="button" onClick={logout} className={ghostBtn}>
+      <button
+        type="button"
+        onClick={logout}
+        className="flex h-11 w-full items-center justify-center gap-2 rounded-xl text-[13px] font-bold text-[#8a8678] active:bg-black/5"
+      >
         <LogOut className="h-4 w-4" /> {t.logout}
       </button>
     </div>

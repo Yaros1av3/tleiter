@@ -8,6 +8,25 @@ export const dynamic = "force-dynamic";
 
 const str = (v: unknown, max = 4000) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
+type Sb = ReturnType<typeof getSupabaseAdmin>;
+
+/* удалить файлы из хранилища пачками */
+async function removeFiles(sb: Sb, bucket: string, paths: string[]) {
+  for (let i = 0; i < paths.length; i += 100) {
+    await sb.storage.from(bucket).remove(paths.slice(i, i + 100));
+  }
+}
+
+async function photoPathsOfTasks(sb: Sb, taskIds: number[]) {
+  if (!taskIds.length) return [];
+  const { data } = await sb
+    .from("bc_submissions")
+    .select("photo_path")
+    .in("task_id", taskIds)
+    .not("photo_path", "is", null);
+  return (data ?? []).map((r) => r.photo_path as string);
+}
+
 /* Обзор для админ-панели: сезоны, задания, участники, команда */
 export async function GET(req: Request) {
   const staff = await getStaff(req);
@@ -43,7 +62,7 @@ export async function GET(req: Request) {
       ? sb.from("bc_tasks").select("*").eq("season_id", season.id).order("day_number")
       : Promise.resolve({ data: [] }),
     partQuery,
-    sb.from("team_members").select("id, first_name, last_name").order("first_name"),
+    sb.from("team_members").select("id, first_name, last_name, user_id").order("first_name"),
     season
       ? sb.from("bc_season_points").select("participant_id, points, days_done").eq("season_id", season.id)
       : Promise.resolve({ data: [] }),
@@ -69,6 +88,7 @@ export async function GET(req: Request) {
     team: (teamRes.data ?? []).map((m) => ({
       id: m.id,
       name: `${m.first_name} ${m.last_name}`.trim(),
+      has_account: Boolean(m.user_id),
     })),
   });
 }
@@ -219,6 +239,99 @@ export async function POST(req: Request) {
     if (body.status === "active" || body.status === "blocked") patch.status = body.status;
     if (!Object.keys(patch).length) return NextResponse.json({ ok: true });
     const { error } = await sb.from("bc_participants").update(patch).eq("id", Number(body.id));
+    if (error) return NextResponse.json({ error: "db" }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  /* ---- удаление и распределение ---- */
+
+  if (action === "season_delete") {
+    const id = Number(body.id);
+    const { data: tasks } = await sb.from("bc_tasks").select("id").eq("season_id", id);
+    const taskIds = (tasks ?? []).map((t) => t.id as number);
+    await removeFiles(sb, "bc-photos", await photoPathsOfTasks(sb, taskIds));
+    const { error } = await sb.from("bc_seasons").delete().eq("id", id);
+    if (error) return NextResponse.json({ error: "db" }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === "tasks_bulk") {
+    const ids = (Array.isArray(body.ids) ? body.ids : []).map(Number).filter(Boolean) as number[];
+    if (!ids.length) return NextResponse.json({ ok: true, changed: 0 });
+    const op = String(body.op);
+
+    if (op === "publish" || op === "hide") {
+      const { error } = await sb.from("bc_tasks").update({ is_published: op === "publish" }).in("id", ids);
+      if (error) return NextResponse.json({ error: "db" }, { status: 500 });
+      return NextResponse.json({ ok: true, changed: ids.length });
+    }
+
+    if (op === "delete") {
+      const force = Boolean(body.force);
+      const { data: withSubs } = await sb.from("bc_submissions").select("task_id").in("task_id", ids);
+      const blocked = new Set((withSubs ?? []).map((r) => r.task_id as number));
+      const target = force ? ids : ids.filter((i) => !blocked.has(i));
+      if (force) await removeFiles(sb, "bc-photos", await photoPathsOfTasks(sb, target));
+      if (target.length) {
+        const { error } = await sb.from("bc_tasks").delete().in("id", target);
+        if (error) return NextResponse.json({ error: "db" }, { status: 500 });
+      }
+      const skippedIds = force ? [] : ids.filter((i) => blocked.has(i));
+      return NextResponse.json({ ok: true, deleted: target.length, skippedIds });
+    }
+    return NextResponse.json({ error: "bad" }, { status: 400 });
+  }
+
+  if (action === "participants_assign") {
+    const ids = (Array.isArray(body.ids) ? body.ids : []).map(Number).filter(Boolean) as number[];
+    if (!ids.length) return NextResponse.json({ ok: true, changed: 0 });
+    const mentor = body.mentor_id ? Number(body.mentor_id) : null;
+    const { error } = await sb.from("bc_participants").update({ mentor_id: mentor }).in("id", ids);
+    if (error) return NextResponse.json({ error: "db" }, { status: 500 });
+    return NextResponse.json({ ok: true, changed: ids.length });
+  }
+
+  /* поровну между выбранными служителями: каждого следующего получает тот, у кого сейчас меньше всего */
+  if (action === "participants_distribute") {
+    const ids = (Array.isArray(body.ids) ? body.ids : []).map(Number).filter(Boolean) as number[];
+    const mentors = (Array.isArray(body.mentor_ids) ? body.mentor_ids : []).map(Number).filter(Boolean) as number[];
+    if (!ids.length || !mentors.length) return NextResponse.json({ error: "empty" }, { status: 400 });
+
+    const { data: all } = await sb.from("bc_participants").select("id, mentor_id");
+    const idSet = new Set(ids);
+    const load = new Map<number, number>(mentors.map((m) => [m, 0]));
+    for (const p of all ?? []) {
+      if (!idSet.has(p.id as number) && p.mentor_id && load.has(p.mentor_id as number)) {
+        load.set(p.mentor_id as number, (load.get(p.mentor_id as number) ?? 0) + 1);
+      }
+    }
+    const groups = new Map<number, number[]>(mentors.map((m) => [m, []]));
+    for (const id of ids) {
+      let best = mentors[0];
+      for (const m of mentors) if ((load.get(m) ?? 0) < (load.get(best) ?? 0)) best = m;
+      groups.get(best)!.push(id);
+      load.set(best, (load.get(best) ?? 0) + 1);
+    }
+    for (const [m, list] of groups) {
+      if (!list.length) continue;
+      const { error } = await sb.from("bc_participants").update({ mentor_id: m }).in("id", list);
+      if (error) return NextResponse.json({ error: "db" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, changed: ids.length });
+  }
+
+  if (action === "participant_delete") {
+    const id = Number(body.id);
+    const { data: p } = await sb.from("bc_participants").select("avatar_url").eq("id", id).maybeSingle();
+    const { data: subs } = await sb
+      .from("bc_submissions")
+      .select("photo_path")
+      .eq("participant_id", id)
+      .not("photo_path", "is", null);
+    await removeFiles(sb, "bc-photos", (subs ?? []).map((r) => r.photo_path as string));
+    const avatar = p?.avatar_url?.split("/bc-avatars/")[1];
+    if (avatar) await removeFiles(sb, "bc-avatars", [decodeURIComponent(avatar.split("?")[0])]);
+    const { error } = await sb.from("bc_participants").delete().eq("id", id);
     if (error) return NextResponse.json({ error: "db" }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
