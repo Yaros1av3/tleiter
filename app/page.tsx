@@ -708,6 +708,14 @@ export default function Home() {
       icon: BriefcaseBusiness,
     },
     {
+      href: "/bible-challenge",
+      label: "Bibel-Challenge",
+      description: isRu
+        ? "Задания, участники и проверка"
+        : "Aufgaben, Teilnehmer und Prüfung",
+      icon: BookOpen,
+    },
+    {
       href: "/rsvp",
       label: isRu ? "Страница подростков" : "Teens-Seite",
       description: isRu
