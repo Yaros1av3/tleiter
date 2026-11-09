@@ -6,10 +6,13 @@ import {
   ArrowLeft,
   Ban,
   CalendarDays,
+  BarChart3,
   Check,
   Copy,
+  ClipboardCheck,
   Eye,
   EyeOff,
+  Gift,
   KeyRound,
   Loader2,
   Pencil,
@@ -23,6 +26,7 @@ import {
 
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
+import { GiftsTab, ReviewTab, StatsTab } from "@/components/BcAdminTabs";
 
 type Season = {
   id: number;
@@ -69,7 +73,7 @@ type Overview = {
   team: { id: number; name: string }[];
 };
 
-type Tab = "tasks" | "people";
+type Tab = "review" | "tasks" | "people" | "gifts" | "stats";
 
 const label = "text-[10px] font-bold uppercase tracking-[0.14em] text-[#9a9585]";
 const card = "rounded-[22px] border border-[#e9e3d3] bg-white";
@@ -140,7 +144,7 @@ export default function BibleChallengeAdminPage() {
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [seasonId, setSeasonId] = useState<number | null>(null);
-  const [tab, setTab] = useState<Tab>("tasks");
+  const [tab, setTab] = useState<Tab>("review");
   const [msg, setMsg] = useState("");
 
   const [seasonForm, setSeasonForm] = useState<Partial<Season> | null>(null);
@@ -328,6 +332,31 @@ export default function BibleChallengeAdminPage() {
                           {L("Остановить", "Stoppen")}
                         </button>
                       )}
+                      {season.status === "active" && (
+                        <button
+                          type="button"
+                          className="text-[12px] font-bold underline"
+                          disabled={busy}
+                          onClick={async () => {
+                            if (
+                              !confirm(
+                                L(
+                                  "Завершить сезон? Подросткам будут выданы награды, это нельзя отменить.",
+                                  "Saison beenden? Die Auszeichnungen werden vergeben, das lässt sich nicht rückgängig machen.",
+                                ),
+                              )
+                            )
+                              return;
+                            setBusy(true);
+                            const { ok } = await call("POST", "/api/bc-admin/work", { action: "season_finish", id: season.id });
+                            setBusy(false);
+                            flash(ok ? L("Сезон завершён, награды выданы.", "Saison beendet, Auszeichnungen vergeben.") : errText());
+                            await load();
+                          }}
+                        >
+                          {L("Завершить", "Beenden")}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -354,18 +383,21 @@ export default function BibleChallengeAdminPage() {
             </div>
 
             {/* вкладки */}
-            <div className="mt-5 grid grid-cols-2 gap-1 rounded-2xl bg-[#f1ede1] p-1">
+            <div className="mt-5 flex gap-1 overflow-x-auto rounded-2xl bg-[#f1ede1] p-1">
               {(
                 [
+                  ["review", L("Проверка", "Prüfung"), ClipboardCheck],
                   ["tasks", L("Задания", "Aufgaben"), CalendarDays],
                   ["people", L("Участники", "Teilnehmer"), Users],
+                  ["gifts", L("Подарки", "Geschenke"), Gift],
+                  ["stats", L("Статистика", "Statistik"), BarChart3],
                 ] as const
               ).map(([key, text, Icon]) => (
                 <button
                   key={key}
                   type="button"
                   onClick={() => setTab(key)}
-                  className={`flex h-10 items-center justify-center gap-2 rounded-xl text-[13px] font-bold ${
+                  className={`flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl px-3.5 text-[13px] font-bold ${
                     tab === key ? "bg-white shadow-sm" : "text-[#8a8678]"
                   }`}
                 >
@@ -374,6 +406,10 @@ export default function BibleChallengeAdminPage() {
                 </button>
               ))}
             </div>
+
+            {tab === "review" && <ReviewTab key={seasonId ?? 0} seasonId={seasonId} />}
+            {tab === "gifts" && <GiftsTab />}
+            {tab === "stats" && <StatsTab key={seasonId ?? 0} seasonId={seasonId} />}
 
             {/* задания */}
             {tab === "tasks" && season && (

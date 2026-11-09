@@ -396,7 +396,9 @@ function TaskDetail({
             disabled={locked}
             maxLength={4000}
           />
-          <span className="mt-1 block text-[12px] text-[#8a8678]">{t.answerHint}</span>
+          <span className="mt-1 block text-[12px] text-[#8a8678]">
+            {answer.trim().length < 10 ? `${t.answerHint} (${answer.trim().length}/10)` : t.answerHint}
+          </span>
         </label>
 
         <div>
@@ -438,8 +440,11 @@ function TaskDetail({
         {!locked && (
           <button
             type="button"
-            onClick={submit}
-            disabled={busy || answer.trim().length < 10}
+            onClick={() => {
+              if (answer.trim().length < 10) return setErr("short");
+              void submit();
+            }}
+            disabled={busy}
             className="flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[#1b2431] text-[16px] font-extrabold text-[#ffc93c] shadow-[0_6px_16px_rgba(27,36,49,0.22)] transition active:scale-[0.99] disabled:opacity-50"
           >
             {busy ? (
