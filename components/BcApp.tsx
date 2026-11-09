@@ -17,6 +17,7 @@ import {
   User,
 } from "lucide-react";
 
+import BcRanking, { MyAwards } from "@/components/BcRanking";
 import BcTasks from "@/components/BcTasks";
 
 type Lang = "de" | "ru";
@@ -319,7 +320,7 @@ export default function BcApp() {
         ) : tab === "profile" ? (
           <Profile me={me as Me} lang={lang} onChanged={loadMe} onLogout={loadMe} />
         ) : tab === "ranking" ? (
-          <Placeholder text={t.soonRanking} />
+          <BcRanking lang={lang} />
         ) : (
           <Today me={me as Me} lang={lang} onChanged={loadMe} />
         )}
@@ -907,6 +908,8 @@ function Profile({
       </div>
 
       <ErrorLine lang={lang} code={err} />
+
+      <MyAwards lang={lang} />
 
       <div className={`${card} space-y-3 p-4`}>
         <p className="text-[14px] font-extrabold">{t.changeNick}</p>
