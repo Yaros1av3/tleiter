@@ -17,6 +17,7 @@ import {
   User,
 } from "lucide-react";
 
+import BcGift from "@/components/BcGift";
 import BcRanking, { MyAwards } from "@/components/BcRanking";
 import BcTasks from "@/components/BcTasks";
 
@@ -761,6 +762,7 @@ function Today({ me, lang, onChanged }: { me: Me; lang: Lang; onChanged: () => v
             : t.topRank}
         </p>
       </div>
+      <BcGift lang={lang} />
       {me.season ? <BcTasks lang={lang} onChanged={onChanged} /> : <Placeholder text={t.noSeason} />}
     </div>
   );
