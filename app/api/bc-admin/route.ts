@@ -68,6 +68,18 @@ export async function GET(req: Request) {
       : Promise.resolve({ data: [] }),
   ]);
 
+  /* сколько ответов ждут проверки (для значка на вкладке) */
+  let pending = 0;
+  if (season) {
+    let pq = sb
+      .from("bc_submissions")
+      .select("id, bc_tasks!inner(season_id)", { count: "exact", head: true })
+      .eq("status", "pending")
+      .eq("bc_tasks.season_id", season.id);
+    if (!staff.isAdmin) pq = pq.in("participant_id", (partsRes.data ?? []).map((p) => p.id as number));
+    pending = (await pq).count ?? 0;
+  }
+
   const pts = new Map(
     ((ptsRes.data ?? []) as { participant_id: number; points: number; days_done: number }[]).map((r) => [
       r.participant_id,
@@ -79,6 +91,7 @@ export async function GET(req: Request) {
     me: { isAdmin: staff.isAdmin, memberId: staff.memberId },
     seasons: seasons ?? [],
     season,
+    pending,
     tasks: tasksRes.data ?? [],
     participants: (partsRes.data ?? []).map((p) => ({
       ...p,

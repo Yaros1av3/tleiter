@@ -1,17 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, ExternalLink, Gift, Loader2, RotateCcw, X } from "lucide-react";
+import { Check, CheckCircle2, ExternalLink, Gift, Loader2, RotateCcw, Trophy, Users } from "lucide-react";
 
 import { bcCall } from "@/lib/bcAdminClient";
 import { useLanguage } from "@/components/LanguageProvider";
-
-const label = "text-[10px] font-bold uppercase tracking-[0.14em] text-[#9a9585]";
-const card = "rounded-[22px] border border-[#e9e3d3] bg-white";
-const btnDark =
-  "flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1b2431] px-4 text-[14px] font-bold text-[#ffc93c] disabled:opacity-50";
-const btnLight =
-  "flex h-11 items-center justify-center gap-2 rounded-xl border border-[#e0d9c4] bg-white px-4 text-[14px] font-bold disabled:opacity-50";
+import { Avatar, Badge, Empty, Segmented, Skeleton, cx, ui, useBcUi } from "@/components/BcUi";
 
 function useL() {
   const { language } = useLanguage();
@@ -19,10 +13,11 @@ function useL() {
   return { isRu, L: (ru: string, de: string) => (isRu ? ru : de) };
 }
 
-function Spinner() {
+function ListSkeleton() {
   return (
-    <div className="mt-10 flex justify-center">
-      <Loader2 size={22} className="animate-spin text-[#8a8678]" />
+    <div className="space-y-3">
+      <Skeleton className="h-40" />
+      <Skeleton className="h-40" />
     </div>
   );
 }
@@ -46,111 +41,133 @@ type Item = {
 
 function ReviewCard({ item, onDone }: { item: Item; onDone: () => void }) {
   const { isRu, L } = useL();
+  const { toast } = useBcUi();
   const [quality, setQuality] = useState<number | null>(item.points_quality);
   const [comment, setComment] = useState(item.admin_comment ?? "");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState<"" | "ok" | "no">("");
+  const [needComment, setNeedComment] = useState(false);
+  const [zoom, setZoom] = useState(false);
 
   const send = async (action: "submission_grade" | "submission_reject") => {
-    setErr("");
     if (action === "submission_reject" && !comment.trim()) {
-      return setErr(L("Напишите, что нужно доработать.", "Schreibe, was überarbeitet werden soll."));
+      setNeedComment(true);
+      return;
     }
-    setBusy(true);
-    const { ok } = await bcCall("POST", "/api/bc-admin/work", {
-      action,
-      id: item.id,
-      quality,
-      comment,
-    });
-    setBusy(false);
-    if (ok) onDone();
-    else setErr(L("Не получилось. Попробуйте ещё раз.", "Das hat nicht geklappt. Bitte nochmal versuchen."));
+    setBusy(action === "submission_grade" ? "ok" : "no");
+    const { ok } = await bcCall("POST", "/api/bc-admin/work", { action, id: item.id, quality, comment });
+    setBusy("");
+    if (ok) {
+      toast(action === "submission_grade" ? L("Ответ принят", "Antwort angenommen") : L("Отправлено на доработку", "Zur Überarbeitung zurückgegeben"));
+      onDone();
+    } else toast(L("Не получилось. Попробуйте ещё раз.", "Das hat nicht geklappt. Bitte nochmal versuchen."), "error");
   };
 
   const p = item.bc_participants;
   const t = item.bc_tasks;
+  const when = new Date(item.submitted_at).toLocaleString(isRu ? "ru-RU" : "de-DE", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const auto = item.points_photo + item.points_time;
+  const marks: [number, string][] = [
+    [0, L("Не по теме", "Am Thema vorbei")],
+    [5, L("Хорошо", "Gut")],
+    [10, L("Отлично", "Sehr gut")],
+  ];
+
   return (
-    <div className={`${card} p-4`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-[15px] font-extrabold">{p.nickname}</p>
+    <article className="overflow-hidden rounded-[20px] border border-[#ece6d3] bg-white">
+      <header className="flex items-center gap-3 px-4 pb-3 pt-4">
+        <Avatar url={null} name={p.nickname} size={40} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] font-extrabold leading-tight">{p.nickname}</p>
           <p className="truncate text-[12px] text-[#8a8678]">
             {p.first_name} {p.last_name}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-[#fff4d1] px-2.5 py-1 text-[11px] font-extrabold text-[#9a6b00]">
+        <Badge tone="soft">
           {L("День", "Tag")} {t.day_number}
-        </span>
-      </div>
-      <p className="mt-2 text-[13px] font-bold">{isRu ? t.title_ru : t.title_de}</p>
-      <p className="text-[11px] text-[#8a8678]">
-        {new Date(item.submitted_at).toLocaleString(isRu ? "ru-RU" : "de-DE", {
-          day: "2-digit",
-          month: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
-        {item.is_late ? ` · ${L("с опозданием", "zu spät")}` : ""}
-      </p>
+        </Badge>
+      </header>
 
-      <p className="mt-3 whitespace-pre-line rounded-xl bg-[#faf8f3] px-3.5 py-3 text-[14px] leading-relaxed">
-        {item.answer_text}
-      </p>
-      {item.photo_url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={item.photo_url} alt="" className="mt-3 max-h-80 w-full rounded-xl object-cover" />
-      )}
-
-      <p className="mt-3 text-[12px] text-[#8a8678]">
-        {L("Автоматически", "Automatisch")}: +{item.points_photo} {L("фото", "Foto")}, +{item.points_time}{" "}
-        {L("срок", "Frist")}
-      </p>
-
-      <p className={`${label} mb-1.5 mt-3`}>{L("Качество ответа", "Qualität der Antwort")}</p>
-      <div className="grid grid-cols-3 gap-2">
-        {[0, 5, 10].map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => setQuality(v)}
-            className={`h-11 rounded-xl text-[15px] font-extrabold ${
-              quality === v ? "bg-[#ffc93c]" : "border border-[#e0d9c4] bg-white"
-            }`}
-          >
-            {v}
+      <div className="px-4">
+        <p className="text-[13px] font-semibold text-[#6f6a5c]">{isRu ? t.title_ru : t.title_de}</p>
+        <p className="mt-0.5 text-[12px] text-[#a09a88]">
+          {when}
+          {item.is_late ? ` · ${L("сдано с опозданием", "zu spät abgegeben")}` : ""}
+        </p>
+        <p className="mt-3 whitespace-pre-line rounded-[14px] bg-[#faf8f3] px-3.5 py-3 text-[15px] leading-relaxed">
+          {item.answer_text}
+        </p>
+        {item.photo_url && (
+          <button type="button" onClick={() => setZoom((v) => !v)} className="mt-3 block w-full overflow-hidden rounded-[14px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={item.photo_url} alt="" className={cx("w-full object-cover", zoom ? "max-h-none" : "max-h-56")} />
           </button>
-        ))}
+        )}
+        <p className="mt-3 text-[12px] text-[#8a8678]">
+          {L("Уже засчитано автоматически", "Automatisch gezählt")}: {auto} {L("баллов", "Punkte")}
+          {item.points_photo ? ` (${L("фото", "Foto")} +${item.points_photo}, ${L("срок", "Frist")} +${item.points_time})` : ` (${L("срок", "Frist")} +${item.points_time})`}
+        </p>
       </div>
 
-      <textarea
-        className="mt-3 min-h-[70px] w-full rounded-xl border border-[#e0d9c4] bg-white px-3 py-2 text-[14px] outline-none focus:border-[#1b2431]"
-        placeholder={L("Комментарий подростку (необязательно)", "Kommentar für den Teen (optional)")}
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-      />
-      {err && <p className="mt-2 text-[13px] font-semibold text-[#9a6b00]">{err}</p>}
+      <div className="mt-3 border-t border-[#f0ebdc] px-4 pb-4 pt-3">
+        <p className={cx(ui.label, "mb-2")}>{L("Оценка за качество", "Bewertung der Qualität")}</p>
+        <div className="grid grid-cols-3 gap-2">
+          {marks.map(([v, text]) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setQuality(v)}
+              className={cx(
+                "flex h-[62px] flex-col items-center justify-center rounded-[14px] transition active:scale-[0.97]",
+                quality === v ? "bg-[#1b2431] text-[#ffc93c]" : "bg-[#f1ede1]",
+              )}
+            >
+              <span className="text-[20px] font-extrabold leading-none">{v}</span>
+              <span className={cx("mt-1 text-[11px] font-medium", quality === v ? "text-[#ffc93c]/80" : "text-[#8a8678]")}>{text}</span>
+            </button>
+          ))}
+        </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button type="button" className={btnLight} disabled={busy} onClick={() => send("submission_reject")}>
-          <RotateCcw size={16} />
-          {L("Доработать", "Überarbeiten")}
-        </button>
-        <button
-          type="button"
-          className={btnDark}
-          disabled={busy || quality === null}
-          onClick={() => send("submission_grade")}
-        >
-          {busy ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-          {L("Принять", "Annehmen")}
-        </button>
+        <textarea
+          className={cx(ui.area, "mt-3 !min-h-[80px]", needComment && "!border-[#b3342f]")}
+          placeholder={L("Комментарий подростку (для доработки обязателен)", "Kommentar für den Teen (bei Überarbeitung Pflicht)")}
+          value={comment}
+          onChange={(e) => {
+            setComment(e.target.value);
+            setNeedComment(false);
+          }}
+        />
+        {needComment && (
+          <p className="mt-1.5 text-[12px] font-semibold text-[#b3342f]">
+            {L("Напишите, что нужно доработать.", "Schreibe, was überarbeitet werden soll.")}
+          </p>
+        )}
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button type="button" className={cx(ui.btn, ui.ghost)} disabled={!!busy} onClick={() => send("submission_reject")}>
+            {busy === "no" ? <Loader2 size={18} className="animate-spin" /> : <RotateCcw size={18} />}
+            {L("На доработку", "Überarbeiten")}
+          </button>
+          <button
+            type="button"
+            className={cx(ui.btn, ui.primary)}
+            disabled={!!busy || quality === null}
+            onClick={() => send("submission_grade")}
+          >
+            {busy === "ok" ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+            {L("Принять", "Annehmen")}
+          </button>
+        </div>
       </div>
-    </div>
+    </article>
   );
 }
 
-export function ReviewTab({ seasonId }: { seasonId: number | null }) {
+export function ReviewTab({ seasonId, onChanged }: { seasonId: number | null; onChanged?: () => void }) {
   const { L } = useL();
   const [mode, setMode] = useState<"pending" | "done">("pending");
   const [items, setItems] = useState<Item[] | null>(null);
@@ -169,32 +186,38 @@ export function ReviewTab({ seasonId }: { seasonId: number | null }) {
   }, [load]);
 
   return (
-    <div className="mt-4 space-y-3">
-      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-[#f1ede1] p-1">
-        {(
-          [
-            ["pending", L("Ждут проверки", "Zu prüfen")],
-            ["done", L("Проверено", "Geprüft")],
-          ] as const
-        ).map(([k, text]) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setMode(k)}
-            className={`h-9 rounded-xl text-[13px] font-bold ${mode === k ? "bg-white shadow-sm" : "text-[#8a8678]"}`}
-          >
-            {text}
-          </button>
-        ))}
-      </div>
+    <div className="space-y-3">
+      <Segmented
+        value={mode}
+        onChange={setMode}
+        options={[
+          { value: "pending", label: L("Ждут проверки", "Zu prüfen") },
+          { value: "done", label: L("Проверено", "Geprüft") },
+        ]}
+      />
       {items === null ? (
-        <Spinner />
+        <ListSkeleton />
       ) : items.length === 0 ? (
-        <div className={`${card} px-5 py-8 text-center text-sm text-[#8a8678]`}>
-          {mode === "pending" ? L("Всё проверено.", "Alles geprüft.") : L("Пока ничего.", "Noch nichts.")}
-        </div>
+        <Empty
+          icon={<CheckCircle2 size={22} />}
+          title={mode === "pending" ? L("Всё проверено", "Alles geprüft") : L("Пока пусто", "Noch leer")}
+          text={
+            mode === "pending"
+              ? L("Новые ответы подростков появятся здесь.", "Neue Antworten der Teens erscheinen hier.")
+              : L("Проверенные ответы будут здесь, их можно исправить.", "Geprüfte Antworten erscheinen hier, du kannst sie ändern.")
+          }
+        />
       ) : (
-        items.map((it) => <ReviewCard key={`${it.id}-${mode}`} item={it} onDone={load} />)
+        items.map((it) => (
+          <ReviewCard
+            key={`${it.id}-${mode}`}
+            item={it}
+            onDone={() => {
+              void load();
+              onChanged?.();
+            }}
+          />
+        ))
       )}
     </div>
   );
@@ -215,8 +238,10 @@ type GiftRow = {
 
 export function GiftsTab() {
   const { isRu, L } = useL();
+  const { confirm, toast } = useBcUi();
   const [gifts, setGifts] = useState<GiftRow[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
+  const [filter, setFilter] = useState<"todo" | "all">("todo");
 
   const load = useCallback(async () => {
     const { data } = await bcCall<{ gifts?: GiftRow[] }>("GET", "/api/bc-admin/work?view=gifts");
@@ -227,55 +252,65 @@ export function GiftsTab() {
     void load();
   }, [load]);
 
-  const act = async (action: string, id: number) => {
+  const act = async (action: string, id: number, okText: string) => {
     setBusy(id);
-    await bcCall("POST", "/api/bc-admin/work", { action, id });
+    const { ok } = await bcCall("POST", "/api/bc-admin/work", { action, id });
     setBusy(null);
+    toast(ok ? okText : L("Не получилось", "Fehlgeschlagen"), ok ? "ok" : "error");
     await load();
   };
 
-  const chip = (s: GiftRow["status"]) =>
-    ({
-      open: { t: L("ждём ссылку", "wartet auf Link"), c: "bg-[#ffc93c] text-[#1b2431]" },
-      submitted: { t: L("ссылка получена", "Link erhalten"), c: "bg-[#fff4d1] text-[#9a6b00]" },
-      expired: { t: L("время вышло", "Zeit abgelaufen"), c: "bg-[#f1ede1] text-[#6f6a5c]" },
-      given: { t: L("выдан", "übergeben"), c: "bg-[#1b2431] text-[#ffc93c]" },
-    })[s];
+  if (gifts === null) return <ListSkeleton />;
 
-  if (gifts === null) return <Spinner />;
+  const shown = gifts.filter((g) => (filter === "todo" ? g.status !== "given" : true));
   const fmt = (iso: string) =>
-    new Date(iso).toLocaleDateString(isRu ? "ru-RU" : "de-DE", { day: "2-digit", month: "2-digit" });
+    new Intl.DateTimeFormat(isRu ? "ru-RU" : "de-DE", { day: "numeric", month: "short" }).format(new Date(iso));
+  const badge = (s: GiftRow["status"]) =>
+    s === "open" ? (
+      <Badge tone="sun">{L("Ждём ссылку", "Wartet auf Link")}</Badge>
+    ) : s === "submitted" ? (
+      <Badge tone="soft">{L("Ссылка получена", "Link erhalten")}</Badge>
+    ) : s === "expired" ? (
+      <Badge tone="danger">{L("Время вышло", "Zeit abgelaufen")}</Badge>
+    ) : (
+      <Badge tone="ink">{L("Выдан", "Übergeben")}</Badge>
+    );
 
   return (
-    <div className="mt-4 space-y-3">
-      <p className={label}>
-        {L("Подарки", "Geschenke")} · {gifts.length}
-      </p>
-      {gifts.length === 0 ? (
-        <div className={`${card} px-5 py-8 text-center text-sm text-[#8a8678]`}>
-          {L("Пока никто не набрал нужное число баллов.", "Noch niemand hat genug Punkte.")}
-        </div>
+    <div className="space-y-3">
+      <Segmented
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { value: "todo", label: L("Нужно сделать", "Offen") },
+          { value: "all", label: L("Все", "Alle") },
+        ]}
+      />
+      {shown.length === 0 ? (
+        <Empty
+          icon={<Gift size={22} />}
+          title={filter === "todo" ? L("Нет открытых подарков", "Keine offenen Geschenke") : L("Подарков пока нет", "Noch keine Geschenke")}
+          text={L(
+            "Окно подарка открывается автоматически, когда подросток набирает 300 баллов.",
+            "Das Geschenk-Fenster öffnet sich automatisch, wenn ein Teen 300 Punkte erreicht.",
+          )}
+        />
       ) : (
-        gifts.map((g) => {
-          const c = chip(g.status);
+        shown.map((g) => {
           const p = g.bc_participants;
           return (
-            <div key={g.id} className={`${card} p-4`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fff4d1] text-[#9a6b00]">
-                    <Gift size={18} />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-[15px] font-extrabold">{p.nickname}</p>
-                    <p className="truncate text-[12px] text-[#8a8678]">
-                      {p.first_name} {p.last_name}
-                    </p>
-                  </div>
+            <article key={g.id} className="rounded-[20px] border border-[#ece6d3] bg-white p-4">
+              <div className="flex items-center gap-3">
+                <Avatar url={null} name={p.nickname} size={40} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[15px] font-extrabold leading-tight">{p.nickname}</p>
+                  <p className="truncate text-[12px] text-[#8a8678]">
+                    {p.first_name} {p.last_name}
+                  </p>
                 </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-extrabold ${c.c}`}>{c.t}</span>
+                {badge(g.status)}
               </div>
-              <p className="mt-2 text-[12px] text-[#8a8678]">
+              <p className="mt-2.5 text-[12px] text-[#8a8678]">
                 {L("Окно открыто", "Fenster geöffnet")} {fmt(g.opened_at)} · {L("до", "bis")} {fmt(g.expires_at)}
               </p>
               {g.gift_link && (
@@ -283,40 +318,42 @@ export function GiftsTab() {
                   href={g.gift_link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-2 flex items-center gap-2 rounded-xl bg-[#faf8f3] px-3 py-2.5 text-[13px] font-semibold underline"
+                  className="mt-3 flex items-center gap-2.5 rounded-[14px] bg-[#faf8f3] px-3.5 py-3 text-[13px] font-semibold active:bg-[#f1ede1]"
                 >
-                  <ExternalLink size={15} className="shrink-0" />
+                  <ExternalLink size={16} className="shrink-0" />
                   <span className="min-w-0 break-all">{g.gift_link}</span>
                 </a>
               )}
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {(g.status === "expired" || g.status === "open" || g.status === "submitted") && (
+              {g.status !== "given" && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    className={btnLight}
+                    className={cx(ui.btn, ui.ghost, "!h-11")}
                     disabled={busy === g.id}
-                    onClick={() => {
-                      if (confirm(L("Открыть окно заново на неделю?", "Fenster für eine Woche neu öffnen?")))
-                        void act("gift_reopen", g.id);
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: L("Открыть окно заново?", "Fenster neu öffnen?"),
+                        text: L("Подросток получит ещё неделю на выбор подарка.", "Der Teen bekommt noch eine Woche Zeit."),
+                        confirmLabel: L("Открыть", "Öffnen"),
+                      });
+                      if (ok) void act("gift_reopen", g.id, L("Окно открыто", "Fenster geöffnet"));
                     }}
                   >
                     <RotateCcw size={16} />
                     {L("Открыть заново", "Neu öffnen")}
                   </button>
-                )}
-                {g.status !== "given" && (
                   <button
                     type="button"
-                    className={btnDark}
+                    className={cx(ui.btn, ui.primary, "!h-11")}
                     disabled={busy === g.id}
-                    onClick={() => act("gift_given", g.id)}
+                    onClick={() => act("gift_given", g.id, L("Отмечено: подарок выдан", "Als übergeben markiert"))}
                   >
                     <Check size={16} />
-                    {L("Выдан", "Übergeben")}
+                    {L("Подарок выдан", "Übergeben")}
                   </button>
-                )}
-              </div>
-            </div>
+                </div>
+              )}
+            </article>
           );
         })
       )}
@@ -343,89 +380,99 @@ export function StatsTab({ seasonId }: { seasonId: number | null }) {
 
   useEffect(() => {
     setS(undefined);
-    bcCall<{ stats?: Stats | null }>(
-      "GET",
-      `/api/bc-admin/work?view=stats${seasonId ? `&season=${seasonId}` : ""}`,
-    ).then(({ data }) => setS(data.stats ?? null));
+    bcCall<{ stats?: Stats | null }>("GET", `/api/bc-admin/work?view=stats${seasonId ? `&season=${seasonId}` : ""}`).then(
+      ({ data }) => setS(data.stats ?? null),
+    );
   }, [seasonId]);
 
-  if (s === undefined) return <Spinner />;
+  if (s === undefined) return <ListSkeleton />;
   if (!s) {
-    return (
-      <div className={`${card} mt-4 px-5 py-8 text-center text-sm text-[#8a8678]`}>
-        {L("Данных пока нет.", "Noch keine Daten.")}
-      </div>
-    );
+    return <Empty icon={<Trophy size={22} />} title={L("Данных пока нет", "Noch keine Daten")} />;
   }
 
   const max = Math.max(1, s.participants, ...s.perDay.map((d) => d.count));
   const tiles: [string, number][] = [
     [L("Участников", "Teilnehmer"), s.participants],
-    [L("Ответов", "Antworten"), s.submissions],
+    [L("Ответов сдано", "Antworten"), s.submissions],
     [L("Ждут проверки", "Zu prüfen"), s.pending],
     [L("Средний балл", "Ø Punkte"), s.avgPoints],
   ];
 
   return (
-    <div className="mt-4 space-y-4">
-      <div className="grid grid-cols-2 gap-2">
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-2.5">
         {tiles.map(([text, n]) => (
-          <div key={text} className={`${card} p-4`}>
-            <p className="text-[28px] font-extrabold leading-none">{n}</p>
-            <p className="mt-1.5 text-[12px] text-[#8a8678]">{text}</p>
+          <div key={text} className="rounded-[18px] border border-[#ece6d3] bg-white p-4">
+            <p className="text-[30px] font-extrabold leading-none tracking-[-0.02em]">{n}</p>
+            <p className="mt-2 text-[13px] text-[#8a8678]">{text}</p>
           </div>
         ))}
       </div>
 
-      <div className={`${card} p-4`}>
-        <p className={`${label} mb-3`}>{L("Сдано по дням", "Abgaben pro Tag")}</p>
+      <section className="rounded-[18px] border border-[#ece6d3] bg-white p-4">
+        <h3 className="text-[15px] font-extrabold">{L("Сколько сдали по дням", "Abgaben pro Tag")}</h3>
         {s.perDay.length === 0 ? (
-          <p className="text-[13px] text-[#8a8678]">{L("Нет опубликованных заданий.", "Keine veröffentlichten Aufgaben.")}</p>
+          <p className="mt-2 text-[13px] text-[#8a8678]">{L("Нет опубликованных заданий.", "Keine veröffentlichten Aufgaben.")}</p>
         ) : (
-          <div className="flex h-28 items-end gap-1">
+          <div className="mt-4 flex h-32 items-end gap-1">
             {s.perDay.map((d) => (
-              <div key={d.day} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
+              <div key={d.day} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1.5">
                 <div
-                  className="w-full rounded-t bg-[#ffc93c]"
+                  className="w-full rounded-t-[4px] bg-[#ffc93c]"
                   style={{ height: `${Math.max(4, (d.count / max) * 100)}%` }}
                   title={`${d.day}: ${d.count}`}
                 />
-                <span className="text-[8px] text-[#8a8678]">{d.day}</span>
+                <span className="text-[9px] text-[#8a8678]">{d.day}</span>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
-      <div className={`${card} p-4`}>
-        <p className={`${label} mb-2`}>{L("Лучшие", "Beste")}</p>
-        {s.top.map((p, i) => (
-          <div key={p.id} className="flex items-center gap-3 border-b border-[#f0ebdc] py-2 last:border-0">
-            <span className="w-5 text-[13px] font-extrabold text-[#9a6b00]">{i + 1}</span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[14px] font-bold">{p.nickname}</span>
-              <span className="block truncate text-[11px] text-[#8a8678]">{p.name}</span>
-            </span>
-            <span className="text-[15px] font-extrabold">{p.points}</span>
-          </div>
-        ))}
-      </div>
+      <section>
+        <h3 className="mb-2 px-1 text-[15px] font-extrabold">{L("Лучшие", "Die Besten")}</h3>
+        <div className={ui.group}>
+          {s.top.map((p, i) => (
+            <div key={p.id} className="flex min-h-[56px] items-center gap-3 px-4 py-2">
+              <span
+                className={cx(
+                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold",
+                  i < 3 ? "bg-[#1b2431] text-[#ffc93c]" : "bg-[#f1ede1] text-[#8a8678]",
+                )}
+              >
+                {i + 1}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-semibold">{p.nickname}</span>
+                <span className="block truncate text-[12px] text-[#8a8678]">{p.name}</span>
+              </span>
+              <span className="text-[17px] font-extrabold">{p.points}</span>
+            </div>
+          ))}
+        </div>
+      </section>
 
-      <div className={`${card} p-4`}>
-        <p className={`${label} mb-2`}>
-          {L("Ещё ничего не сдали", "Noch nichts abgegeben")} · {s.silent.length}
-        </p>
+      <section>
+        <h3 className="mb-2 px-1 text-[15px] font-extrabold">
+          {L("Ещё ничего не сдали", "Noch nichts abgegeben")}{" "}
+          <span className="font-semibold text-[#8a8678]">{s.silent.length}</span>
+        </h3>
         {s.silent.length === 0 ? (
-          <p className="flex items-center gap-1.5 text-[13px] text-[#8a8678]">
-            <X className="hidden" />
-            {L("Все хотя бы раз сдали.", "Alle haben mindestens einmal abgegeben.")}
-          </p>
+          <div className="flex items-center gap-2 rounded-[18px] border border-[#ece6d3] bg-white px-4 py-4 text-[14px] text-[#6f6a5c]">
+            <Users size={16} />
+            {L("Все хотя бы раз сдали задание.", "Alle haben mindestens einmal abgegeben.")}
+          </div>
         ) : (
-          <p className="text-[13px] leading-relaxed">
-            {s.silent.map((p) => `${p.nickname} (${p.name})`).join(", ")}
-          </p>
+          <div className={ui.group}>
+            {s.silent.map((p) => (
+              <div key={p.id} className="min-h-[52px] px-4 py-2.5">
+                <p className="text-[15px] font-semibold">{p.nickname}</p>
+                <p className="text-[12px] text-[#8a8678]">{p.name}</p>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
