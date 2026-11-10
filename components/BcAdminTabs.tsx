@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, CheckCircle2, ExternalLink, Gift, Loader2, RotateCcw, Trophy, Users } from "lucide-react";
+import { Check, CheckCircle2, MessageCircle, ExternalLink, Gift, Loader2, RotateCcw, Trophy, Users } from "lucide-react";
 
 import { bcCall } from "@/lib/bcAdminClient";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -372,6 +372,7 @@ type Stats = {
   perDay: { day: number; count: number }[];
   top: { id: number; nickname: string; name: string; points: number; days: number }[];
   silent: { id: number; nickname: string; name: string }[];
+  quiet: { id: number; nickname: string; name: string; missed: number; last: string | null; whatsapp: string | null }[];
 };
 
 export function StatsTab({ seasonId }: { seasonId: number | null }) {
@@ -408,6 +409,51 @@ export function StatsTab({ seasonId }: { seasonId: number | null }) {
           </div>
         ))}
       </div>
+
+      <section>
+        <h3 className="mb-2 px-1 text-[15px] font-extrabold">
+          {L("Кто пропал", "Wer fehlt")}{" "}
+          <span className="font-semibold text-[#8a8678]">{s.quiet.length}</span>
+        </h3>
+        {s.quiet.length === 0 ? (
+          <div className="flex items-center gap-2 rounded-[18px] border border-[#ece6d3] bg-white px-4 py-4 text-[14px] text-[#6f6a5c]">
+            <Users size={16} />
+            {L("Никто не пропускает 2 дня подряд и больше.", "Niemand fehlt 2 Tage in Folge oder länger.")}
+          </div>
+        ) : (
+          <div className={ui.group}>
+            {s.quiet.map((p) => (
+              <div key={p.id} className="flex min-h-[60px] items-center gap-3 px-4 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[15px] font-semibold">{p.nickname}</p>
+                  <p className="truncate text-[12px] text-[#8a8678]">
+                    {p.name}
+                    {" · "}
+                    {L(`пропустил(а) дней: ${p.missed}`, `${p.missed} Tage verpasst`)}
+                    {" · "}
+                    {p.last
+                      ? L(`последний ответ ${p.last.slice(8, 10)}.${p.last.slice(5, 7)}.`, `zuletzt ${p.last.slice(8, 10)}.${p.last.slice(5, 7)}.`)
+                      : L("ещё не сдавал(а)", "noch nichts abgegeben")}
+                  </p>
+                </div>
+                {p.whatsapp ? (
+                  <a
+                    href={p.whatsapp}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#1b2431] px-3.5 text-[13px] font-bold text-[#ffc93c] active:scale-95"
+                  >
+                    <MessageCircle size={15} />
+                    WhatsApp
+                  </a>
+                ) : (
+                  <span className="shrink-0 text-[11px] text-[#b3ad9b]">{L("нет номера", "keine Nummer")}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="rounded-[18px] border border-[#ece6d3] bg-white p-4">
         <h3 className="text-[15px] font-extrabold">{L("Сколько сдали по дням", "Abgaben pro Tag")}</h3>
@@ -452,27 +498,6 @@ export function StatsTab({ seasonId }: { seasonId: number | null }) {
         </div>
       </section>
 
-      <section>
-        <h3 className="mb-2 px-1 text-[15px] font-extrabold">
-          {L("Ещё ничего не сдали", "Noch nichts abgegeben")}{" "}
-          <span className="font-semibold text-[#8a8678]">{s.silent.length}</span>
-        </h3>
-        {s.silent.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-[18px] border border-[#ece6d3] bg-white px-4 py-4 text-[14px] text-[#6f6a5c]">
-            <Users size={16} />
-            {L("Все хотя бы раз сдали задание.", "Alle haben mindestens einmal abgegeben.")}
-          </div>
-        ) : (
-          <div className={ui.group}>
-            {s.silent.map((p) => (
-              <div key={p.id} className="min-h-[52px] px-4 py-2.5">
-                <p className="text-[15px] font-semibold">{p.nickname}</p>
-                <p className="text-[12px] text-[#8a8678]">{p.name}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }

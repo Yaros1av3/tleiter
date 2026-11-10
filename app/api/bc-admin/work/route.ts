@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getStaff } from "@/lib/bcStaff";
+import { berlinTodayStr, missedOf } from "@/lib/bcProgress";
 
 export const dynamic = "force-dynamic";
 
@@ -17,12 +18,12 @@ async function scopeIds(sb: Sb, staff: { isAdmin: boolean; memberId: number | nu
 async function seasonOf(sb: Sb, raw: string | null) {
   const wanted = Number(raw);
   if (wanted) {
-    const { data } = await sb.from("bc_seasons").select("id, title_de, title_ru").eq("id", wanted).maybeSingle();
+    const { data } = await sb.from("bc_seasons").select("id, title_de, title_ru, status").eq("id", wanted).maybeSingle();
     if (data) return data;
   }
   const { data } = await sb
     .from("bc_seasons")
-    .select("id, title_de, title_ru")
+    .select("id, title_de, title_ru, status")
     .eq("status", "active")
     .maybeSingle();
   return data;
@@ -91,14 +92,14 @@ export async function GET(req: Request) {
 
     let pq = sb
       .from("bc_participants")
-      .select("id, nickname, first_name, last_name, status")
+      .select("id, nickname, first_name, last_name, status, teen_id")
       .eq("status", "active");
     if (ids) pq = pq.in("id", ids);
     const [partsRes, tasksRes] = await Promise.all([
       pq,
       sb
         .from("bc_tasks")
-        .select("id, day_number")
+        .select("id, day_number, task_date")
         .eq("season_id", season.id)
         .eq("is_published", true)
         .order("day_number"),
@@ -136,6 +137,52 @@ export async function GET(req: Request) {
     const total = people.reduce((n, p) => n + p.points, 0);
     void allowed;
 
+    /* кто пропал: 2 и больше последних дней подряд без ответа (только в идущем сезоне) */
+    type Quiet = { id: number; nickname: string; name: string; missed: number; last: string | null; whatsapp: string | null };
+    let quiet: Quiet[] = [];
+    if ((season as { status?: string }).status === "active") {
+      const today = berlinTodayStr();
+      const taskList = tasks as { id: number; task_date: string }[];
+      const dateOf = new Map(taskList.map((t) => [t.id, t.task_date]));
+      const subsBy = new Map<number, Set<number>>();
+      for (const sRow of subs) {
+        const set = subsBy.get(sRow.participant_id) ?? new Set<number>();
+        set.add(sRow.task_id);
+        subsBy.set(sRow.participant_id, set);
+      }
+      const teenIds = parts.map((p) => p.teen_id as number | null).filter((v): v is number => !!v);
+      const { data: teenRows } = teenIds.length
+        ? await sb.from("teens").select("id, phone").in("id", teenIds)
+        : { data: [] };
+      const phoneOf = new Map((teenRows ?? []).map((t) => [t.id as number, (t.phone as string | null) ?? null]));
+      const wa = (phone: string | null) => {
+        if (!phone) return null;
+        const trimmed = phone.trim();
+        const digits = trimmed.replace(/\D/g, "");
+        if (digits.length < 7) return null;
+        let intl = digits;
+        if (trimmed.startsWith("+")) intl = digits;
+        else if (digits.startsWith("00")) intl = digits.slice(2);
+        else if (digits.startsWith("0")) intl = `49${digits.slice(1)}`;
+        return `https://wa.me/${intl}`;
+      };
+      quiet = parts
+        .map((p) => {
+          const mine = subsBy.get(p.id as number) ?? new Set<number>();
+          const dates = Array.from(mine).map((id) => dateOf.get(id) ?? "").filter(Boolean).sort();
+          return {
+            id: p.id as number,
+            nickname: p.nickname as string,
+            name: `${p.first_name} ${p.last_name}`.trim(),
+            missed: missedOf(taskList, mine, today),
+            last: dates.length ? dates[dates.length - 1] : null,
+            whatsapp: wa(p.teen_id ? phoneOf.get(p.teen_id as number) ?? null : null),
+          };
+        })
+        .filter((q) => q.missed >= 2)
+        .sort((a, b) => b.missed - a.missed || a.name.localeCompare(b.name));
+    }
+
     return NextResponse.json({
       stats: {
         participants: people.length,
@@ -146,6 +193,7 @@ export async function GET(req: Request) {
         perDay,
         top,
         silent,
+        quiet,
       },
     });
   }

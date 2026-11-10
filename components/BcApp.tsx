@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 
 import BcGift from "@/components/BcGift";
+import BcProgress from "@/components/BcProgress";
+import BcPush from "@/components/BcPush";
 import BcRanking, { MyAwards } from "@/components/BcRanking";
 import BcTasks from "@/components/BcTasks";
 
@@ -793,6 +795,7 @@ function Today({ me, lang, onChanged }: { me: Me; lang: Lang; onChanged: () => v
         </p>
       </div>
 
+      <BcProgress lang={lang} refreshKey={me.points} />
       <MentorBar me={me} lang={lang} />
       <BcGift lang={lang} />
       {me.season ? <BcTasks lang={lang} onChanged={onChanged} /> : <Placeholder text={t.noSeason} />}
@@ -970,6 +973,7 @@ function Profile({
       <ErrorLine lang={lang} code={err} />
 
       <MentorBar me={me} lang={lang} />
+      <BcPush lang={lang} />
 
       <MyAwards lang={lang} />
 
