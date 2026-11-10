@@ -40,6 +40,7 @@ import { normalizeServiceTime } from "@/lib/services";
 import { getVerseOfTheDay } from "@/lib/verses";
 import ReminderDot from "@/components/ReminderDot";
 import InstallBanner from "@/components/InstallBanner";
+import WhatsNew from "@/components/WhatsNew";
 import { useLanguage } from "@/components/LanguageProvider";
 
 type WorkProject = {
@@ -881,6 +882,7 @@ export default function Home() {
 
         <div className="mx-auto w-full max-w-[760px] px-4 pb-28 sm:px-6">
           <InstallBanner isRu={isRu} />
+          <WhatsNew isRu={isRu} />
 
           {/* =====================================================
               NEW IDEA

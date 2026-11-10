@@ -19,6 +19,7 @@ import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import Avatar from "@/components/Avatar";
 import PushNotifications from "@/components/PushNotifications";
+import NotifyUpdate from "@/components/Notifyupdate";
 import InstallApp from "@/components/InstallApp";
 
 type Profile = {
@@ -829,6 +830,8 @@ export default function SettingsPage() {
         <InstallApp isRu={isRu} />
 
         <PushNotifications isRu={isRu} />
+
+        <NotifyUpdate isRu={isRu} />
 
         {/* Logout */}
         <section className="mt-4 overflow-hidden rounded-[24px] border border-red-100 bg-white shadow-[0_4px_18px_rgba(27,36,49,0.04)]">
