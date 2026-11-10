@@ -106,6 +106,14 @@ function plusDays(date: string, n: number) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+const AUTO_TITLE = /^(Bibel-Challenge|Библейский челлендж) /;
+const lastDayOf = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+function dayCount(a?: string | null, b?: string | null) {
+  if (!a || !b) return 0;
+  const n = Math.round((new Date(`${b}T12:00:00`).getTime() - new Date(`${a}T12:00:00`).getTime()) / 86400000) + 1;
+  return n > 0 ? n : 0;
+}
+
 export default function BibleChallengeAdminPage() {
   return (
     <BcUiProvider>
@@ -180,9 +188,10 @@ function AdminInner() {
     return map[code ?? ""] ?? L("Не получилось. Попробуйте ещё раз.", "Das hat nicht geklappt. Bitte nochmal versuchen.");
   };
 
-  const act = async (body: Record<string, unknown>, okText?: string) => {
+  const act = async (body: Record<string, unknown>, okText?: string, reloadSeason?: number) => {
     setBusy(true);
     const { ok, data: d } = await bcCall<{
+      id?: number;
       created?: number;
       password?: string;
       deleted?: number;
@@ -194,7 +203,7 @@ function AdminInner() {
       return null;
     }
     if (okText) toast(okText);
-    await load();
+    await load(reloadSeason);
     return d;
   };
 
@@ -254,6 +263,51 @@ function AdminInner() {
       start_date: "",
       end_date: "",
     });
+
+  /* выбран месяц: даты сезона и названия подставляются сами */
+  const applyMonth = (m: number, y: number) =>
+    setSeasonForm((f) => {
+      const monthDe = new Intl.DateTimeFormat("de-DE", { month: "long" }).format(new Date(y, m, 1));
+      const monthRu = new Intl.DateTimeFormat("ru-RU", { month: "long" }).format(new Date(y, m, 1));
+      const keep = (v?: string) => !!v && !AUTO_TITLE.test(v);
+      return {
+        ...f,
+        year: y,
+        start_date: `${y}-${pad(m + 1)}-01`,
+        end_date: `${y}-${pad(m + 1)}-${pad(lastDayOf(y, m))}`,
+        title_de: keep(f?.title_de) ? f?.title_de : `Bibel-Challenge ${monthDe} ${y}`,
+        title_ru: keep(f?.title_ru) ? f?.title_ru : `Библейский челлендж ${monthRu} ${y}`,
+      };
+    });
+
+  const saveSeason = async () => {
+    if (!seasonForm) return;
+    const form = seasonForm;
+    const isNew = !form.id;
+    const d = await act({ action: "season_save", ...form }, L("Сохранено", "Gespeichert"));
+    if (!d) return;
+    setSeasonForm(null);
+    const days = dayCount(form.start_date, form.end_date);
+    if (isNew && d.id && days > 0) {
+      await load(d.id);
+      setTab("tasks");
+      const yes = await confirm({
+        title: L(`Создать задания на все ${days} дн.?`, `Aufgaben für alle ${days} Tage erstellen?`),
+        text: L(
+          "Мы сразу создадим заготовки на каждый день сезона с датами и сроками сдачи. Останется заполнить тексты.",
+          "Wir erstellen sofort Vorlagen für jeden Tag mit Datum und Abgabefrist. Du füllst nur noch die Texte aus.",
+        ),
+        confirmLabel: L("Создать", "Erstellen"),
+      });
+      if (yes) {
+        await act(
+          { action: "tasks_generate", season_id: d.id },
+          L(`Создано заданий: ${days}`, `Aufgaben erstellt: ${days}`),
+          d.id,
+        );
+      }
+    }
+  };
 
   const newTask = () => {
     if (!season) return;
@@ -363,6 +417,7 @@ function AdminInner() {
     }
   };
 
+  const seasonDays = dayCount(season?.start_date, season?.end_date);
   const barOn = (tab === "tasks" && taskSelect) || (tab === "people" && peopleSelect);
   const tasksSorted = data?.tasks ?? [];
   const today = berlinToday();
@@ -569,20 +624,22 @@ function AdminInner() {
                       </p>
                       {isAdmin && (
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() =>
-                              act(
-                                { action: "tasks_generate", season_id: season.id },
-                                L("Заготовки на все дни созданы", "Vorlagen für alle Tage erstellt"),
-                              )
-                            }
-                            className="flex h-9 items-center gap-1.5 rounded-full bg-white px-3.5 text-[13px] font-semibold ring-1 ring-[#e6dfca] active:scale-95 disabled:opacity-50"
-                          >
-                            <Sparkles size={14} />
-                            {L("Все дни сразу", "Alle Tage")}
-                          </button>
+                          {seasonDays > tasksSorted.length && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                act(
+                                  { action: "tasks_generate", season_id: season.id },
+                                  L("Заготовки на все дни созданы", "Vorlagen für alle Tage erstellt"),
+                                )
+                              }
+                              className="flex h-9 items-center gap-1.5 rounded-full bg-white px-3.5 text-[13px] font-semibold ring-1 ring-[#e6dfca] active:scale-95 disabled:opacity-50"
+                            >
+                              <Sparkles size={14} />
+                              {L(`Все дни (${seasonDays})`, `Alle Tage (${seasonDays})`)}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => {
@@ -606,8 +663,8 @@ function AdminInner() {
                         icon={<CalendarDays size={22} />}
                         title={L("Заданий пока нет", "Noch keine Aufgaben")}
                         text={L(
-                          "Нажмите «Все дни сразу», и мы создадим заготовки на каждый день сезона. Останется заполнить их.",
-                          "Mit „Alle Tage“ erstellen wir Vorlagen für jeden Tag der Saison. Du füllst sie nur noch aus.",
+                          "Нажмите «Все дни», и мы создадим заготовки на каждый день сезона по его датам. Останется заполнить их.",
+                          "Mit „Alle Tage“ erstellen wir Vorlagen für jeden Tag der Saison nach ihren Daten. Du füllst sie nur noch aus.",
                         )}
                       />
                     ) : (
@@ -1024,10 +1081,7 @@ function AdminInner() {
             type="button"
             className={cx(ui.btn, ui.primary, "w-full")}
             disabled={busy}
-            onClick={async () => {
-              const d = await act({ action: "season_save", ...seasonForm }, L("Сохранено", "Gespeichert"));
-              if (d) setSeasonForm(null);
-            }}
+            onClick={saveSeason}
           >
             {busy ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
             {L("Сохранить", "Speichern")}
@@ -1036,24 +1090,48 @@ function AdminInner() {
       >
         {seasonForm && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-[1fr_96px] gap-3">
+              <SelectField
+                label={L("Месяц сезона", "Monat der Saison")}
+                value={seasonForm.start_date ? Number(seasonForm.start_date.slice(5, 7)) - 1 : null}
+                placeholder={L("Выбрать месяц", "Monat wählen")}
+                options={Array.from({ length: 12 }, (_, m) => ({
+                  value: m,
+                  label: new Intl.DateTimeFormat(locale, { month: "long" }).format(new Date(2024, m, 1)),
+                }))}
+                onChange={(v) => v !== "" && applyMonth(Number(v), seasonForm.year || new Date().getFullYear())}
+              />
               <Labeled text={L("Год", "Jahr")}>
                 <input
                   className={ui.input}
                   inputMode="numeric"
                   value={seasonForm.year ?? ""}
-                  onChange={(e) => setSeasonForm({ ...seasonForm, year: Number(e.target.value.replace(/\D/g, "")) })}
-                />
-              </Labeled>
-              <Labeled text={L("Номер в году", "Nr. im Jahr")}>
-                <input
-                  className={ui.input}
-                  inputMode="numeric"
-                  value={seasonForm.number ?? ""}
-                  onChange={(e) => setSeasonForm({ ...seasonForm, number: Number(e.target.value.replace(/\D/g, "")) })}
+                  onChange={(e) => {
+                    const y = Number(e.target.value.replace(/\D/g, "").slice(0, 4));
+                    if (y >= 2000 && seasonForm.start_date) applyMonth(Number(seasonForm.start_date.slice(5, 7)) - 1, y);
+                    else setSeasonForm({ ...seasonForm, year: y });
+                  }}
                 />
               </Labeled>
             </div>
+            {dayCount(seasonForm.start_date, seasonForm.end_date) > 0 && (
+              <p className="-mt-1 rounded-[14px] bg-[#fff4d1] px-3.5 py-2.5 text-[13px] font-semibold text-[#9a6b00]">
+                {L("Дней в сезоне", "Tage in der Saison")}: {dayCount(seasonForm.start_date, seasonForm.end_date)}
+                {". "}
+                {L(
+                  "После сохранения мы предложим сразу создать задания на все дни.",
+                  "Nach dem Speichern bieten wir an, sofort Aufgaben für alle Tage zu erstellen.",
+                )}
+              </p>
+            )}
+            <Labeled text={L("Номер сезона в году", "Nr. der Saison im Jahr")}>
+              <input
+                className={ui.input}
+                inputMode="numeric"
+                value={seasonForm.number ?? ""}
+                onChange={(e) => setSeasonForm({ ...seasonForm, number: Number(e.target.value.replace(/\D/g, "")) })}
+              />
+            </Labeled>
             <Labeled text={L("Название по-немецки", "Titel auf Deutsch")}>
               <input
                 className={ui.input}
@@ -1069,12 +1147,12 @@ function AdminInner() {
               />
             </Labeled>
             <DateField
-              label={L("Первый день", "Erster Tag")}
+              label={L("Первый день (можно изменить)", "Erster Tag (änderbar)")}
               value={seasonForm.start_date}
               onChange={(v) => setSeasonForm({ ...seasonForm, start_date: v })}
             />
             <DateField
-              label={L("Последний день", "Letzter Tag")}
+              label={L("Последний день (можно изменить)", "Letzter Tag (änderbar)")}
               value={seasonForm.end_date}
               onChange={(v) => setSeasonForm({ ...seasonForm, end_date: v })}
             />

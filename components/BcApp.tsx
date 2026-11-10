@@ -13,6 +13,7 @@ import {
   EyeOff,
   Loader2,
   LogOut,
+  MessageCircle,
   Trash2,
   Trophy,
   User,
@@ -37,6 +38,7 @@ type Me = {
     is_guest: boolean;
   } | null;
   season: { id: number; title: string } | null;
+  mentor: { name: string; whatsapp: string | null } | null;
   points: number;
   rank: Rank | null;
   nextRank: Rank | null;
@@ -77,6 +79,8 @@ const T = {
     tabToday: "Heute",
     tabRanking: "Ranking",
     tabProfile: "Profil",
+    mentor: "Dein Ansprechpartner",
+    writeWa: "WhatsApp",
     hello: "Hallo",
     points: "Punkte",
     toNext: "bis",
@@ -147,6 +151,8 @@ const T = {
     tabToday: "Сегодня",
     tabRanking: "Рейтинг",
     tabProfile: "Профиль",
+    mentor: "Твой ответственный",
+    writeWa: "WhatsApp",
     hello: "Привет",
     points: "баллов",
     toNext: "до ранга",
@@ -723,6 +729,36 @@ function AuthFlow({ lang, onDone }: { lang: Lang; onDone: () => void }) {
   );
 }
 
+/* ---------- ответственный служитель и WhatsApp ---------- */
+
+function MentorBar({ me, lang }: { me: Me; lang: Lang }) {
+  const t = T[lang];
+  if (!me.mentor) return null;
+  const body = (
+    <>
+      <Avatar url={null} name={me.mentor.name || "?"} size={34} />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[11px] text-[#8a8678]">{t.mentor}</span>
+        <span className="block truncate text-[14px] font-extrabold leading-tight">{me.mentor.name}</span>
+      </span>
+      {me.mentor.whatsapp && (
+        <span className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#1b2431] px-3.5 text-[12px] font-bold text-[#ffc93c]">
+          <MessageCircle className="h-4 w-4" />
+          {t.writeWa}
+        </span>
+      )}
+    </>
+  );
+  const cls = "flex items-center gap-3 rounded-2xl border border-[#e9e3d3] bg-white p-2.5";
+  return me.mentor.whatsapp ? (
+    <a href={me.mentor.whatsapp} target="_blank" rel="noopener noreferrer" className={`${cls} active:scale-[0.99]`}>
+      {body}
+    </a>
+  ) : (
+    <div className={cls}>{body}</div>
+  );
+}
+
 /* ---------- вкладка "Сегодня" ---------- */
 
 function Today({ me, lang, onChanged }: { me: Me; lang: Lang; onChanged: () => void }) {
@@ -757,6 +793,7 @@ function Today({ me, lang, onChanged }: { me: Me; lang: Lang; onChanged: () => v
         </p>
       </div>
 
+      <MentorBar me={me} lang={lang} />
       <BcGift lang={lang} />
       {me.season ? <BcTasks lang={lang} onChanged={onChanged} /> : <Placeholder text={t.noSeason} />}
     </div>
@@ -931,6 +968,8 @@ function Profile({
       </div>
 
       <ErrorLine lang={lang} code={err} />
+
+      <MentorBar me={me} lang={lang} />
 
       <MyAwards lang={lang} />
 
