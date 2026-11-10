@@ -19,7 +19,7 @@ import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import Avatar from "@/components/Avatar";
 import PushNotifications from "@/components/PushNotifications";
-import NotifyUpdate from "@/components/Notifyupdate";
+import NotifyUpdate from "@/components/NotifyUpdate";
 import InstallApp from "@/components/InstallApp";
 
 type Profile = {
