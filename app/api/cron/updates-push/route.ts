@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import webpush from "web-push";
 
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
@@ -7,46 +7,32 @@ import { UPDATES } from "@/lib/updates";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SUPER_ADMIN_EMAIL = "yargalaychuk@gmail.com";
+/*
+ * Раз в сутки (см. vercel.json) проверяет, есть ли в lib/updates.ts новое обновление
+ * с push: true, о котором ещё не рассылали. Если есть, шлёт всем служителям push
+ * (на двух языках) и запоминает id. Ручной запуск: ?force=1 (с секретом).
+ */
+export async function GET(request: NextRequest) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return NextResponse.json({ error: "CRON_SECRET is not configured" }, { status: 500 });
+  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
 
-async function authorize(req: Request) {
-  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!token) return false;
-  const { data, error } = await getSupabaseAdmin().auth.getUser(token);
-  if (error || !data.user) return false;
-  return (data.user.email ?? "").toLowerCase() === SUPER_ADMIN_EMAIL;
-}
+  const latest = UPDATES[0];
+  if (!latest || !latest.push) return NextResponse.json({ sent: 0, note: "latest update has no push" });
 
-/* Состояние для кнопки: какое обновление последнее, слали ли о нём, сколько подписчиков */
-export async function GET(req: Request) {
-  if (!(await authorize(req))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const sb = getSupabaseAdmin();
-  const latest = UPDATES[0];
-  const [{ data: state }, { count }] = await Promise.all([
-    sb.from("app_state").select("value").eq("key", "last_update_push").maybeSingle(),
-    sb.from("push_subscriptions").select("endpoint", { count: "exact", head: true }),
-  ]);
-  return NextResponse.json({
-    id: latest?.id ?? null,
-    title: latest?.title ?? null,
-    alreadySent: Boolean(latest && state?.value === latest.id),
-    subscribers: count ?? 0,
-  });
-}
+  const force = request.nextUrl.searchParams.get("force") === "1";
 
-/* Отправить push о последнем обновлении всем служителям с включёнными уведомлениями */
-export async function POST(req: Request) {
-  if (!(await authorize(req))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
-
-  const latest = UPDATES[0];
-  if (!latest) return NextResponse.json({ error: "no_update" }, { status: 400 });
+  const { data: state } = await sb.from("app_state").select("value").eq("key", "last_update_push").maybeSingle();
+  if (!force && state?.value === latest.id) return NextResponse.json({ sent: 0, note: "already sent", id: latest.id });
 
   const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
-  if (!pub || !priv) return NextResponse.json({ error: "vapid" }, { status: 500 });
+  if (!pub || !priv) return NextResponse.json({ error: "VAPID keys are not configured" }, { status: 500 });
   webpush.setVapidDetails(process.env.VAPID_SUBJECT || "mailto:info@example.com", pub, priv);
 
-  const sb = getSupabaseAdmin();
   const { data: subs } = await sb.from("push_subscriptions").select("endpoint, p256dh, auth");
 
   const payload = JSON.stringify({
@@ -58,6 +44,7 @@ export async function POST(req: Request) {
 
   let sent = 0;
   const expired: string[] = [];
+
   for (const sub of subs ?? []) {
     try {
       await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload);
@@ -68,8 +55,9 @@ export async function POST(req: Request) {
       else console.error("update push error:", error);
     }
   }
+
   if (expired.length) await sb.from("push_subscriptions").delete().in("endpoint", expired);
   await sb.from("app_state").upsert({ key: "last_update_push", value: latest.id, updated_at: new Date().toISOString() });
 
-  return NextResponse.json({ sent });
+  return NextResponse.json({ sent, removedExpired: expired.length, id: latest.id });
 }
