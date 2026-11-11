@@ -22,20 +22,63 @@ export default function NotifyUpdate({ isRu }: { isRu: boolean }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState("");
 
-  useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
-      const session = data.session;
-      if ((session?.user.email ?? "").toLowerCase() !== SUPER_ADMIN_EMAIL) return;
-      setToken(session!.access_token);
-      const res = await fetch("/api/admin/notify-update", {
-        headers: { Authorization: `Bearer ${session!.access_token}` },
-        cache: "no-store",
-      });
-      if (res.ok) setInfo(await res.json());
-    });
-  }, []);
+  const [error, setError] = useState("");
+  const [isSuper, setIsSuper] = useState(false);
 
-  if (!token || !info || !info.id) return null;
+  useEffect(() => {
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if ((user?.email ?? "").toLowerCase() !== SUPER_ADMIN_EMAIL) return;
+      setIsSuper(true);
+
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+      if (!accessToken) {
+        setError(isRu ? "Нет сессии, выйди и войди заново." : "Keine Sitzung, bitte neu anmelden.");
+        return;
+      }
+      setToken(accessToken);
+
+      try {
+        const res = await fetch("/api/admin/notify-update", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          cache: "no-store",
+        });
+        if (!res.ok) {
+          setError(
+            res.status === 404
+              ? isRu
+                ? "Не найден файл app/api/admin/notify-update/route.ts."
+                : "Datei app/api/admin/notify-update/route.ts fehlt."
+              : isRu
+                ? `Сервер ответил ошибкой ${res.status}.`
+                : `Serverfehler ${res.status}.`,
+          );
+          return;
+        }
+        setInfo(await res.json());
+      } catch {
+        setError(isRu ? "Нет связи с сервером." : "Keine Verbindung zum Server.");
+      }
+    })();
+  }, [isRu]);
+
+  if (!isSuper) return null;
+
+  if (error || !token || !info || !info.id) {
+    return (
+      <section className="mt-4 rounded-[24px] border border-[#e9e3d3] bg-white p-5 shadow-[0_4px_18px_rgba(27,36,49,0.04)]">
+        <p className="text-[15px] font-semibold text-[#2a2a26]">
+          {isRu ? "Уведомить об обновлении" : "Über Update informieren"}
+        </p>
+        <p className="mt-1 text-[12px] leading-snug text-[#a0453a]">
+          {error || (isRu ? "Загрузка..." : "Lädt...")}
+        </p>
+      </section>
+    );
+  }
 
   async function send() {
     setBusy(true);
