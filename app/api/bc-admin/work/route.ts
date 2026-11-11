@@ -78,11 +78,64 @@ export async function GET(req: Request) {
     let q = sb
       .from("bc_gifts")
       .select(
-        "id, status, opened_at, expires_at, gift_link, submitted_at, given_at, bc_participants!inner(nickname, first_name, last_name, mentor_id)",
+        "id, status, opened_at, expires_at, gift_link, gift_price, submitted_at, given_at, bc_participants!inner(nickname, first_name, last_name, mentor_id)",
       );
     if (ids) q = q.in("participant_id", ids);
     const { data } = await q.order("opened_at", { ascending: false }).limit(200);
     return NextResponse.json({ gifts: data ?? [] });
+  }
+
+  /* ---- данные для PDF-экспорта итогов ---- */
+  if (view === "export") {
+    const { data: sRow } = await sb
+      .from("bc_seasons")
+      .select("id, year, number, start_date, end_date")
+      .eq("id", Number((await seasonOf(sb, url.searchParams.get("season")))?.id ?? 0))
+      .maybeSingle();
+    if (!sRow) return NextResponse.json({ error: "noseason" }, { status: 404 });
+
+    /* участники: все, кто сдал хотя бы одно задание сезона */
+    const { data: tks } = await sb.from("bc_tasks").select("id").eq("season_id", sRow.id);
+    const taskIds = (tks ?? []).map((t) => t.id as number);
+    const doers = new Set<number>();
+    if (taskIds.length) {
+      let sq = sb.from("bc_submissions").select("participant_id").in("task_id", taskIds);
+      if (ids) sq = sq.in("participant_id", ids);
+      for (const r of (await sq).data ?? []) doers.add(r.participant_id as number);
+    }
+    const { data: pRows } = doers.size
+      ? await sb.from("bc_participants").select("first_name, last_name").in("id", Array.from(doers))
+      : { data: [] };
+    const participants = (pRows ?? [])
+      .map((p) => ({ first_name: p.first_name as string, last_name: p.last_name as string }))
+      .sort((a, b) => a.last_name.localeCompare(b.last_name, "de") || a.first_name.localeCompare(b.first_name, "de"));
+
+    /* подарки: у кого есть ссылка */
+    let gq = sb
+      .from("bc_gifts")
+      .select("gift_link, gift_price, bc_participants!inner(first_name, last_name)")
+      .eq("season_id", sRow.id)
+      .not("gift_link", "is", null);
+    if (ids) gq = gq.in("participant_id", ids);
+    const { data: gRows } = await gq;
+    const gifts = ((gRows ?? []) as unknown as {
+      gift_link: string;
+      gift_price: number | null;
+      bc_participants: { first_name: string; last_name: string };
+    }[])
+      .map((g) => ({
+        first_name: g.bc_participants.first_name,
+        last_name: g.bc_participants.last_name,
+        link: g.gift_link,
+        price: g.gift_price == null ? null : Number(g.gift_price),
+      }))
+      .sort((a, b) => a.last_name.localeCompare(b.last_name, "de"));
+
+    return NextResponse.json({
+      season: { year: sRow.year, number: sRow.number, start_date: sRow.start_date, end_date: sRow.end_date },
+      participants,
+      gifts,
+    });
   }
 
   /* ---- статистика ---- */
@@ -257,6 +310,21 @@ export async function POST(req: Request) {
       .from("bc_gifts")
       .update({ status: "given", given_at: new Date().toISOString() })
       .eq("id", g.id);
+    if (error) return NextResponse.json({ error: "db" }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  /* цена подарка (для PDF с подарками) */
+  if (action === "gift_price") {
+    const { data: g } = await sb.from("bc_gifts").select("id, participant_id").eq("id", Number(body.id)).maybeSingle();
+    if (!g) return NextResponse.json({ error: "notfound" }, { status: 404 });
+    if (!(await canTouch(g.participant_id))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    const raw = String(body.price ?? "").replace(",", ".").replace(/[^\d.]/g, "");
+    const price = raw === "" ? null : Math.round(Number(raw) * 100) / 100;
+    if (price !== null && (!Number.isFinite(price) || price < 0 || price > 100000)) {
+      return NextResponse.json({ error: "bad" }, { status: 400 });
+    }
+    const { error } = await sb.from("bc_gifts").update({ gift_price: price }).eq("id", g.id);
     if (error) return NextResponse.json({ error: "db" }, { status: 500 });
     return NextResponse.json({ ok: true });
   }

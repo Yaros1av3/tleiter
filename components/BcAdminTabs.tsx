@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, CheckCircle2, MessageCircle, ExternalLink, Gift, Loader2, RotateCcw, Trophy, Users } from "lucide-react";
+import { Check, CheckCircle2, FileText, MessageCircle, ExternalLink, Gift, Loader2, RotateCcw, Trophy, Users } from "lucide-react";
 
 import { bcCall } from "@/lib/bcAdminClient";
+import { downloadGiftsPdf, downloadParticipantsPdf, type ExportData } from "@/lib/bcPdf";
 import { useLanguage } from "@/components/LanguageProvider";
 import { Avatar, Badge, Empty, Segmented, Skeleton, cx, ui, useBcUi } from "@/components/BcUi";
 
@@ -231,6 +232,7 @@ type GiftRow = {
   opened_at: string;
   expires_at: string;
   gift_link: string | null;
+  gift_price: number | null;
   submitted_at: string | null;
   given_at: string | null;
   bc_participants: { nickname: string; first_name: string; last_name: string };
@@ -323,6 +325,22 @@ export function GiftsTab() {
                   <ExternalLink size={16} className="shrink-0" />
                   <span className="min-w-0 break-all">{g.gift_link}</span>
                 </a>
+              )}
+              {g.gift_link && (
+                <label className="mt-2.5 flex items-center gap-3">
+                  <span className="text-[13px] font-semibold text-[#6f6a5c]">{L("Цена, €", "Preis, €")}</span>
+                  <input
+                    className={cx(ui.input, "!h-11 max-w-[140px]")}
+                    inputMode="decimal"
+                    placeholder="19,99"
+                    defaultValue={g.gift_price != null ? String(g.gift_price).replace(".", ",") : ""}
+                    onBlur={async (e) => {
+                      const value = e.target.value;
+                      const { ok } = await bcCall("POST", "/api/bc-admin/work", { action: "gift_price", id: g.id, price: value });
+                      toast(ok ? L("Цена сохранена", "Preis gespeichert") : L("Не получилось", "Fehlgeschlagen"), ok ? "ok" : "error");
+                    }}
+                  />
+                </label>
               )}
               {g.status !== "given" && (
                 <div className="mt-3 grid grid-cols-2 gap-2">
@@ -498,6 +516,78 @@ export function StatsTab({ seasonId }: { seasonId: number | null }) {
         </div>
       </section>
 
+      <ExportSection seasonId={seasonId} />
     </div>
+  );
+}
+
+/* ================= Экспорт итогов в PDF ================= */
+
+function ExportSection({ seasonId }: { seasonId: number | null }) {
+  const { L } = useL();
+  const { toast } = useBcUi();
+  const [busy, setBusy] = useState<"" | "people" | "gifts">("");
+
+  const run = async (kind: "people" | "gifts") => {
+    setBusy(kind);
+    try {
+      const { ok, data } = await bcCall<ExportData & { error?: string }>(
+        "GET",
+        `/api/bc-admin/work?view=export${seasonId ? `&season=${seasonId}` : ""}`,
+      );
+      if (!ok || !data.season) {
+        toast(L("Не удалось получить данные", "Daten konnten nicht geladen werden"), "error");
+        return;
+      }
+      if (kind === "people") {
+        await downloadParticipantsPdf(data);
+      } else {
+        if (data.gifts.length === 0) {
+          toast(L("Пока нет подарков со ссылкой", "Noch keine Geschenke mit Link"), "error");
+          return;
+        }
+        await downloadGiftsPdf(data);
+      }
+      toast(L("PDF готов", "PDF fertig"));
+    } catch {
+      toast(L("Не получилось создать PDF", "PDF konnte nicht erstellt werden"), "error");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const btn = (kind: "people" | "gifts", title: string, sub: string) => (
+    <button
+      type="button"
+      disabled={busy !== ""}
+      onClick={() => run(kind)}
+      className="flex w-full items-center gap-3 rounded-[18px] border border-[#ece6d3] bg-white p-4 text-left active:scale-[0.99] disabled:opacity-60"
+    >
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#fff4d1] text-[#9a6b00]">
+        {busy === kind ? <Loader2 size={20} className="animate-spin" /> : <FileText size={20} />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-extrabold">{title}</span>
+        <span className="block text-[12px] text-[#8a8678]">{sub}</span>
+      </span>
+    </button>
+  );
+
+  return (
+    <section>
+      <h3 className="mb-2 px-1 text-[15px] font-extrabold">{L("Экспорт итогов (PDF)", "Export der Ergebnisse (PDF)")}</h3>
+      <div className="space-y-2.5">
+        {btn(
+          "people",
+          L("Описание и участники", "Beschreibung und Teilnehmer"),
+          L("Текст челленджа и таблица имён", "Text der Challenge und Namenstabelle"),
+        )}
+        {btn(
+          "gifts",
+          L("Таблица подарков", "Geschenketabelle"),
+          L("Имя, ссылка на Amazon, цена", "Name, Amazon-Link, Preis"),
+        )}
+      </div>
+    </section>
   );
 }
