@@ -45,6 +45,7 @@ export default function IdeasPage() {
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [canDelete, setCanDelete] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -140,6 +141,8 @@ export default function IdeasPage() {
 
       const { data: admin } = await supabase.rpc("is_admin");
       setIsAdmin(admin === true);
+      const { data: perm } = await supabase.rpc("has_permission", { p: "ideas" });
+      setCanDelete(admin === true || perm === true);
 
       await load();
     }
@@ -524,7 +527,7 @@ export default function IdeasPage() {
                   })}
                 </div>
 
-                {(isAdmin || idea.project_id) && (
+                {(isAdmin || canDelete || idea.project_id) && (
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-3">
                     {idea.project_id ? (
                       <button
@@ -549,7 +552,7 @@ export default function IdeasPage() {
                       )
                     )}
 
-                    {isAdmin &&
+                    {canDelete &&
                       (confirmDeleteId === idea.id ? (
                         <>
                           <button

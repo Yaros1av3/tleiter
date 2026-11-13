@@ -24,6 +24,42 @@ export type UpdateEntry = {
 
 export const UPDATES: UpdateEntry[] = [
   {
+    id: "2026-11-13",
+    date: "2026-11-13",
+    push: true,
+    title: {
+      ru: "Роли и права в команде",
+      de: "Rollen und Rechte im Team",
+    },
+    pushBody: {
+      ru: "На странице «Команда» появились роли с цветами и правами. Загляни.",
+      de: "Auf der Seite „Team“ gibt es jetzt Rollen mit Farben und Rechten. Schau rein.",
+    },
+    items: [
+      {
+        title: { ru: "Свои роли", de: "Eigene Rollen" },
+        text: {
+          ru: "Админ может создать роль со своим названием и цветом и назначить её человеку. Роль видна цветной плашкой в карточке человека.",
+          de: "Admins können eine Rolle mit eigenem Namen und eigener Farbe erstellen und einer Person zuweisen. Die Rolle erscheint als farbiges Label in der Karte.",
+        },
+      },
+      {
+        title: { ru: "Права для ролей", de: "Rechte für Rollen" },
+        text: {
+          ru: "Роли можно дать дополнительные права, например управлять поездками или удалять идеи. Так не нужно делать каждого админом.",
+          de: "Rollen können zusätzliche Rechte bekommen, z. B. Fahrten verwalten oder Ideen löschen. So muss nicht jeder Admin werden.",
+        },
+      },
+      {
+        title: { ru: "Страница подростков", de: "Seite für Jugendliche" },
+        text: {
+          ru: "Если в воскресенье нет урока (например, подростки в зале), подростки теперь видят это с причиной.",
+          de: "Wenn an einem Sonntag kein Unterricht ist (z. B. Jugendliche im Saal), sehen die Jugendlichen das jetzt mit Begründung.",
+        },
+      },
+    ],
+  },
+  {
     id: "2026-11-10",
     date: "2026-11-10",
     push: true,

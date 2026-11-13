@@ -20,6 +20,7 @@ import {
   Phone,
   Plus,
   Search,
+  ShieldCheck,
   Trash2,
   UserRound,
   Users,
@@ -30,6 +31,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations, type Language } from "@/lib/translations";
+import RoleEditor, { RoleBadge, RolePickerSheet } from "@/components/RoleEditor";
+import type { AppRole } from "@/lib/permissions";
 
 type Position =
   | "hauptleiter"
@@ -56,6 +59,7 @@ type TeamMember = {
   created_at: string;
   updated_at: string;
   user_id?: string | null;
+  role_id?: number | null;
 };
 
 type MemberForm = {
@@ -68,6 +72,7 @@ type MemberForm = {
   languages: string[];
   status: Status;
   notes: string;
+  role_id: number | null;
 };
 
 type WorkItem = {
@@ -117,11 +122,12 @@ const emptyForm: MemberForm = {
   languages: [],
   status: "active",
   notes: "",
+  role_id: null,
 };
 
 /* email не запрашивается напрямую — его получают только админы через функцию */
 const MEMBER_COLUMNS =
-  "id,first_name,last_name,position,phone,birth_date,languages,status,notes,avatar_url,created_at,updated_at,user_id";
+  "id,first_name,last_name,position,phone,birth_date,languages,status,notes,avatar_url,created_at,updated_at,user_id,role_id";
 
 const positionOrder: Record<Position, number> = {
   hauptleiter: 1,
@@ -460,6 +466,9 @@ export default function TeamPage() {
     useState<TeamMember | null>(null);
 
   const [form, setForm] = useState<MemberForm>(emptyForm);
+  const [roles, setRoles] = useState<AppRole[]>([]);
+  const [showRoles, setShowRoles] = useState(false);
+  const [showRolePicker, setShowRolePicker] = useState(false);
 
   const [selectedFile, setSelectedFile] =
     useState<File | null>(null);
@@ -496,6 +505,12 @@ export default function TeamPage() {
     };
   }, [previewUrl]);
 
+  const roleById = (id: number | null | undefined) => (id ? roles.find((r) => r.id === id) : undefined);
+  const roleCounts: Record<number, number> = {};
+  for (const m of members) {
+    if (m.role_id) roleCounts[m.role_id] = (roleCounts[m.role_id] ?? 0) + 1;
+  }
+
   async function loadData() {
     setLoading(true);
 
@@ -509,6 +524,12 @@ export default function TeamPage() {
     setMyUserId(authUser?.id ?? null);
 
     setIsAdmin(adminNow);
+
+    const { data: roleRows } = await supabase
+      .from("app_roles")
+      .select("id,name,color,permissions")
+      .order("name", { ascending: true });
+    setRoles((roleRows ?? []) as AppRole[]);
 
     const [
       membersResponse,
@@ -848,6 +869,7 @@ export default function TeamPage() {
       languages: normalizeLanguages(member.languages),
       status: member.status,
       notes: member.notes ?? "",
+      role_id: member.role_id ?? null,
     });
 
     setSelectedFile(null);
@@ -985,6 +1007,7 @@ export default function TeamPage() {
       languages: normalizeLanguages(form.languages),
       status: form.status,
       notes: form.notes.trim() || null,
+      role_id: form.role_id,
       updated_at: new Date().toISOString(),
     };
 
@@ -1191,6 +1214,17 @@ export default function TeamPage() {
       >
         <UserRound size={14} />
         {language === "de" ? "Mein Profil" : "Мой профиль"}
+      </button>
+    )}
+
+    {isAdmin && (
+      <button
+        type="button"
+        onClick={() => setShowRoles(true)}
+        aria-label={language === "de" ? "Rollen und Rechte" : "Роли и права"}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-900 shadow-sm transition active:scale-95"
+      >
+        <ShieldCheck size={18} strokeWidth={2.2} />
       </button>
     )}
 
@@ -1585,6 +1619,10 @@ export default function TeamPage() {
                                 )}
                               </span>
 
+                              {roleById(member.role_id) && (
+                                <RoleBadge role={roleById(member.role_id)!} />
+                              )}
+
                               <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-neutral-400">
                                 <span
                                   className={`h-1.5 w-1.5 rounded-full ${
@@ -1920,6 +1958,10 @@ export default function TeamPage() {
                           language,
                         )}
                       </span>
+
+                      {roleById(selectedMember.role_id) && (
+                        <RoleBadge role={roleById(selectedMember.role_id)!} size="md" />
+                      )}
 
                       <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-neutral-400">
                         <span
@@ -2307,6 +2349,27 @@ export default function TeamPage() {
         </div>
       )}
 
+      <RoleEditor
+        open={showRoles}
+        roles={roles}
+        counts={roleCounts}
+        isRu={language === "ru"}
+        onClose={() => setShowRoles(false)}
+        onChanged={loadData}
+      />
+
+      <RolePickerSheet
+        open={showRolePicker}
+        roles={roles}
+        value={form.role_id}
+        isRu={language === "ru"}
+        onClose={() => setShowRolePicker(false)}
+        onSelect={(id) => {
+          setForm((current) => ({ ...current, role_id: id }));
+          setShowRolePicker(false);
+        }}
+      />
+
       {/* Create / Edit */}
       {showModal && (
         <div
@@ -2435,6 +2498,30 @@ export default function TeamPage() {
                   />
                 </div>
               </div>
+
+              {/* Роль с цветом и правами (только админ) */}
+              {isAdmin && (
+                <div>
+                  <label className="mb-2 block text-xs font-bold text-neutral-700">
+                    {language === "de" ? "Rolle" : "Роль"}
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowRolePicker(true)}
+                    className="flex h-12 w-full items-center gap-2.5 rounded-xl border border-neutral-200 bg-neutral-50 px-3 text-left text-sm"
+                  >
+                    {roleById(form.role_id) ? (
+                      <RoleBadge role={roleById(form.role_id)!} size="md" />
+                    ) : (
+                      <span className="text-neutral-400">
+                        {language === "de" ? "Keine Rolle" : "Без роли"}
+                      </span>
+                    )}
+                    <ChevronRight size={16} className="ml-auto text-neutral-400" />
+                  </button>
+                </div>
+              )}
 
               {/* Position + Status (только админ) */}
               {isAdmin && (
