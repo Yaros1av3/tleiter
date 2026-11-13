@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import {
+  CalendarOff,
   BookOpen,
   Bell,
   BellRing,
@@ -42,6 +43,14 @@ type Lesson = {
   going: number;
 };
 
+type Notice = {
+  id: number;
+  date: string;
+  time: string;
+  title_de: string | null;
+  title_ru: string | null;
+};
+
 type TeenEvent = {
   id: number;
   title: string;
@@ -62,6 +71,7 @@ const TEXT = {
   de: {
     next: "Nächster Unterricht",
     noLesson: "Für dieses Treffen ist noch kein Unterricht geplant.",
+    noticeHead: "Kein Unterricht",
     topicOpen: "Thema folgt",
     serving: "Es dienen",
     nobody: "Wird noch festgelegt",
@@ -101,6 +111,7 @@ const TEXT = {
   ru: {
     next: "Ближайший урок",
     noLesson: "Для этой встречи урок пока не запланирован.",
+    noticeHead: "Урока не будет",
     topicOpen: "Тема скоро появится",
     serving: "Служат",
     nobody: "Пока не назначены",
@@ -182,6 +193,7 @@ export default function TeensHub() {
   const [service, setService] = useState<Service | null | undefined>(undefined);
   const [lessons, setLessons] = useState<Lesson[] | null>(null);
   const [events, setEvents] = useState<TeenEvent[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadDetail, setLoadDetail] = useState("");
 
@@ -215,8 +227,9 @@ export default function TeensHub() {
         throw new Error("load");
       }
 
-      const data = (await response.json()) as { lessons: Lesson[]; events: TeenEvent[] };
+      const data = (await response.json()) as { lessons: Lesson[]; events: TeenEvent[]; notices?: Notice[] };
       setLessons(data.lessons);
+      setNotices(data.notices ?? []);
       setEvents(data.events);
       setLoadFailed(false);
 
@@ -532,6 +545,7 @@ export default function TeensHub() {
   }
 
   const myLessons = (lessons ?? []).filter((lesson) => lesson.time === service);
+  const myNotices = notices.filter((notice) => notice.time === service);
 
   const nameInput = (
     id: string,
@@ -652,6 +666,24 @@ export default function TeensHub() {
                 {loadDetail}
               </p>
             )}
+
+            {/* почему на ближайшей встрече нет урока */}
+            {myNotices.map((notice) => {
+              const reason = lang === "ru" ? notice.title_ru || notice.title_de : notice.title_de || notice.title_ru;
+
+              return (
+                <div key={notice.id} className="mt-6 flex gap-3 rounded-[22px] bg-[#fff4d1] p-4">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#ffc93c] text-[#1b2431]">
+                    <CalendarOff size={19} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-bold capitalize text-[#9a6b00]">{dateLabel(notice.date)}</p>
+                    <p className="mt-0.5 text-[15px] font-extrabold leading-tight text-[#1b2431]">{t.noticeHead}</p>
+                    {reason && <p className="mt-1 text-[14px] leading-snug text-[#5c4a10]">{reason}</p>}
+                  </div>
+                </div>
+              );
+            })}
 
             {/* ближайший урок */}
             <p className="mb-2 mt-6 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9a9585]">

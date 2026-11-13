@@ -39,6 +39,30 @@ export async function GET() {
       (entry) => firstByTime.get(String(entry.service_time)) === entry.schedule_date,
     );
 
+    // записи типа «событие» (например, «подростки в зале»), которые идут РАНЬШЕ ближайшего урока:
+    // подросток должен видеть, что в этот день урока нет и почему
+    const { data: eventEntries, error: eventEntriesError } = await supabase
+      .from("schedule_entries")
+      .select("id, schedule_date, service_time, title_de, title_ru")
+      .eq("entry_type", "event")
+      .gte("schedule_date", today)
+      .order("schedule_date", { ascending: true })
+      .limit(30);
+
+    if (eventEntriesError) {
+      throw new Error(`schedule_entries events: ${eventEntriesError.message}`);
+    }
+
+    const noticeSeen = new Set<string>();
+    const notices = (eventEntries ?? []).filter((entry) => {
+      const key = String(entry.service_time);
+      if (noticeSeen.has(key)) return false;
+      const firstLesson = firstByTime.get(key);
+      if (firstLesson && (entry.schedule_date as string) >= firstLesson) return false;
+      noticeSeen.add(key);
+      return true;
+    });
+
     const ids = lessonRows.map((entry) => entry.id as number);
 
     const serving = new Map<number, string[]>();
@@ -114,7 +138,23 @@ export async function GET() {
           serving: serving.get(entry.id as number) ?? [],
           going: going.get(entry.id as number) ?? 0,
         })),
-        events: events ?? [],
+        notices: notices.map((entry) => ({
+          id: entry.id,
+          date: entry.schedule_date,
+          time: entry.service_time,
+          title_de: entry.title_de,
+          title_ru: entry.title_ru,
+        })),
+        events: (events ?? []).map((event) => ({
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          start_at: event.start_at,
+          end_at: event.end_at,
+          location: event.location,
+          link_url: event.link_url,
+          form: null,
+        })),
       },
       { headers: { "Cache-Control": "no-store" } },
     );
