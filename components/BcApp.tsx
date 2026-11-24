@@ -19,6 +19,7 @@ import {
   User,
 } from "lucide-react";
 
+import BcExtras from "@/components/BcExtras";
 import BcGift from "@/components/BcGift";
 import BcProgress from "@/components/BcProgress";
 import BcPush from "@/components/BcPush";
@@ -799,6 +800,7 @@ function Today({ me, lang, onChanged }: { me: Me; lang: Lang; onChanged: () => v
       <MentorBar me={me} lang={lang} />
       <BcGift lang={lang} />
       {me.season ? <BcTasks lang={lang} onChanged={onChanged} /> : <Placeholder text={t.noSeason} />}
+      {me.season && <BcExtras lang={lang} onChanged={onChanged} />}
     </div>
   );
 }

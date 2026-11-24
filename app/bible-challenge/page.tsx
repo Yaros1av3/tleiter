@@ -32,6 +32,7 @@ import {
 import { bcCall } from "@/lib/bcAdminClient";
 import { useLanguage } from "@/components/LanguageProvider";
 import { GiftsTab, ReviewTab, StatsTab } from "@/components/BcAdminTabs";
+import BcExtrasAdmin from "@/components/BcExtrasAdmin";
 import {
   Avatar,
   BcUiProvider,
@@ -71,6 +72,8 @@ type Task = {
   title_ru: string;
   text_de: string | null;
   text_ru: string | null;
+  extra_de?: string | null;
+  extra_ru?: string | null;
   is_published: boolean;
 };
 type Participant = {
@@ -610,7 +613,12 @@ function AdminInner() {
             <div className="pt-4">
               {tab === "review" && <ReviewTab key={seasonId ?? 0} seasonId={seasonId} onChanged={() => load()} />}
               {tab === "gifts" && <GiftsTab />}
-              {tab === "stats" && <StatsTab key={seasonId ?? 0} seasonId={seasonId} />}
+              {tab === "stats" && (
+                <>
+                  <StatsTab key={seasonId ?? 0} seasonId={seasonId} />
+                  <BcExtrasAdmin key={`x${seasonId ?? 0}`} seasonId={seasonId} />
+                </>
+              )}
 
               {/* ЗАДАНИЯ */}
               {tab === "tasks" &&
@@ -1260,6 +1268,13 @@ function AdminInner() {
                     onChange={(e) => setTaskForm({ ...taskForm, text_de: e.target.value })}
                   />
                 </Labeled>
+                <Labeled text="Extra-Aufgabe">
+                  <textarea
+                    className={ui.area}
+                    value={taskForm.extra_de ?? ""}
+                    onChange={(e) => setTaskForm({ ...taskForm, extra_de: e.target.value })}
+                  />
+                </Labeled>
               </>
             ) : (
               <>
@@ -1275,6 +1290,13 @@ function AdminInner() {
                     className={ui.area}
                     value={taskForm.text_ru ?? ""}
                     onChange={(e) => setTaskForm({ ...taskForm, text_ru: e.target.value })}
+                  />
+                </Labeled>
+                <Labeled text="Доп. задание">
+                  <textarea
+                    className={ui.area}
+                    value={taskForm.extra_ru ?? ""}
+                    onChange={(e) => setTaskForm({ ...taskForm, extra_ru: e.target.value })}
                   />
                 </Labeled>
               </>

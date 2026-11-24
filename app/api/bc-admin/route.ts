@@ -179,6 +179,8 @@ export async function POST(req: Request) {
       title_ru: str(body.title_ru, 160),
       text_de: str(body.text_de) || null,
       text_ru: str(body.text_ru) || null,
+      extra_de: str(body.extra_de) || null,
+      extra_ru: str(body.extra_ru) || null,
       is_published: Boolean(body.is_published),
     };
     if (!row.season_id || !row.day_number || !row.task_date || !row.deadline || !row.title_de || !row.title_ru)
