@@ -23,6 +23,24 @@ import {
 
 import TeensInstall from "@/components/TeensInstall";
 import { shortTitle } from "@/lib/shortTitle";
+import {
+  AchievementsCard,
+  VerseCard,
+  CelebrationLayer,
+  ProgressCard,
+  TeensAnimStyles,
+  type Celebration,
+} from "@/components/TeensProgress";
+import {
+  ACHIEVEMENTS,
+  HISTORY_KEY,
+  berlinToday,
+  computeStats,
+  levelOf,
+  parseHistory,
+  withDate,
+  withoutDate,
+} from "@/lib/teensProgress";
 
 type Lang = "de" | "ru";
 type Service = "10:00" | "12:30";
@@ -203,6 +221,10 @@ export default function TeensHub() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [nameError, setNameError] = useState(false);
 
+  const [history, setHistory] = useState<string[]>([]);
+  const [celebration, setCelebration] = useState<Celebration | null>(null);
+  const today = berlinToday();
+
   const [supported, setSupported] = useState(true);
   const [iosInstall, setIosInstall] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
@@ -234,9 +256,15 @@ export default function TeensHub() {
       setLoadFailed(false);
 
       const stored: Record<number, boolean> = {};
+      let hist = parseHistory(safeGet(HISTORY_KEY));
       for (const lesson of data.lessons) {
-        if (safeGet(`teens-rsvp-${lesson.id}`) === "1") stored[lesson.id] = true;
+        if (safeGet(`teens-rsvp-${lesson.id}`) === "1") {
+          stored[lesson.id] = true;
+          hist = withDate(hist, lesson.date);
+        }
       }
+      safeSet(HISTORY_KEY, JSON.stringify(hist));
+      setHistory(hist);
       setMarked(stored);
     } catch {
       setLoadFailed(true);
@@ -368,6 +396,32 @@ export default function TeensHub() {
 
       safeSet(`teens-rsvp-${lesson.id}`, going ? "1" : null);
       setMarked((current) => ({ ...current, [lesson.id]: going }));
+
+      // серия, уровни и достижения
+      const before = history;
+      const after = going ? withDate(before, lesson.date) : withoutDate(before, lesson.date);
+      safeSet(HISTORY_KEY, JSON.stringify(after));
+      setHistory(after);
+
+      if (going) {
+        const sBefore = computeStats(before, today);
+        const sAfter = computeStats(after, today);
+        const lvBefore = levelOf(sBefore.xp).index;
+        const lvAfter = levelOf(sAfter.xp);
+        const newAch = ACHIEVEMENTS.filter((a) => a.done(sAfter) && !a.done(sBefore));
+
+        if (lvAfter.index > lvBefore) {
+          setCelebration({ id: Date.now(), kind: "level", title: lang === "ru" ? lvAfter.current.ru : lvAfter.current.de });
+        } else if (newAch.length > 0) {
+          setCelebration({ id: Date.now(), kind: "ach", title: lang === "ru" ? newAch[0].ru : newAch[0].de });
+        } else {
+          setCelebration({
+            id: Date.now(),
+            kind: "start",
+            title: lang === "ru" ? `${sAfter.streak} в серии` : `${sAfter.streak} in Folge`,
+          });
+        }
+      }
       await load();
     } catch {
       setPushMessage(t.error);
@@ -646,6 +700,8 @@ export default function TeensHub() {
           <ChevronRight size={18} className="shrink-0 text-[#ffc93c]" />
         </a>
 
+        <ProgressCard lang={lang} history={history} today={today} />
+
         {lessons === null ? (
           <div className="mt-16 flex justify-center">
             <Loader2 size={24} className="animate-spin text-[#8a8678]" />
@@ -901,6 +957,9 @@ export default function TeensHub() {
               </div>
             )}
 
+            <VerseCard lang={lang} today={today} />
+            <AchievementsCard lang={lang} history={history} today={today} />
+
             {/* уведомления */}
             <div className={`${card} mt-8 p-4`}>
               <div className="flex items-center gap-3">
@@ -955,6 +1014,9 @@ export default function TeensHub() {
           </>
         )}
       </div>
+
+      <TeensAnimStyles />
+      <CelebrationLayer lang={lang} event={celebration} onDone={() => setCelebration(null)} />
 
       {installOpen && (
         <TeensInstall
