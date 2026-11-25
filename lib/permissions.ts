@@ -6,7 +6,7 @@
  * Админы имеют все права всегда.
  */
 
-export type PermissionKey = "trips" | "ideas";
+export type PermissionKey = "trips" | "ideas" | "camps";
 
 export const PERMISSIONS: {
   key: PermissionKey;
@@ -21,6 +21,13 @@ export const PERMISSIONS: {
     de: "Fahrten",
     descRu: "Создавать и менять поездки, участники, оплата, расходы и голосования",
     descDe: "Fahrten erstellen und ändern, Teilnehmer, Zahlungen, Ausgaben und Abstimmungen",
+  },
+  {
+    key: "camps",
+    ru: "T-Camps",
+    de: "T-Camps",
+    descRu: "Создавать и менять лагерь: команда, обязанности и расписание",
+    descDe: "Camp anlegen und ändern: Team, Aufgaben und Tagesplan",
   },
   {
     key: "ideas",

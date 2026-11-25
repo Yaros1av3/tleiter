@@ -12,14 +12,19 @@ import {
   ChevronRight,
   CalendarDays,
   CalendarRange,
+  Check,
+  ChevronDown,
+  ChevronUp,
   Clock3,
   FileText,
   Lightbulb,
+  Tent,
   ListChecks,
   ClipboardList,
   MapPin,
   Users,
   UserRound,
+  ArrowUpDown,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -280,9 +285,61 @@ export default function Home() {
   const [nextTrip, setNextTrip] = useState<NextTrip | null>(null);
   const [loading, setLoading] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [menuOrder, setMenuOrder] = useState<string[]>([]);
+  const [editMenu, setEditMenu] = useState(false);
+  const [menuUserId, setMenuUserId] = useState<string | null>(null);
 
   const isRu = language === "ru";
   const verse = useMemo(() => getVerseOfTheDay(), []);
+
+  /* личный порядок пунктов меню «Ещё»: сначала из памяти телефона, потом из базы */
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("tlight-menu-order") ?? "[]");
+      if (Array.isArray(saved)) setMenuOrder(saved.filter((x) => typeof x === "string"));
+    } catch {
+      /* без хранилища работает порядок по умолчанию */
+    }
+    let alive = true;
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!alive || !user) return;
+      setMenuUserId(user.id);
+      const { data } = await supabase
+        .from("user_menu_prefs")
+        .select("menu_order")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const order = (data as { menu_order?: string[] } | null)?.menu_order;
+      if (alive && Array.isArray(order) && order.length > 0) {
+        setMenuOrder(order);
+        try {
+          localStorage.setItem("tlight-menu-order", JSON.stringify(order));
+        } catch {
+          /* не страшно */
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  function saveMenuOrder(next: string[]) {
+    setMenuOrder(next);
+    try {
+      localStorage.setItem("tlight-menu-order", JSON.stringify(next));
+    } catch {
+      /* не страшно */
+    }
+    if (menuUserId) {
+      void supabase
+        .from("user_menu_prefs")
+        .upsert({ user_id: menuUserId, menu_order: next, updated_at: new Date().toISOString() });
+    }
+  }
 
   useEffect(() => {
     loadDashboard();
@@ -773,6 +830,14 @@ export default function Home() {
       icon: Bus,
     },
     {
+      href: "/camps",
+      label: "T-Camps",
+      description: isRu
+        ? "Подготовка подросткового лагеря"
+        : "Vorbereitung des Teen-Camps",
+      icon: Tent,
+    },
+    {
       href: reminder.exempt ? "/availability?tab=overview" : "/availability",
       label: reminder.exempt
         ? isRu
@@ -799,6 +864,25 @@ export default function Home() {
       icon: SettingsIcon,
     },
   ];
+
+  const keyOf = (href: string) => href.split("?")[0];
+  const rank = (href: string) => {
+    const i = menuOrder.indexOf(keyOf(href));
+    return i === -1 ? 1000 : i;
+  };
+  const orderedItems = moreItems
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => rank(a.item.href) - rank(b.item.href) || a.index - b.index)
+    .map((x) => x.item);
+
+  function moveItem(href: string, dir: -1 | 1) {
+    const keys = orderedItems.map((i) => keyOf(i.href));
+    const at = keys.indexOf(keyOf(href));
+    const to = at + dir;
+    if (at < 0 || to < 0 || to >= keys.length) return;
+    [keys[at], keys[to]] = [keys[to], keys[at]];
+    saveMenuOrder(keys);
+  }
 
   return (
     <>
@@ -1832,11 +1916,24 @@ export default function Home() {
                   </p>
                 </div>
 
+                <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() =>
-                    setMoreOpen(false)
-                  }
+                  onClick={() => setEditMenu((v) => !v)}
+                  className={`flex h-10 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold ${
+                    editMenu ? "bg-[#ffc93c] text-[#1b2431]" : "bg-[#f3f4f5] text-[#4e5966]"
+                  }`}
+                >
+                  {editMenu ? <Check size={16} /> : <ArrowUpDown size={16} />}
+                  {editMenu ? (isRu ? "Готово" : "Fertig") : isRu ? "Порядок" : "Ordnen"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    setEditMenu(false);
+                  }}
                   className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f3f4f5] text-[#4e5966]"
                   aria-label={
                     isRu
@@ -1846,10 +1943,19 @@ export default function Home() {
                 >
                   <X size={19} />
                 </button>
+                </div>
               </div>
 
+              {editMenu && (
+                <p className="px-5 pb-1 pt-3 text-[12px] text-[#7a8490]">
+                  {isRu
+                    ? "Поставь наверх то, чем пользуешься чаще всего. Порядок виден только тебе."
+                    : "Setze oben, was du am häufigsten nutzt. Die Reihenfolge sieht nur du."}
+                </p>
+              )}
+
               <div className="grid max-h-[70vh] grid-cols-1 gap-2 overflow-y-auto p-3">
-                {moreItems.map((item) => {
+                {orderedItems.map((item, pos) => {
                   const Icon = item.icon;
 
                   return (
@@ -1857,6 +1963,7 @@ export default function Home() {
                       type="button"
                       key={item.href}
                       onClick={() => {
+                        if (editMenu) return;
                         setMoreOpen(false);
                         router.push(item.href);
                       }}
@@ -1892,10 +1999,49 @@ export default function Home() {
                           {item.description}
                         </p>
                       </div>
+
+                      {editMenu && (
+                        <div className="flex shrink-0 flex-col gap-1">
+                          <span
+                            role="button"
+                            aria-label={isRu ? "Выше" : "Nach oben"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveItem(item.href, -1);
+                            }}
+                            className={`flex h-8 w-9 items-center justify-center rounded-[10px] bg-white shadow-sm ${pos === 0 ? "opacity-30" : "text-[#1b2431]"}`}
+                          >
+                            <ChevronUp size={17} />
+                          </span>
+                          <span
+                            role="button"
+                            aria-label={isRu ? "Ниже" : "Nach unten"}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveItem(item.href, 1);
+                            }}
+                            className={`flex h-8 w-9 items-center justify-center rounded-[10px] bg-white shadow-sm ${pos === orderedItems.length - 1 ? "opacity-30" : "text-[#1b2431]"}`}
+                          >
+                            <ChevronDown size={17} />
+                          </span>
+                        </div>
+                      )}
                     </button>
                   );
                 })}
               </div>
+
+              {editMenu && menuOrder.length > 0 && (
+                <div className="px-5 pb-1">
+                  <button
+                    type="button"
+                    onClick={() => saveMenuOrder([])}
+                    className="flex min-h-[40px] w-full items-center justify-center text-[13px] font-semibold text-[#9a6b00]"
+                  >
+                    {isRu ? "Вернуть порядок по умолчанию" : "Standardreihenfolge wiederherstellen"}
+                  </button>
+                </div>
+              )}
 
               <div className="border-t border-[#eceef0] px-5 py-3">
                 <button
