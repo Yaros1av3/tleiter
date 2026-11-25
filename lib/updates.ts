@@ -24,6 +24,64 @@ export type UpdateEntry = {
 
 export const UPDATES: UpdateEntry[] = [
   {
+    id: "2026-11-25",
+    date: "2026-11-25",
+    push: true,
+    title: {
+      ru: "Новый раздел T-Camps и удобное меню",
+      de: "Neuer Bereich T-Camps und praktisches Menü",
+    },
+    pushBody: {
+      ru: "В меню «Ещё» появился раздел T-Camps для подготовки лагеря. Загляни.",
+      de: "Im Menü „Mehr“ gibt es den neuen Bereich T-Camps für die Camp-Vorbereitung. Schau rein.",
+    },
+    items: [
+      {
+        title: { ru: "T-Camps: подготовка лагеря", de: "T-Camps: Camp-Vorbereitung" },
+        text: {
+          ru: "Команда лагеря и обязанности, расписание по часам, регистрация подростков по отдельной ссылке, отряды и домики, материалы (PDF, презентации, документы) и отметка о заезде: приехал, карта, деньги. Видят все служители.",
+          de: "Camp-Team und Aufgaben, Tagesplan nach Uhrzeit, Anmeldung der Jugendlichen über einen eigenen Link, Gruppen und Hütten, Materialien (PDF, Präsentationen, Dokumente) und Anreise-Check: angekommen, Karte, Kasse. Alle Mitarbeiter können es sehen.",
+        },
+      },
+      {
+        title: { ru: "Меню под себя", de: "Menü nach Wunsch" },
+        text: {
+          ru: "В меню «Ещё» нажми «Порядок» и поставь наверх разделы, которыми пользуешься чаще всего, в том числе T-Camps. Порядок виден только тебе.",
+          de: "Tippe im Menü „Mehr“ auf „Ordnen“ und setze die Bereiche, die du am häufigsten nutzt, nach oben, auch T-Camps. Die Reihenfolge sieht nur du.",
+        },
+      },
+    ],
+  },
+  {
+    id: "2026-11-24",
+    date: "2026-11-24",
+    push: true,
+    title: {
+      ru: "Своё меню и доп. задания в Bibel-Challenge",
+      de: "Eigenes Menü und Extra-Aufgaben im Bibel-Challenge",
+    },
+    pushBody: {
+      ru: "Теперь можно самому выбрать порядок разделов в меню «Ещё». Загляни.",
+      de: "Du kannst die Reihenfolge der Bereiche im Menü „Mehr“ jetzt selbst festlegen. Schau rein.",
+    },
+    items: [
+      {
+        title: { ru: "Меню под себя", de: "Menü nach Wunsch" },
+        text: {
+          ru: "В меню «Ещё» нажми «Порядок» и поставь наверх разделы, которыми пользуешься чаще всего. Порядок виден только тебе и сохраняется на всех твоих устройствах.",
+          de: "Tippe im Menü „Mehr“ auf „Ordnen“ und setze die Bereiche, die du am häufigsten nutzt, nach oben. Die Reihenfolge sieht nur du und sie gilt auf all deinen Geräten.",
+        },
+      },
+      {
+        title: { ru: "Доп. задания в Bibel-Challenge", de: "Extra-Aufgaben im Bibel-Challenge" },
+        text: {
+          ru: "У подростков появились дополнительные задания: выученные стихи (+20 баллов, их отмечает служитель) и сторис со стихом (+10 баллов, один в день).",
+          de: "Die Jugendlichen haben jetzt Extra-Aufgaben: gelernte Verse (+20 Punkte, vom Mitarbeiter eingetragen) und eine Story mit Bibelvers (+10 Punkte, eine pro Tag).",
+        },
+      },
+    ],
+  },
+  {
     id: "2026-11-13",
     date: "2026-11-13",
     push: true,
