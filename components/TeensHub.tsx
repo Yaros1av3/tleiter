@@ -15,6 +15,12 @@ import {
   Loader2,
   MapPin,
   Download,
+  Flame,
+  Home as HomeIcon,
+  LogOut,
+  Lightbulb,
+  PartyPopper,
+  Settings,
   Share,
   User,
   Users,
@@ -23,24 +29,18 @@ import {
 
 import TeensInstall from "@/components/TeensInstall";
 import { shortTitle } from "@/lib/shortTitle";
+import TeensAuth from "@/components/TeensAuth";
+import TeensHint, { resetHints } from "@/components/TeensHint";
+import TeensFeedback from "@/components/TeensFeedback";
 import {
   AchievementsCard,
-  VerseCard,
   CelebrationLayer,
   ProgressCard,
   TeensAnimStyles,
+  VerseCard,
   type Celebration,
 } from "@/components/TeensProgress";
-import {
-  ACHIEVEMENTS,
-  HISTORY_KEY,
-  berlinToday,
-  computeStats,
-  levelOf,
-  parseHistory,
-  withDate,
-  withoutDate,
-} from "@/lib/teensProgress";
+import { ACHIEVEMENTS, berlinToday, computeStats, levelOf } from "@/lib/teensProgress";
 
 type Lang = "de" | "ru";
 type Service = "10:00" | "12:30";
@@ -60,6 +60,22 @@ type Lesson = {
   serving: string[];
   going: number;
 };
+
+type MeInfo = {
+  participant: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    nickname: string;
+    lang: Lang;
+    avatar_url: string | null;
+  } | null;
+  lessonDates: string[];
+  attended: string[];
+  going: number[];
+};
+
+type Tab = "home" | "me";
 
 type Notice = {
   id: number;
@@ -125,6 +141,28 @@ const TEXT = {
     loadError: "Konnte nicht geladen werden.",
     retry: "Nochmal",
     locale: "de-DE",
+    hello: "Hallo",
+    tabHome: "Start",
+    tabChallenge: "Challenge",
+    tabMe: "Ich",
+    settings: "Einstellungen",
+    service: "Gottesdienst",
+    changeService: "Ändern",
+    signOut: "Abmelden",
+    welcomeTitle: "Willkommen bei TLight Teens",
+    welcomeSub: "Unterricht, Bibel-Challenge und Preise in einer App.",
+    chipLessons: "Unterricht",
+    chipChallenge: "Challenge",
+    chipEvents: "Termine",
+    challengeSub: "Täglich lesen, Punkte sammeln, Preise gewinnen",
+    comingBtn: "Ich komme!",
+    hintStreak: "Die Flamme zeigt, wie oft du in Folge beim Unterricht warst. Tippe darauf für Details.",
+    hintComing: "Tippe auf „Ich komme!“, damit wir wissen, dass du da bist. Der Unterricht zählt für deine Serie.",
+    hintChallenge: "Hier liest du jeden Tag ein Kapitel und sammelst Punkte für Preise.",
+    hintLevel: "XP sind Punkte für deine Unterrichte. Je mehr du sammelst, desto höher dein Level.",
+    hintVerse: "Jeden Tag ein neuer Vers. Lies ihn in Ruhe und merke ihn dir.",
+    showHints: "Tipps wieder anzeigen",
+    hintsOn: "Tipps sind wieder an",
   },
   ru: {
     next: "Ближайший урок",
@@ -165,6 +203,28 @@ const TEXT = {
     loadError: "Не удалось загрузить.",
     retry: "Ещё раз",
     locale: "ru-RU",
+    hello: "Привет",
+    tabHome: "Главная",
+    tabChallenge: "Челлендж",
+    tabMe: "Я",
+    settings: "Настройки",
+    service: "Служение",
+    changeService: "Изменить",
+    signOut: "Выйти",
+    welcomeTitle: "Добро пожаловать в TLight Teens",
+    welcomeSub: "Уроки, Bibel-Challenge и призы в одном приложении.",
+    chipLessons: "Уроки",
+    chipChallenge: "Челлендж",
+    chipEvents: "События",
+    challengeSub: "Читай каждый день, собирай баллы, получай призы",
+    comingBtn: "Я буду!",
+    hintStreak: "Огонёк показывает, сколько уроков подряд ты был. Нажми на него, чтобы посмотреть подробнее.",
+    hintComing: "Нажми «Я буду!», чтобы мы знали, что ты придёшь. Этот урок пойдёт в твою серию.",
+    hintChallenge: "Здесь ты читаешь каждый день по главе и собираешь баллы за призы.",
+    hintLevel: "XP это очки за уроки. Чем больше соберёшь, тем выше твой уровень.",
+    hintVerse: "Каждый день новый стих. Прочитай его спокойно и запомни.",
+    showHints: "Показать подсказки снова",
+    hintsOn: "Подсказки снова включены",
   },
 } as const;
 
@@ -215,14 +275,15 @@ export default function TeensHub() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadDetail, setLoadDetail] = useState("");
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [marked, setMarked] = useState<Record<number, boolean>>({});
+  // undefined — ещё грузим, participant null — не вошёл
+  const [me, setMe] = useState<MeInfo | undefined>(undefined);
+  const [tab, setTab] = useState<Tab>("home");
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [nameError, setNameError] = useState(false);
-
-  const [history, setHistory] = useState<string[]>([]);
+  const [rsvpError, setRsvpError] = useState(false);
   const [celebration, setCelebration] = useState<Celebration | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [hintsKey, setHintsKey] = useState(0);
+  const [hintsDone, setHintsDone] = useState(false);
   const today = berlinToday();
 
   const [supported, setSupported] = useState(true);
@@ -255,22 +316,48 @@ export default function TeensHub() {
       setEvents(data.events);
       setLoadFailed(false);
 
-      const stored: Record<number, boolean> = {};
-      let hist = parseHistory(safeGet(HISTORY_KEY));
-      for (const lesson of data.lessons) {
-        if (safeGet(`teens-rsvp-${lesson.id}`) === "1") {
-          stored[lesson.id] = true;
-          hist = withDate(hist, lesson.date);
-        }
-      }
-      safeSet(HISTORY_KEY, JSON.stringify(hist));
-      setHistory(hist);
-      setMarked(stored);
     } catch {
       setLoadFailed(true);
       setLessons((current) => current ?? []);
     }
   }, []);
+
+  const loadMe = useCallback(async (svc: Service) => {
+    try {
+      const response = await fetch(`/api/t/me?service=${encodeURIComponent(svc)}`, { cache: "no-store" });
+      const data = (await response.json()) as Partial<MeInfo>;
+
+      if (!response.ok || !data.participant) {
+        setMe({ participant: null, lessonDates: [], attended: [], going: [] });
+        return;
+      }
+
+      setMe({
+        participant: data.participant,
+        lessonDates: data.lessonDates ?? [],
+        attended: data.attended ?? [],
+        going: data.going ?? [],
+      });
+
+      // язык профиля подростка совпадает с выбранным служением
+      if (data.participant.lang !== LANG_OF[svc]) {
+        fetch("/api/bc/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lang: LANG_OF[svc] }),
+        }).catch(() => undefined);
+      }
+    } catch {
+      setMe({ participant: null, lessonDates: [], attended: [], going: [] });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (service === "10:00" || service === "12:30") {
+      safeSet("bc_lang", LANG_OF[service]);
+      void loadMe(service);
+    }
+  }, [service, loadMe]);
 
   useEffect(() => {
     // ?service=10:00 или ?service=12:30 — предпросмотр для команды (без запоминания)
@@ -295,9 +382,6 @@ export default function TeensHub() {
     };
 
     window.addEventListener("beforeinstallprompt", onPrompt);
-
-    setFirstName(safeGet("teens-first") ?? "");
-    setLastName(safeGet("teens-last") ?? "");
 
     const ok = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
     setSupported(ok);
@@ -332,7 +416,7 @@ export default function TeensHub() {
       safeSet("teens-service", next);
     }
 
-    setNameError(false);
+    setMe(undefined);
     window.scrollTo?.({ top: 0 });
 
     // если уже подписан — обновляем язык уведомлений
@@ -354,80 +438,60 @@ export default function TeensHub() {
     }
   }
 
-  async function rsvp(lesson: Lesson, going: boolean) {
-    const first = firstName.trim();
-    const last = lastName.trim();
+  async function setGoing(lesson: Lesson, on: boolean) {
+    if (!service || !me?.participant) return;
 
-    if (going && (!first || !last)) {
-      setNameError(true);
-      return;
-    }
-
-    setNameError(false);
+    setRsvpError(false);
     setBusyId(lesson.id);
 
-    // при отмене берём имя, под которым отмечались
-    const sendFirst = going ? first : (safeGet("teens-first") ?? first);
-    const sendLast = going ? last : (safeGet("teens-last") ?? last);
-
     try {
-      const response = await fetch("/api/t/rsvp", {
+      const response = await fetch("/api/t/going", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          entry_id: lesson.id,
-          first_name: sendFirst,
-          last_name: sendLast,
-          going,
-        }),
+        body: JSON.stringify({ entry_id: lesson.id, going: on }),
       });
 
       if (!response.ok) {
-        if (response.status === 422) setNameError(true);
-        else setPushMessage(t.error);
+        setRsvpError(true);
         setBusyId(null);
         return;
       }
 
-      if (going) {
-        safeSet("teens-first", first);
-        safeSet("teens-last", last);
-      }
+      if (on) {
+        const before = computeStats(me.attended, me.lessonDates, today);
+        const after = computeStats([...me.attended, lesson.date], me.lessonDates, today);
+        const levelAfter = levelOf(after.xp);
+        const newAch = ACHIEVEMENTS.filter((a) => a.done(after) && !a.done(before));
 
-      safeSet(`teens-rsvp-${lesson.id}`, going ? "1" : null);
-      setMarked((current) => ({ ...current, [lesson.id]: going }));
-
-      // серия, уровни и достижения
-      const before = history;
-      const after = going ? withDate(before, lesson.date) : withoutDate(before, lesson.date);
-      safeSet(HISTORY_KEY, JSON.stringify(after));
-      setHistory(after);
-
-      if (going) {
-        const sBefore = computeStats(before, today);
-        const sAfter = computeStats(after, today);
-        const lvBefore = levelOf(sBefore.xp).index;
-        const lvAfter = levelOf(sAfter.xp);
-        const newAch = ACHIEVEMENTS.filter((a) => a.done(sAfter) && !a.done(sBefore));
-
-        if (lvAfter.index > lvBefore) {
-          setCelebration({ id: Date.now(), kind: "level", title: lang === "ru" ? lvAfter.current.ru : lvAfter.current.de });
+        if (levelAfter.index > levelOf(before.xp).index) {
+          setCelebration({ id: Date.now(), kind: "level", title: lang === "ru" ? levelAfter.current.ru : levelAfter.current.de });
         } else if (newAch.length > 0) {
           setCelebration({ id: Date.now(), kind: "ach", title: lang === "ru" ? newAch[0].ru : newAch[0].de });
         } else {
           setCelebration({
             id: Date.now(),
             kind: "start",
-            title: lang === "ru" ? `${sAfter.streak} в серии` : `${sAfter.streak} in Folge`,
+            title: lang === "ru" ? `${after.streak} в серии` : `${after.streak} in Folge`,
           });
         }
       }
-      await load();
+
+      await Promise.all([loadMe(service), load()]);
     } catch {
-      setPushMessage(t.error);
+      setRsvpError(true);
     }
 
     setBusyId(null);
+  }
+
+  async function signOut() {
+    try {
+      await fetch("/api/bc/logout", { method: "POST" });
+    } catch {
+      /* всё равно показываем вход */
+    }
+    setTab("home");
+    setMe({ participant: null, lessonDates: [], attended: [], going: [] });
   }
 
   async function enablePush() {
@@ -601,127 +665,153 @@ export default function TeensHub() {
   const myLessons = (lessons ?? []).filter((lesson) => lesson.time === service);
   const myNotices = notices.filter((notice) => notice.time === service);
 
-  const nameInput = (
-    id: string,
-    label: string,
-    value: string,
-    onChange: (next: string) => void,
-    autoComplete: string,
-  ) => (
-    <label htmlFor={id} className="block">
-      <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.1em] text-[#9a6b00]">
-        {label}
-      </span>
-      <span className="flex h-[52px] items-center gap-3 rounded-2xl border border-[#eadfb8] bg-white px-4 shadow-[0_2px_8px_rgba(154,107,0,0.06)] transition focus-within:border-[#1b2431] focus-within:ring-[3px] focus-within:ring-[#ffc93c]/50">
-        <User size={17} className="shrink-0 text-[#c4b377]" />
-        <input
-          id={id}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          autoComplete={autoComplete}
-          className="h-full min-w-0 flex-1 bg-transparent text-[17px] font-semibold text-[#1b2431] outline-none placeholder:font-medium placeholder:text-[#c9c2a8]"
-        />
-      </span>
-    </label>
+  const serviceBadge = (
+    <button
+      type="button"
+      onClick={() => setService(null)}
+      className="flex h-10 items-center gap-1.5 rounded-full bg-white pl-4 pr-3 text-[13px] font-extrabold ring-1 ring-[#e9e3d3] active:scale-[0.97]"
+    >
+      {service}
+      <span className="text-[#9a9585]">{lang === "ru" ? "RU" : "DE"}</span>
+      <ChevronDown size={14} className="text-[#9a9585]" />
+    </button>
   );
 
-  return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto overflow-x-hidden bg-[#faf8f3] text-[#1b2431] [overflow-wrap:anywhere]">
-      <div className="mx-auto w-full max-w-[520px] px-4 pb-16 pt-[max(1.25rem,env(safe-area-inset-top))]">
-        {/* шапка */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            {logo}
-            <div>
-              <div className="text-[19px] font-extrabold leading-none tracking-[-0.03em]">TLight</div>
-              <div className="mt-1 text-[9px] font-bold uppercase leading-none tracking-[0.16em] text-[#9a9585]">
-                Teens
-              </div>
+  const brand = (
+    <div className="flex items-center gap-2.5">
+      {logo}
+      <div>
+        <div className="text-[19px] font-extrabold leading-none tracking-[-0.03em]">TLight</div>
+        <div className="mt-1 text-[9px] font-bold uppercase leading-none tracking-[0.16em] text-[#9a9585]">Teens</div>
+      </div>
+    </div>
+  );
+
+  /* ---------- ждём данные подростка ---------- */
+  if (me === undefined) {
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#faf8f3]">
+        <TeensAnimStyles />
+        <span className="tp-float">{logo}</span>
+      </div>
+    );
+  }
+
+  /* ---------- вход и регистрация ---------- */
+  if (!me.participant) {
+    return (
+      <div className="fixed inset-0 z-[60] overflow-y-auto overflow-x-hidden bg-[#faf8f3] text-[#1b2431] [overflow-wrap:anywhere]">
+        <TeensAnimStyles />
+        <div className="mx-auto w-full max-w-[520px] px-4 pb-16 pt-[max(1.25rem,env(safe-area-inset-top))]">
+          <div className="flex items-center justify-between">
+            {brand}
+            {serviceBadge}
+          </div>
+
+          <div className="tp-up tp-shine relative mt-6 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#1b2431] via-[#243044] to-[#1b2431] p-6 text-white shadow-[0_14px_34px_rgba(27,36,49,0.22)]">
+            <h1 className="text-[24px] font-extrabold leading-tight tracking-[-0.02em]">{t.welcomeTitle}</h1>
+            <p className="mt-2 text-[14px] leading-5 text-white/70">{t.welcomeSub}</p>
+            <div className="mt-5 flex gap-2.5">
+              {[
+                { icon: CalendarDays, label: t.chipLessons },
+                { icon: BookOpen, label: t.chipChallenge },
+                { icon: PartyPopper, label: t.chipEvents },
+              ].map((chip, i) => (
+                <div key={chip.label} className="tp-float flex flex-1 flex-col items-center gap-1.5 rounded-2xl bg-white/10 py-3" style={{ animationDelay: `${i * 300}ms` }}>
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#ffc93c] text-[#1b2431]">
+                    <chip.icon size={18} strokeWidth={2.3} />
+                  </span>
+                  <span className="text-[11px] font-bold">{chip.label}</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setService(null)}
-            className="flex h-10 items-center gap-1.5 rounded-full bg-white pl-4 pr-3 text-[13px] font-extrabold ring-1 ring-[#e9e3d3] active:scale-[0.97]"
-          >
-            {service}
-            <span className="text-[#9a9585]">{lang === "ru" ? "RU" : "DE"}</span>
-            <ChevronDown size={14} className="text-[#9a9585]" />
-          </button>
+          <div className="mt-6">
+            <TeensAuth lang={lang} onDone={() => void loadMe(service)} />
+          </div>
         </div>
+      </div>
+    );
+  }
 
-        {!standalone && !bannerHidden && (
-          <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[#ffc93c] p-3 text-[#1b2431]">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1b2431] text-[#ffc93c]">
-              <Download size={18} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[14px] font-extrabold leading-tight">{t.installBanner}</p>
-              <p className="text-[12px] font-medium leading-4 text-[#1b2431]/70">{t.installSub}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setInstallOpen(true)}
-              className="h-9 shrink-0 rounded-full bg-[#1b2431] px-4 text-[12px] font-bold text-[#ffc93c] active:scale-95"
-            >
-              {t.installHow}
-            </button>
-            <button
-              type="button"
-              aria-label="close"
-              onClick={() => {
-                setBannerHidden(true);
-                safeSet("teens-install-hidden", "1");
-              }}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#1b2431]/60 active:bg-black/10"
-            >
-              <X size={15} />
-            </button>
-          </div>
-        )}
+  const participant = me.participant;
+  const goingSet = new Set(me.going);
+  const stats = computeStats(me.attended, me.lessonDates, today);
+  const level = levelOf(stats.xp);
+  const initials = `${participant.first_name[0] ?? ""}${participant.last_name[0] ?? ""}`.toUpperCase();
 
-        {/* Bibel-Challenge */}
-        <a
-          href="/t/bc"
-          className="mt-4 flex items-center gap-3 rounded-[22px] bg-[#1b2431] p-3.5 text-white shadow-[0_10px_30px_rgba(27,36,49,0.18)] active:scale-[0.99]"
+  const avatar = (size: number) =>
+    participant.avatar_url ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={participant.avatar_url} alt="" width={size} height={size} className="shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />
+    ) : (
+      <span
+        className="flex shrink-0 items-center justify-center rounded-full bg-[#ffc93c] font-extrabold text-[#1b2431]"
+        style={{ width: size, height: size, fontSize: size * 0.36 }}
+      >
+        {initials}
+      </span>
+    );
+
+  /* ---------- вкладка «Главная» ---------- */
+  const home = (
+    <>
+      {/* приветствие */}
+      <div className="tp-up mt-5 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[13px] font-bold text-[#9a9585]">{t.hello}</p>
+          <h1 className="truncate text-[28px] font-extrabold leading-tight tracking-[-0.03em]">{participant.first_name}!</h1>
+        </div>
+        <button
+          type="button"
+          onClick={() => setTab("me")}
+          className={
+            "flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-[16px] font-extrabold active:scale-95 " +
+            (stats.streak > 0 ? "bg-gradient-to-b from-[#ffc93c] to-[#ff9d3c] text-[#1b2431]" : "bg-white text-[#c9c2a8] ring-1 ring-[#e9e3d3]")
+          }
         >
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#ffc93c] text-[#1b2431]">
-            <BookOpen size={22} strokeWidth={2.2} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[16px] font-extrabold leading-tight">Bibel-Challenge</span>
-            <span className="mt-0.5 block text-[12px] leading-4 text-white/65">
-              {lang === "ru"
-                ? "Читай каждый день, собирай баллы, получай призы"
-                : "Täglich lesen, Punkte sammeln, Preise gewinnen"}
-            </span>
-          </span>
-          <ChevronRight size={18} className="shrink-0 text-[#ffc93c]" />
-        </a>
+          <Flame size={18} className={stats.streak > 0 ? "tp-flame" : ""} fill={stats.streak > 0 ? "currentColor" : "none"} />
+          {stats.streak}
+        </button>
+      </div>
 
-        <ProgressCard lang={lang} history={history} today={today} />
+      <TeensHint key={`streak-${hintsKey}`} id="streak" lang={lang} text={t.hintStreak} className="mt-4" />
 
-        {lessons === null ? (
-          <div className="mt-16 flex justify-center">
-            <Loader2 size={24} className="animate-spin text-[#8a8678]" />
-          </div>
-        ) : (
-          <>
-            {loadFailed && (
-              <div className="mt-5 flex items-center justify-between rounded-2xl bg-[#fff4d1] px-4 py-3 text-[13px] font-semibold text-[#9a6b00]">
-                {t.loadError}
-                <button type="button" onClick={load} className="font-bold underline">
-                  {t.retry}
-                </button>
-              </div>
-            )}
+      {/* Bibel-Challenge */}
+      <a
+        href="/t/bc"
+        className="tp-up tp-shine relative mt-5 flex items-center gap-3 overflow-hidden rounded-[24px] bg-[#1b2431] p-4 text-white shadow-[0_10px_30px_rgba(27,36,49,0.18)] active:scale-[0.99]"
+        style={{ animationDelay: "80ms" }}
+      >
+        <span className="tp-float flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#ffc93c] text-[#1b2431]">
+          <BookOpen size={26} strokeWidth={2.2} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[18px] font-extrabold leading-tight">Bibel-Challenge</span>
+          <span className="mt-0.5 block text-[12px] leading-4 text-white/65">{t.challengeSub}</span>
+        </span>
+        <ChevronRight size={20} className="shrink-0 text-[#ffc93c]" />
+      </a>
 
-            {loadFailed && loadDetail && (
-              <p className="mt-2 break-words rounded-xl bg-white px-3 py-2 text-[11px] text-[#8a8678]">
-                {loadDetail}
-              </p>
-            )}
+      {lessons === null ? (
+        <div className="mt-16 flex justify-center">
+          <Loader2 size={24} className="animate-spin text-[#8a8678]" />
+        </div>
+      ) : (
+        <>
+          {loadFailed && (
+            <div className="mt-5 flex items-center justify-between rounded-2xl bg-[#fff4d1] px-4 py-3 text-[13px] font-semibold text-[#9a6b00]">
+              {t.loadError}
+              <button type="button" onClick={load} className="font-bold underline">
+                {t.retry}
+              </button>
+            </div>
+          )}
+
+          {loadFailed && loadDetail && (
+            <p className="mt-2 break-words rounded-xl bg-white px-3 py-2 text-[11px] text-[#8a8678]">{loadDetail}</p>
+          )}
 
             {/* почему на ближайшей встрече нет урока */}
             {myNotices.map((notice) => {
@@ -741,22 +831,20 @@ export default function TeensHub() {
               );
             })}
 
-            {/* ближайший урок */}
-            <p className="mb-2 mt-6 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9a9585]">
-              {t.next}
-            </p>
+          <TeensHint key={`challenge-${hintsKey}`} id="challenge" lang={lang} text={t.hintChallenge} className="mt-4" />
 
-            {myLessons.length === 0 ? (
-              <div className={`${card} px-5 py-8 text-center text-[14px] text-[#8a8678]`}>
-                {t.noLesson}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {myLessons.map((lesson) => {
-                  const done = marked[lesson.id];
-                  const lessonTitle = title(lesson);
+          {/* ближайший урок */}
+          <p className="mb-2 mt-7 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9a9585]">{t.next}</p>
 
-                  return (
+          {myLessons.length === 0 ? (
+            <div className={`${card} px-5 py-8 text-center text-[14px] text-[#8a8678]`}>{t.noLesson}</div>
+          ) : (
+            <div className="space-y-3">
+              {myLessons.map((lesson) => {
+                const done = goingSet.has(lesson.id);
+                const lessonTitle = title(lesson);
+
+                return (
                     <div key={lesson.id} className="overflow-hidden rounded-[26px] bg-[#1b2431] text-white">
                       <div className="p-5">
                         <div className="flex items-center justify-between gap-3">
@@ -807,62 +895,54 @@ export default function TeensHub() {
                         </div>
                       </div>
 
-                      {/* отметка */}
-                      <div className="bg-[#fff4d1] p-4 text-[#1b2431]">
-                        {done ? (
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2 text-[14px] font-bold">
-                              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1b2431] text-[#ffc93c]">
-                                <Check size={15} strokeWidth={3} />
-                              </span>
-                              {t.youAre}
-                            </div>
-                            <button
-                              type="button"
-                              disabled={busyId === lesson.id}
-                              onClick={() => rsvp(lesson, false)}
-                              className="h-9 rounded-full border border-[#1b2431]/25 px-4 text-[12px] font-bold disabled:opacity-50"
-                            >
-                              {t.cancel}
-                            </button>
+                    {/* отметка */}
+                    <div className="bg-[#fff4d1] p-4 text-[#1b2431]">
+                      {!done && <TeensHint key={`coming-${hintsKey}`} id="coming" lang={lang} text={t.hintComing} className="mb-3 !bg-white" />}
+                      {done ? (
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 text-[15px] font-extrabold">
+                            <span className="tp-pop flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-white">
+                              <Check size={19} strokeWidth={3} />
+                            </span>
+                            {t.youAre}
                           </div>
-                        ) : (
-                          <>
-                            <p className="text-[16px] font-extrabold">{t.imComing}</p>
-                            <p className="mb-3 mt-0.5 text-[12px] leading-4 text-[#9a6b00]">{t.nameHint}</p>
+                          <button
+                            type="button"
+                            disabled={busyId === lesson.id}
+                            onClick={() => setGoing(lesson, false)}
+                            className="h-9 rounded-full border border-[#1b2431]/25 px-4 text-[12px] font-bold disabled:opacity-50"
+                          >
+                            {t.cancel}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busyId === lesson.id}
+                          onClick={() => setGoing(lesson, true)}
+                          className="tp-ring flex h-[56px] w-full items-center justify-center rounded-2xl bg-[#1b2431] text-[17px] font-extrabold text-[#ffc93c] shadow-[0_6px_16px_rgba(27,36,49,0.22)] active:scale-[0.98] disabled:opacity-50"
+                        >
+                          {busyId === lesson.id ? <Loader2 size={20} className="animate-spin" /> : t.comingBtn}
+                        </button>
+                      )}
 
-                            <div className="space-y-2.5">
-                              {nameInput(`first-${lesson.id}`, t.first, firstName, setFirstName, "given-name")}
-                              {nameInput(`last-${lesson.id}`, t.last, lastName, setLastName, "family-name")}
-                            </div>
+                      {rsvpError && <p className="mt-2 text-[12px] font-semibold text-red-600">{t.error}</p>}
 
-                            {nameError && (
-                              <p className="mt-2 text-[12px] font-semibold text-red-600">{t.nameError}</p>
-                            )}
-
-                            <button
-                              type="button"
-                              disabled={busyId === lesson.id}
-                              onClick={() => rsvp(lesson, true)}
-                              className="mt-3 flex h-[52px] w-full items-center justify-center rounded-2xl bg-[#1b2431] text-[16px] font-extrabold text-[#ffc93c] shadow-[0_6px_16px_rgba(27,36,49,0.22)] active:scale-[0.99] disabled:opacity-50"
-                            >
-                              {busyId === lesson.id ? <Loader2 size={18} className="animate-spin" /> : t.confirm}
-                            </button>
-                          </>
-                        )}
-
-                        {lesson.going > 0 && (
-                          <p className="mt-3 flex items-center gap-1.5 text-[12px] font-semibold text-[#9a6b00]">
-                            <Users size={13} />
-                            {lesson.going} {t.coming}
-                          </p>
-                        )}
-                      </div>
+                      {lesson.going > 0 && (
+                        <p className="mt-3 flex items-center gap-1.5 text-[12px] font-semibold text-[#9a6b00]">
+                          <Users size={13} />
+                          {lesson.going} {t.coming}
+                        </p>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <VerseCard lang={lang} today={today} />
+          <TeensHint key={`verse-${hintsKey}`} id="verse" lang={lang} text={t.hintVerse} className="mt-3" />
 
             {/* события */}
             <p className="mb-2 mt-8 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9a9585]">
@@ -957,11 +1037,44 @@ export default function TeensHub() {
               </div>
             )}
 
-            <VerseCard lang={lang} today={today} />
-            <AchievementsCard lang={lang} history={history} today={today} />
+        </>
+      )}
+    </>
+  );
 
+  /* ---------- вкладка «Я» ---------- */
+  const mine = (
+    <>
+      <div className="tp-up mt-5 flex items-center gap-4">
+        {avatar(64)}
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-[24px] font-extrabold leading-tight tracking-[-0.02em]">
+            {participant.first_name} {participant.last_name}
+          </h1>
+          <p className="mt-0.5 truncate text-[13px] font-semibold text-[#9a9585]">
+            @{participant.nickname} · {lang === "ru" ? level.current.ru : level.current.de}
+          </p>
+        </div>
+      </div>
+
+      <TeensHint key={`level-${hintsKey}`} id="level" lang={lang} text={t.hintLevel} className="mt-4" />
+      <ProgressCard lang={lang} history={me.attended} lessonDates={me.lessonDates} today={today} />
+      <AchievementsCard lang={lang} history={me.attended} lessonDates={me.lessonDates} today={today} />
+      <TeensFeedback lang={lang} />
+
+          <div className={`${card} mt-4 p-4`}>
+            <button type="button" onClick={() => setSettingsOpen((v) => !v)} className="flex w-full items-center justify-between gap-3 text-left">
+              <span className="flex items-center gap-2 text-[15px] font-extrabold">
+                <Settings size={16} className="text-[#9a6b00]" />
+                {t.settings}
+              </span>
+              <ChevronDown size={18} className={"text-[#9a9585] transition-transform " + (settingsOpen ? "rotate-180" : "")} />
+            </button>
+
+            {settingsOpen && (
+              <div className="mt-3 space-y-3">
             {/* уведомления */}
-            <div className={`${card} mt-8 p-4`}>
+            <div className="rounded-xl bg-[#faf8f3] p-3">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#fff4d1] text-[#9a6b00]">
                   {subscribed ? <BellRing size={19} /> : <Bell size={19} />}
@@ -1011,11 +1124,130 @@ export default function TeensHub() {
 
               {pushMessage && <p className="mt-2 text-[12px] font-semibold text-red-600">{pushMessage}</p>}
             </div>
-          </>
-        )}
-      </div>
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-[#faf8f3] px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#9a9585]">{t.service}</p>
+                <p className="text-[15px] font-extrabold">
+                  {service} · {lang === "ru" ? "Русский" : "Deutsch"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setService(null)}
+                className="h-9 shrink-0 rounded-full border border-[#1b2431]/20 px-4 text-[12px] font-bold"
+              >
+                {t.changeService}
+              </button>
+            </div>
 
+            <button
+              type="button"
+              onClick={() => {
+                resetHints();
+                setHintsKey((v) => v + 1);
+                setPushMessage("");
+                setRsvpError(false);
+                setHintsDone(true);
+                window.setTimeout(() => setHintsDone(false), 2500);
+              }}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#e9e3d3] text-[13px] font-bold text-[#6f6a5c]"
+            >
+              <Lightbulb size={15} />
+              {hintsDone ? t.hintsOn : t.showHints}
+            </button>
+
+            <button
+              type="button"
+              onClick={signOut}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#e9e3d3] text-[13px] font-bold text-[#6f6a5c]"
+            >
+              <LogOut size={15} />
+              {t.signOut}
+            </button>
+              </div>
+            )}
+          </div>
+    </>
+  );
+
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-[#faf8f3] text-[#1b2431] [overflow-wrap:anywhere]">
       <TeensAnimStyles />
+
+      <main className="flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="mx-auto w-full max-w-[520px] px-4 pb-8 pt-[max(1.25rem,env(safe-area-inset-top))]">
+          <div className="flex items-center justify-between">
+            {brand}
+            {serviceBadge}
+          </div>
+
+        {!standalone && !bannerHidden && (
+          <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[#ffc93c] p-3 text-[#1b2431]">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1b2431] text-[#ffc93c]">
+              <Download size={18} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] font-extrabold leading-tight">{t.installBanner}</p>
+              <p className="text-[12px] font-medium leading-4 text-[#1b2431]/70">{t.installSub}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setInstallOpen(true)}
+              className="h-9 shrink-0 rounded-full bg-[#1b2431] px-4 text-[12px] font-bold text-[#ffc93c] active:scale-95"
+            >
+              {t.installHow}
+            </button>
+            <button
+              type="button"
+              aria-label="close"
+              onClick={() => {
+                setBannerHidden(true);
+                safeSet("teens-install-hidden", "1");
+              }}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#1b2431]/60 active:bg-black/10"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
+
+          {tab === "home" ? home : mine}
+        </div>
+      </main>
+
+      <nav className="border-t border-[#e9e3d3] bg-white pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto grid max-w-[520px] grid-cols-3">
+          <button
+            type="button"
+            onClick={() => setTab("home")}
+            className={`flex flex-col items-center gap-0.5 py-1.5 text-[10px] font-bold ${tab === "home" ? "text-[#1b2431]" : "text-[#a8a393]"}`}
+          >
+            <span className={`flex h-7 w-12 items-center justify-center rounded-full transition ${tab === "home" ? "bg-[#ffc93c]" : ""}`}>
+              <HomeIcon className="h-[18px] w-[18px]" strokeWidth={2.1} />
+            </span>
+            {t.tabHome}
+          </button>
+
+          <a href="/t/bc" className="flex flex-col items-center gap-0.5 py-1.5 text-[10px] font-bold text-[#a8a393]">
+            <span className="flex h-7 w-12 items-center justify-center rounded-full">
+              <BookOpen className="h-[18px] w-[18px]" strokeWidth={2.1} />
+            </span>
+            {t.tabChallenge}
+          </a>
+
+          <button
+            type="button"
+            onClick={() => setTab("me")}
+            className={`flex flex-col items-center gap-0.5 py-1.5 text-[10px] font-bold ${tab === "me" ? "text-[#1b2431]" : "text-[#a8a393]"}`}
+          >
+            <span className={`flex h-7 w-12 items-center justify-center rounded-full transition ${tab === "me" ? "bg-[#ffc93c]" : ""}`}>
+              <User className="h-[18px] w-[18px]" strokeWidth={2.1} />
+            </span>
+            {t.tabMe}
+          </button>
+        </div>
+      </nav>
+
       <CelebrationLayer lang={lang} event={celebration} onDone={() => setCelebration(null)} />
 
       {installOpen && (

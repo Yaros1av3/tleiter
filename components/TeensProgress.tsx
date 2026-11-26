@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Award, BookOpen, Compass, Crown, Flame, Shield, Sprout, Star, Trophy, Zap } from "lucide-react";
+import { Award, BookOpen, ChevronDown, Compass, Crown, Flame, Shield, Sprout, Star, Trophy, Zap } from "lucide-react";
 
 import {
   ACHIEVEMENTS,
@@ -18,7 +18,7 @@ import {
 const TX = {
   de: {
     series: "Serie",
-    weeks: (n: number) => (n === 1 ? "Woche in Folge" : "Wochen in Folge"),
+    weeks: (n: number) => (n === 1 ? "Unterricht in Folge" : "Unterrichte in Folge"),
     startHint: "Trag dich für den Unterricht ein und starte deine Serie.",
     broken: "Die Serie ist unterbrochen. Starte eine neue.",
     best: "Rekord",
@@ -28,6 +28,7 @@ const TX = {
     maxLevel: "Höchstes Level",
     last7: "Letzte Wochen",
     achievements: "Erfolge",
+    tapBadge: "Tippe auf ein Symbol, dann siehst du, wie du es bekommst.",
     verse: "Vers des Tages",
     unlocked: "Neuer Erfolg",
     levelUp: "Neues Level",
@@ -44,6 +45,7 @@ const TX = {
     maxLevel: "Высший уровень",
     last7: "Последние недели",
     achievements: "Достижения",
+    tapBadge: "Нажми на значок, и увидишь, как его получить.",
     verse: "Стих дня",
     unlocked: "Новое достижение",
     levelUp: "Новый уровень",
@@ -123,9 +125,9 @@ export function TeensAnimStyles() {
 
 /* ---------- карточка прогресса ---------- */
 
-export function ProgressCard({ lang, history, today }: { lang: Lang; history: string[]; today: string }) {
+export function ProgressCard({ lang, history, lessonDates, today }: { lang: Lang; history: string[]; lessonDates: string[]; today: string }) {
   const t = TX[lang];
-  const stats = useMemo(() => computeStats(history, today), [history, today]);
+  const stats = useMemo(() => computeStats(history, lessonDates, today), [history, lessonDates, today]);
   const level = levelOf(stats.xp);
   const streakShown = useCountUp(stats.streak);
   const totalShown = useCountUp(stats.total);
@@ -244,51 +246,84 @@ export function ProgressCard({ lang, history, today }: { lang: Lang; history: st
 
 /* ---------- достижения ---------- */
 
-export function AchievementsCard({ lang, history, today }: { lang: Lang; history: string[]; today: string }) {
+export function AchievementsCard({ lang, history, lessonDates, today }: { lang: Lang; history: string[]; lessonDates: string[]; today: string }) {
   const t = TX[lang];
-  const stats = useMemo(() => computeStats(history, today), [history, today]);
+  const stats = useMemo(() => computeStats(history, lessonDates, today), [history, lessonDates, today]);
   const doneCount = ACHIEVEMENTS.filter((a) => a.done(stats)).length;
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<string | null>(null);
+  const pickedAch = ACHIEVEMENTS.find((a) => a.id === picked) ?? null;
 
   return (
-    <section className="tp-up mt-6 rounded-[22px] border border-[#e9e3d3] bg-white p-4" style={{ animationDelay: "120ms" }}>
-      <div className="mb-3 flex items-center justify-between">
-        <p className="flex items-center gap-2 text-[15px] font-extrabold">
+    <section className="tp-up mt-4 rounded-[22px] border border-[#e9e3d3] bg-white p-4" style={{ animationDelay: "120ms" }}>
+      <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between gap-3 text-left">
+        <span className="flex items-center gap-2 text-[15px] font-extrabold">
           <Award size={17} className="text-[#9a6b00]" />
           {t.achievements}
-        </p>
-        <span className="rounded-full bg-[#fff4d1] px-2.5 py-0.5 text-[12px] font-extrabold text-[#9a6b00]">
-          {doneCount}/{ACHIEVEMENTS.length}
         </span>
-      </div>
+        <span className="flex items-center gap-2">
+          <span className="rounded-full bg-[#fff4d1] px-2.5 py-0.5 text-[12px] font-extrabold text-[#9a6b00]">
+            {doneCount}/{ACHIEVEMENTS.length}
+          </span>
+          <ChevronDown size={18} className={"text-[#9a9585] transition-transform " + (open ? "rotate-180" : "")} />
+        </span>
+      </button>
 
-      <div className="grid grid-cols-4 gap-2.5">
-        {ACHIEVEMENTS.map((a, i) => {
-          const done = a.done(stats);
-          return (
-            <div
+      {!open && (
+        <div className="mt-3 flex gap-1.5">
+          {ACHIEVEMENTS.map((a) => (
+            <span
               key={a.id}
-              className="tp-up flex flex-col items-center text-center"
-              style={{ animationDelay: `${180 + i * 60}ms` }}
-              title={lang === "ru" ? a.hintRu : a.hintDe}
+              className={
+                "flex h-8 w-8 items-center justify-center rounded-lg " +
+                (a.done(stats) ? "bg-gradient-to-b from-[#ffc93c] to-[#ff9d3c] text-[#1b2431]" : "bg-[#f0ede3] text-[#c9c2a8]")
+              }
             >
-              <span
-                className={
-                  "flex h-[52px] w-[52px] items-center justify-center rounded-2xl " +
-                  (done
-                    ? "tp-float bg-gradient-to-b from-[#ffc93c] to-[#ff9d3c] text-[#1b2431] shadow-[0_6px_14px_rgba(255,157,60,0.35)]"
-                    : "bg-[#f0ede3] text-[#c9c2a8]")
-                }
-                style={done ? { animationDelay: `${i * 220}ms` } : undefined}
-              >
-                <AchIcon icon={a.icon} />
-              </span>
-              <span className={"mt-1.5 text-[10.5px] font-bold leading-tight " + (done ? "text-[#1b2431]" : "text-[#a8a290]")}>
-                {lang === "ru" ? a.ru : a.de}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+              <AchIcon icon={a.icon} size={15} />
+            </span>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <>
+          <div className="mt-3 grid grid-cols-4 gap-2.5">
+            {ACHIEVEMENTS.map((a, i) => {
+              const done = a.done(stats);
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setPicked(a.id)}
+                  className="tp-up flex flex-col items-center text-center active:scale-95"
+                  style={{ animationDelay: `${i * 40}ms` }}
+                >
+                  <span
+                    className={
+                      "flex h-[52px] w-[52px] items-center justify-center rounded-2xl transition " +
+                      (done
+                        ? "bg-gradient-to-b from-[#ffc93c] to-[#ff9d3c] text-[#1b2431] shadow-[0_6px_14px_rgba(255,157,60,0.35)]"
+                        : "bg-[#f0ede3] text-[#c9c2a8]") +
+                      (picked === a.id ? " ring-2 ring-[#1b2431]" : "")
+                    }
+                  >
+                    <AchIcon icon={a.icon} />
+                  </span>
+                  <span className={"mt-1.5 text-[10.5px] font-bold leading-tight " + (done ? "text-[#1b2431]" : "text-[#a8a290]")}>
+                    {lang === "ru" ? a.ru : a.de}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="mt-3 rounded-xl bg-[#faf8f3] px-3 py-2.5 text-[13px] font-semibold leading-snug text-[#5c5a50]">
+            {pickedAch
+              ? `${lang === "ru" ? pickedAch.ru : pickedAch.de}: ${lang === "ru" ? pickedAch.hintRu : pickedAch.hintDe}`
+              : t.tapBadge}
+          </p>
+        </>
+      )}
     </section>
   );
 }

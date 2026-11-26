@@ -1900,8 +1900,8 @@ export default function Home() {
           />
 
           <div className="fixed inset-x-0 bottom-0 z-50 px-3 pb-3">
-            <div className="mx-auto max-w-[430px] overflow-hidden rounded-[28px] border border-[#e2e5e8] bg-white shadow-[0_-12px_40px_rgba(17,24,32,0.16)]">
-              <div className="flex items-center justify-between border-b border-[#eceef0] px-5 py-4">
+            <div className="mx-auto flex max-h-[calc(100dvh-1.5rem)] max-w-[430px] flex-col overflow-hidden rounded-[28px] border border-[#e2e5e8] bg-white shadow-[0_-12px_40px_rgba(17,24,32,0.16)]">
+              <div className="flex shrink-0 items-center justify-between border-b border-[#eceef0] px-5 py-4">
                 <div>
                   <p className="text-[18px] font-bold tracking-[-0.02em] text-[#111820]">
                     {isRu
@@ -1947,14 +1947,14 @@ export default function Home() {
               </div>
 
               {editMenu && (
-                <p className="px-5 pb-1 pt-3 text-[12px] text-[#7a8490]">
+                <p className="shrink-0 px-5 pb-1 pt-3 text-[12px] text-[#7a8490]">
                   {isRu
                     ? "Поставь наверх то, чем пользуешься чаще всего. Порядок виден только тебе."
                     : "Setze oben, was du am häufigsten nutzt. Die Reihenfolge sieht nur du."}
                 </p>
               )}
 
-              <div className="grid max-h-[70vh] grid-cols-1 gap-2 overflow-y-auto p-3">
+              <div className="grid min-h-0 flex-1 grid-cols-1 content-start gap-2 overflow-y-auto p-3">
                 {orderedItems.map((item, pos) => {
                   const Icon = item.icon;
 
@@ -2032,7 +2032,7 @@ export default function Home() {
               </div>
 
               {editMenu && menuOrder.length > 0 && (
-                <div className="px-5 pb-1">
+                <div className="shrink-0 px-5 pb-1">
                   <button
                     type="button"
                     onClick={() => saveMenuOrder([])}
@@ -2043,7 +2043,7 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="border-t border-[#eceef0] px-5 py-3">
+              <div className="shrink-0 border-t border-[#eceef0] px-5 py-3">
                 <button
                   type="button"
                   onClick={() => {

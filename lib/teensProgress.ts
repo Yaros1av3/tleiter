@@ -5,8 +5,6 @@
 
 export type Lang = "de" | "ru";
 
-export const HISTORY_KEY = "teens-history";
-
 /* ---------- даты ---------- */
 
 export function berlinToday(): string {
@@ -35,28 +33,6 @@ export function addDays(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/* ---------- история ---------- */
-
-export function parseHistory(raw: string | null): string[] {
-  if (!raw) return [];
-  try {
-    const list = JSON.parse(raw) as unknown;
-    if (!Array.isArray(list)) return [];
-    const clean = list.filter((x): x is string => typeof x === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x));
-    return Array.from(new Set(clean)).sort();
-  } catch {
-    return [];
-  }
-}
-
-export function withDate(history: string[], date: string): string[] {
-  return Array.from(new Set([...history, date])).sort();
-}
-
-export function withoutDate(history: string[], date: string): string[] {
-  return history.filter((d) => d !== date);
-}
-
 /* ---------- серия ---------- */
 
 export type Stats = {
@@ -67,23 +43,33 @@ export type Stats = {
   xp: number;
 };
 
-/* уроки идут раз в неделю: серия продолжается, если между отметками не больше 8 дней */
-export function computeStats(history: string[], today: string): Stats {
-  const list = [...history].sort();
-  const total = list.length;
+/*
+ * attended — даты уроков, на которые подросток отметился.
+ * lessonDates — даты всех проведённых уроков его служения.
+ * Серия: сколько уроков подряд (без пропусков) он отметил; недели без урока серию не рвут.
+ */
+export function computeStats(attended: string[], lessonDates: string[], today: string): Stats {
+  const att = new Set(attended);
+  const all = Array.from(new Set([...lessonDates, ...attended])).sort();
 
   let best = 0;
   let run = 0;
-  for (let i = 0; i < list.length; i++) {
-    run = i > 0 && daysBetween(list[i - 1], list[i]) <= 8 ? run + 1 : 1;
+  for (const d of all) {
+    run = att.has(d) ? run + 1 : 0;
     if (run > best) best = run;
   }
 
-  const last = list[total - 1];
-  const alive = total > 0 && daysBetween(last, today) <= 14;
-  const streak = alive ? run : 0;
+  // текущая серия: идём с конца, будущие уроки без отметки ещё не пропущены
+  let i = all.length - 1;
+  while (i >= 0 && all[i] > today && !att.has(all[i])) i--;
+  let streak = 0;
+  while (i >= 0 && att.has(all[i])) {
+    streak++;
+    i--;
+  }
 
-  return { total, streak, best, alive, xp: total * 10 + best * 5 };
+  const total = att.size;
+  return { total, streak, best, alive: streak > 0, xp: total * 10 + best * 5 };
 }
 
 /* ---------- уровни ---------- */

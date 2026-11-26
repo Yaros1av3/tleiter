@@ -13,6 +13,7 @@ import {
   Phone,
   Plus,
   RotateCcw,
+  Smartphone,
   Search,
   SlidersHorizontal,
   Trash2,
@@ -22,6 +23,7 @@ import {
 
 import { supabase } from "@/lib/supabase";
 import { useLanguage } from "@/components/LanguageProvider";
+import TeensFeedbackAdmin from "@/components/TeensFeedbackAdmin";
 
 type Gender = "male" | "female";
 type TeenLanguage = "de" | "ru";
@@ -59,6 +61,8 @@ type BirthdayCelebration = {
 type AgeFilter = "all" | 12 | 13 | "plus" | "other";
 type GenderFilter = "all" | Gender;
 type LanguageFilter = "all" | TeenLanguage;
+type AppFilter = "all" | "yes" | "no";
+type AppUser = { created_at: string; last_login_at: string | null };
 type StatusFilter = "active" | "all" | "inactive";
 
 type Tab = "teens" | "graduates";
@@ -290,6 +294,8 @@ export default function TeensPage() {
     useState<GenderFilter>("all");
   const [languageFilter, setLanguageFilter] =
     useState<LanguageFilter>("all");
+  const [appFilter, setAppFilter] = useState<AppFilter>("all");
+  const [appUsers, setAppUsers] = useState<Map<number, AppUser>>(new Map());
   const [ageFilter, setAgeFilter] =
     useState<AgeFilter>("all");
 
@@ -337,7 +343,24 @@ export default function TeensPage() {
   useEffect(() => {
     loadTeens();
     loadBirthdayCelebrations();
+    loadAppUsers();
   }, []);
+
+  // кто из подростков уже завёл профиль в приложении
+  async function loadAppUsers() {
+    const { data, error } = await supabase.rpc("teen_app_users");
+
+    if (error) {
+      console.error("teen_app_users:", error.message);
+      return;
+    }
+
+    const map = new Map<number, AppUser>();
+    for (const row of (data ?? []) as { teen_id: number; created_at: string; last_login_at: string | null }[]) {
+      map.set(row.teen_id, { created_at: row.created_at, last_login_at: row.last_login_at });
+    }
+    setAppUsers(map);
+  }
 
   async function loadTeens() {
     setLoading(true);
@@ -691,6 +714,9 @@ export default function TeensPage() {
           return false;
         }
 
+        if (appFilter === "yes" && !appUsers.has(teen.id)) return false;
+        if (appFilter === "no" && appUsers.has(teen.id)) return false;
+
         if (
           ageFilter !== "all" &&
           ageFilter !== "other" &&
@@ -747,6 +773,8 @@ export default function TeensPage() {
     genderFilter,
     languageFilter,
     ageFilter,
+    appFilter,
+    appUsers,
     isRu,
   ]);
 
@@ -932,14 +960,16 @@ export default function TeensPage() {
       : 0) +
     (languageFilter !== "all"
       ? 1
-      : 0);
+      : 0) +
+    (appFilter !== "all" ? 1 : 0);
 
   const hasActiveFilters =
     search.trim() !== "" ||
     statusFilter !== "active" ||
     ageFilter !== "all" ||
     genderFilter !== "all" ||
-    languageFilter !== "all";
+    languageFilter !== "all" ||
+    appFilter !== "all";
 
   function resetFilters() {
     setSearch("");
@@ -947,6 +977,7 @@ export default function TeensPage() {
     setAgeFilter("all");
     setGenderFilter("all");
     setLanguageFilter("all");
+    setAppFilter("all");
   }
 
   function resetForm() {
@@ -1241,6 +1272,8 @@ export default function TeensPage() {
             </h1>
           </div>
 
+          <div className="flex items-center">
+          <TeensFeedbackAdmin />
           <button
             type="button"
             onClick={
@@ -1258,6 +1291,7 @@ export default function TeensPage() {
               strokeWidth={2}
             />
           </button>
+          </div>
         </header>
 
         {/* BIRTHDAY CARD */}
@@ -1819,6 +1853,41 @@ export default function TeensPage() {
                       </div>
                     </div>
 
+                    {/* APP */}
+
+                    <div>
+                      <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-400">
+                        {isRu ? "Приложение" : "App"}
+                        {" · "}
+                        {teens.filter((x) => x.is_active && appUsers.has(x.id)).length}
+                        {" / "}
+                        {teens.filter((x) => x.is_active).length}
+                      </p>
+
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {(
+                          [
+                            ["all", isRu ? "Все" : "Alle"],
+                            ["yes", isRu ? "Есть" : "Ja"],
+                            ["no", isRu ? "Нет" : "Nein"],
+                          ] as [AppFilter, string][]
+                        ).map(([value, label]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => setAppFilter(value)}
+                            className={`h-9 rounded-xl text-[10px] font-semibold transition ${
+                              appFilter === value
+                                ? "bg-neutral-950 text-white"
+                                : "bg-neutral-100 text-neutral-500"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* RESET */}
 
                     {hasActiveFilters && (
@@ -1944,6 +2013,13 @@ export default function TeensPage() {
                                   ? "лет"
                                   : "Jahre"}
                               </span>
+
+                              {appUsers.has(teen.id) && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                                  <Smartphone size={10} />
+                                  {isRu ? "В приложении" : "In der App"}
+                                </span>
+                              )}
 
                               {age >= 14 && (
                                 <span className="rounded-full bg-gradient-to-r from-amber-100 to-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-600 ring-1 ring-inset ring-amber-300/70">
@@ -2312,6 +2388,52 @@ export default function TeensPage() {
               phone={selectedTeen.parent2_phone}
               callLabel={isRu ? "Позвонить" : "Anrufen"}
             />
+
+            {(() => {
+              const app = appUsers.get(selectedTeen.id);
+              const fmt = (iso: string) =>
+                new Date(iso).toLocaleDateString(isRu ? "ru-RU" : "de-DE", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                });
+
+              return (
+                <div
+                  className={`mt-2 flex items-center gap-3 rounded-2xl p-3 ${
+                    app ? "bg-emerald-50" : "bg-neutral-50"
+                  }`}
+                >
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                      app ? "bg-emerald-500 text-white" : "bg-neutral-200 text-neutral-400"
+                    }`}
+                  >
+                    <Smartphone size={16} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-neutral-900">
+                      {app
+                        ? isRu
+                          ? "Есть приложение"
+                          : "Hat die App"
+                        : isRu
+                          ? "Приложения нет"
+                          : "Noch keine App"}
+                    </p>
+                    {app && (
+                      <p className="text-[12px] text-neutral-500">
+                        {isRu ? "Профиль с " : "Profil seit "}
+                        {fmt(app.created_at)}
+                        {app.last_login_at
+                          ? (isRu ? ", последний вход " : ", zuletzt ") + fmt(app.last_login_at)
+                          : ""}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             <TeenEvents teenId={selectedTeen.id} isRu={isRu} />
 

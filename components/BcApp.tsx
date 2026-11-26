@@ -255,13 +255,16 @@ export default function BcApp() {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("today");
+  // если подросток уже выбрал служение (10:00 / 12:30), язык задан им и переключатель не нужен
+  const [langLocked, setLangLocked] = useState(false);
+  const langLockedRef = useRef(false);
 
   const t = T[lang];
 
   const loadMe = useCallback(async () => {
     const { data } = await api<Me>("/api/bc/me", undefined, "GET");
     setMe(data as Me);
-    if (data?.participant?.lang) setLang(data.participant.lang);
+    if (!langLockedRef.current && data?.participant?.lang) setLang(data.participant.lang);
     setLoading(false);
   }, []);
 
@@ -271,6 +274,17 @@ export default function BcApp() {
       saved = localStorage.getItem(LANG_KEY);
     } catch {}
     if (saved === "de" || saved === "ru") setLang(saved);
+
+    let service: string | null = null;
+    try {
+      service = localStorage.getItem("teens-service");
+    } catch {}
+    if (service === "10:00" || service === "12:30") {
+      langLockedRef.current = true;
+      setLangLocked(true);
+      setLang(service === "12:30" ? "ru" : "de");
+    }
+
     void loadMe();
   }, [loadMe]);
 
@@ -311,18 +325,30 @@ export default function BcApp() {
     </div>
   );
 
-  if (loading) return <div className="fixed inset-0 z-[60] bg-[#faf8f3]" />;
-
   const loggedIn = !!me?.participant;
+
+  // вход и регистрация теперь живут в приложении подростков (/t)
+  useEffect(() => {
+    if (!loading && !loggedIn) window.location.replace("/t");
+  }, [loading, loggedIn]);
+
+  if (loading || !loggedIn) return <div className="fixed inset-0 z-[60] bg-[#faf8f3]" />;
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-[#faf8f3] text-[#1b2431] [overflow-wrap:anywhere]">
       <header className="mx-auto flex w-full max-w-[520px] items-center gap-2.5 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <a
+          href="/t"
+          aria-label="TLight Teens"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-[#e9e3d3] active:scale-95"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </a>
         {logo}
         <h1 className="min-w-0 flex-1 truncate text-[17px] font-extrabold tracking-[-0.02em]">
           {t.title}
         </h1>
-        {langSwitch}
+        {!langLocked && langSwitch}
       </header>
 
       <main className="mx-auto w-full max-w-[520px] flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4">
@@ -468,7 +494,7 @@ function PasswordInput({
 
 type Step = "login" | "name" | "birth" | "notfound" | "exists" | "create";
 
-function AuthFlow({ lang, onDone }: { lang: Lang; onDone: () => void }) {
+export function AuthFlow({ lang, onDone }: { lang: Lang; onDone: () => void }) {
   const t = T[lang];
   const [step, setStep] = useState<Step>("login");
   const [busy, setBusy] = useState(false);
