@@ -127,6 +127,9 @@ const TEXT = {
     installSub: "So bekommst du Benachrichtigungen.",
     installHow: "Wie?",
     installOpen: "Wie installieren?",
+    installCardTitle: "App auf den Startbildschirm",
+    installCardSub: "Öffnen mit einem Tipp. Wir zeigen dir, wie.",
+    installLink: "So installierst du die App auf dem Handy",
     notify: "Benachrichtigungen",
     notifyText: "Wir sagen dir Bescheid, wenn ein Unterricht ansteht oder ein neuer Termin dazukommt.",
     enable: "Einschalten",
@@ -189,6 +192,9 @@ const TEXT = {
     installSub: "Так будут приходить уведомления.",
     installHow: "Как?",
     installOpen: "Как установить?",
+    installCardTitle: "Приложение на главный экран",
+    installCardSub: "Открывай одним касанием. Покажем, как это сделать.",
+    installLink: "Как установить приложение на телефон",
     notify: "Уведомления",
     notifyText: "Мы напомним про урок и расскажем, когда появится новое событие.",
     enable: "Включить",
@@ -730,6 +736,21 @@ export default function TeensHub() {
           <div className="mt-6">
             <TeensAuth lang={lang} onDone={() => void loadMe(service)} />
           </div>
+
+          {!standalone && (
+            <button
+              type="button"
+              onClick={() => setInstallOpen(true)}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-[13px] font-bold text-[#9a6b00] active:opacity-60"
+            >
+              <Download size={15} />
+              {t.installLink}
+            </button>
+          )}
+
+          {installOpen && (
+            <TeensInstall lang={lang} canPrompt={Boolean(installEvent)} onPrompt={runInstallPrompt} onClose={() => setInstallOpen(false)} />
+          )}
         </div>
       </div>
     );
@@ -1060,6 +1081,24 @@ export default function TeensHub() {
       <TeensHint key={`level-${hintsKey}`} id="level" lang={lang} text={t.hintLevel} className="mt-4" />
       <ProgressCard lang={lang} history={me.attended} lessonDates={me.lessonDates} today={today} />
       <AchievementsCard lang={lang} history={me.attended} lessonDates={me.lessonDates} today={today} />
+      {!standalone && (
+        <button
+          type="button"
+          onClick={() => setInstallOpen(true)}
+          className="tp-up mt-4 flex w-full items-center gap-3 rounded-[22px] border border-[#e9e3d3] bg-white p-4 text-left active:scale-[0.99]"
+          style={{ animationDelay: "140ms" }}
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ffc93c] text-[#1b2431]">
+            <Download size={20} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-extrabold leading-tight">{t.installCardTitle}</span>
+            <span className="mt-0.5 block text-[12px] leading-4 text-[#8a8678]">{t.installCardSub}</span>
+          </span>
+          <ChevronRight size={18} className="shrink-0 text-[#c4b377]" />
+        </button>
+      )}
+
       <TeensFeedback lang={lang} />
 
           <div className={`${card} mt-4 p-4`}>
