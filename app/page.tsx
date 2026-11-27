@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -1969,8 +1969,18 @@ export default function Home() {
                       }}
                       className="flex min-h-[68px] items-center gap-3 rounded-[18px] bg-[#f6f7f7] px-4 py-3 text-left transition active:scale-[0.98]"
                     >
-                      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-white text-[#303b48] shadow-sm">
-                        <Icon size={19} />
+                      <div
+                        className={
+                          BRAND_BY_HREF[item.href]
+                            ? "relative flex h-10 w-10 shrink-0 items-center justify-center"
+                            : "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-white text-[#303b48] shadow-sm"
+                        }
+                      >
+                        {BRAND_BY_HREF[item.href] ? (
+                          <BrandIcon kind={BRAND_BY_HREF[item.href]} size={40} />
+                        ) : (
+                          <Icon size={19} />
+                        )}
 
                         {item.href.startsWith("/availability") && reminder.needed && (
                           <ReminderDot className="-right-0.5 -top-0.5" />
@@ -2103,6 +2113,83 @@ function SettingsIcon({
     >
       <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
       <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 1.7-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.02 1.55V20h-2.4v-.21a1.7 1.7 0 0 0-1.02-1.55 1.7 1.7 0 0 0-1.88.34l-.06.06-1.7-1.7.06-.06A1.7 1.7 0 0 0 8.5 15a1.7 1.7 0 0 0-1.55-1.02H6.7v-2.4h.25A1.7 1.7 0 0 0 8.5 10a1.7 1.7 0 0 0-.34-1.88L8.1 8.06l1.7-1.7.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.02-1.55V5h2.4v.21a1.7 1.7 0 0 0 1.02 1.55 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.7 1.7-.06.06A1.7 1.7 0 0 0 19.4 10a1.7 1.7 0 0 0 1.55 1.02h.25v2.4h-.25A1.7 1.7 0 0 0 19.4 15Z" />
+    </svg>
+  );
+}
+/* Особые иконки (буква T + знак раздела) для трёх важных страниц в меню "Ещё" */
+type BrandKind = "camp" | "bible" | "plus";
+
+const BRAND_BY_HREF: Record<string, BrandKind> = {
+  "/camps": "camp",
+  "/bible-challenge": "bible",
+  "/teenie-plus": "plus",
+};
+
+function BrandIcon({ kind, size = 40 }: { kind: BrandKind; size?: number }) {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
+  const bg = "bg" + uid;
+  const dk = "dk" + uid;
+  const yl = "yl" + uid;
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      role="img"
+      aria-hidden="true"
+      style={{ filter: "drop-shadow(0 1px 2px rgba(27,36,49,0.18))" }}
+    >
+      <defs>
+        <linearGradient id={bg} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="1" stopColor="#f3f1ea" />
+        </linearGradient>
+        <linearGradient id={dk} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#2f394b" />
+          <stop offset="1" stopColor="#1B2431" />
+        </linearGradient>
+        <linearGradient id={yl} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#FFD35C" />
+          <stop offset="1" stopColor="#FFB82E" />
+        </linearGradient>
+      </defs>
+
+      <rect x="1" y="1" width="98" height="98" rx="27" fill={`url(#${bg})`} stroke="#e6e2d6" strokeWidth="1.5" />
+
+      {/* T: жёлтая планка справа, тёмная буква поверх */}
+      <rect x="40" y="22" width="44" height="18" rx="9" fill={`url(#${yl})`} />
+      <rect x="15" y="22" width="42" height="18" rx="9" fill={`url(#${dk})`} />
+      <rect x="35" y="22" width="19" height="58" rx="9.5" fill={`url(#${dk})`} />
+
+      {kind === "camp" && (
+        <g>
+          <path d="M58 91 L75 62 L92 91 Z" fill={`url(#${dk})`} strokeLinejoin="round" stroke={`url(#${dk})`} strokeWidth="3" />
+          <path d="M69 91 L75 80 L81 91 Z" fill={`url(#${yl})`} />
+          <path d="M75 62 V50" stroke="#1B2431" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M75.5 50.5 L86 54 L75.5 58 Z" fill={`url(#${yl})`} />
+        </g>
+      )}
+
+      {kind === "bible" && (
+        <g>
+          <path d="M57 68 Q67 64 75 69 V88 Q67 83 57 87 Z" fill={`url(#${dk})`} strokeLinejoin="round" stroke={`url(#${dk})`} strokeWidth="2" />
+          <path d="M93 68 Q83 64 75 69 V88 Q83 83 93 87 Z" fill={`url(#${dk})`} strokeLinejoin="round" stroke={`url(#${dk})`} strokeWidth="2" />
+          <rect x="83" y="71" width="3" height="11" rx="1.2" fill="#FFC93C" />
+          <rect x="79.5" y="74.5" width="10" height="3" rx="1.2" fill="#FFC93C" />
+          <path d="M55 92 Q75 99 95 92" fill="none" stroke="#FFC93C" strokeWidth="3" strokeLinecap="round" />
+        </g>
+      )}
+
+      {kind === "plus" && (
+        <g>
+          <rect x="70" y="62" width="11" height="30" rx="4.5" fill={`url(#${yl})`} />
+          <rect x="60.5" y="71.5" width="30" height="11" rx="4.5" fill={`url(#${yl})`} />
+          <path d="M84 57 L88 52" stroke="#FFC93C" strokeWidth="2.6" strokeLinecap="round" />
+          <path d="M90 63 L95 61" stroke="#FFC93C" strokeWidth="2.6" strokeLinecap="round" />
+          <path d="M77 54 L78 49" stroke="#FFC93C" strokeWidth="2.6" strokeLinecap="round" />
+        </g>
+      )}
     </svg>
   );
 }
