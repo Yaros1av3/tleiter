@@ -28,6 +28,19 @@ type QueueRow = {
   cnt: number;
   payload: Json;
 };
+const CATEGORY: Record<string, string> = {
+  event: "event",
+  event_upd: "event",
+  idea: "idea",
+  teen: "teen",
+  trip: "trip",
+  poll: "trip",
+  material: "material",
+  camp: "camp",
+  camp_reg: "camp_reg",
+  feedback: "feedback",
+};
+
 type Msg = {
   title: string;
   body: string;
@@ -80,48 +93,9 @@ function fmtTime(time: string) {
   return String(time).slice(0, 5).replace("13:00", "12:30");
 }
 
-async function scheduleText(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  entryId: string,
-) {
-  const [{ data: entry }, { data: links }] = await Promise.all([
-    supabase.from("schedule_entries").select("*").eq("id", entryId).maybeSingle(),
-    supabase
-      .from("schedule_entry_members")
-      .select("team_member_id")
-      .eq("schedule_entry_id", entryId),
-  ]);
-
-  if (!entry) return null;
-
-  const ids = (links ?? []).map((l) => l.team_member_id as number);
-  let names: string[] = [];
-
-  if (ids.length > 0) {
-    const { data: members } = await supabase
-      .from("team_members")
-      .select("first_name, last_name")
-      .in("id", ids);
-
-    names = (members ?? []).map((m) =>
-      `${m.first_name ?? ""} ${String(m.last_name ?? "").slice(0, 1)}.`.trim(),
-    );
-  }
-
-  const when = [fmtDate(str(entry.schedule_date)), fmtTime(str(entry.service_time))]
-    .filter(Boolean)
-    .join(" · ");
-
-  const shown = names.slice(0, 8).join(", ");
-  const more = names.length > 8 ? ` и ещё ${names.length - 8}` : "";
-
-  return { when, who: names.length ? `Служат: ${shown}${more}.` : "" };
-}
-
 async function build(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   row: QueueRow,
-  newSchedules: Set<string>,
 ): Promise<Msg | null> {
   const p = row.payload;
   const n = row.cnt;
@@ -150,22 +124,6 @@ async function build(
             ? `${title}: изменено терминов — ${n}`
             : [title, fmtDateTime(str(p.start_at))].filter(Boolean).join(" · "),
         url: "/calendar",
-        audience: "all",
-      };
-    }
-    case "sched_new":
-    case "sched": {
-      const eid = str(p.schedule_entry_id) || str(p.id);
-      if (row.kind === "sched" && newSchedules.has(eid)) return null; // уже вошло в «новое служение»
-      const info = await scheduleText(supabase, eid);
-      if (!info) return null;
-      return {
-        title:
-          row.kind === "sched_new"
-            ? "TLight — новое служение"
-            : "TLight — расписание обновлено",
-        body: [info.when, info.who].filter(Boolean).join(". "),
-        url: "/schedule",
         audience: "all",
       };
     }
@@ -235,6 +193,102 @@ async function build(
   }
 }
 
+/*
+ * Расписание: пишем только тем, кого это касается.
+ * - поставили на служение -> «тебя поставили»
+ * - сняли -> «тебя сняли»
+ * - перенесли дату/время -> тем, кто остался
+ * Если ничего не изменилось (просто пересохранили карточку), уведомлений нет.
+ */
+async function handleSchedules(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  queue: QueueRow[],
+  mutes: Map<string, Set<string>>,
+  includeActor: boolean,
+) {
+  const rows = queue.filter((r) => r.kind === "sched" || r.kind === "sched_new");
+  const eids = new Map<string, { isNew: boolean; actor: string | null }>();
+
+  for (const r of rows) {
+    const eid = str(r.payload.schedule_entry_id) || str(r.payload.id);
+    if (!eid) continue;
+    const prev = eids.get(eid);
+    eids.set(eid, { isNew: (prev?.isNew ?? false) || r.kind === "sched_new", actor: r.actor ?? prev?.actor ?? null });
+  }
+
+  let total = 0;
+  const muted = mutes.get("schedule") ?? new Set<string>();
+
+  for (const [eid, info] of eids) {
+    try {
+      const [{ data: entry }, { data: links }, { data: state }] = await Promise.all([
+        supabase.from("schedule_entries").select("*").eq("id", eid).maybeSingle(),
+        supabase.from("schedule_entry_members").select("team_member_id").eq("schedule_entry_id", eid),
+        supabase.from("notify_sched_state").select("*").eq("entry_id", eid).maybeSingle(),
+      ]);
+
+      if (!entry) {
+        await supabase.from("notify_sched_state").delete().eq("entry_id", eid);
+        continue;
+      }
+
+      const cur = (links ?? []).map((l) => Number(l.team_member_id));
+      const sdate = str(entry.schedule_date);
+      const stime = str(entry.service_time);
+      const when = [fmtDate(sdate), fmtTime(stime)].filter(Boolean).join(" · ");
+
+      const old: number[] = info.isNew || !state ? [] : ((state.members ?? []) as number[]).map(Number);
+      const moved = !!state && !info.isNew && (state.sdate !== sdate || state.stime !== stime);
+
+      await supabase
+        .from("notify_sched_state")
+        .upsert({ entry_id: eid, members: cur, sdate, stime });
+
+      const added = cur.filter((id) => !old.includes(id));
+      const removed = old.filter((id) => !cur.includes(id));
+      const stayed = cur.filter((id) => old.includes(id));
+
+      const allIds = Array.from(new Set([...cur, ...old]));
+      if (allIds.length === 0) continue;
+
+      const { data: members } = await supabase
+        .from("team_members")
+        .select("id, user_id, first_name, last_name")
+        .in("id", allIds);
+
+      const byId = new Map((members ?? []).map((m) => [Number(m.id), m]));
+      const userOf = (id: number) => (byId.get(id)?.user_id as string | null) ?? null;
+      const ok = (uid: string | null): uid is string =>
+        !!uid && !muted.has(uid) && (includeActor || uid !== info.actor);
+
+      const names = cur
+        .map((id) => byId.get(id))
+        .filter(Boolean)
+        .map((m) => `${m!.first_name ?? ""} ${String(m!.last_name ?? "").slice(0, 1)}.`.trim());
+      const who = names.length ? ` Служат: ${names.slice(0, 8).join(", ")}${names.length > 8 ? ` и ещё ${names.length - 8}` : ""}.` : "";
+
+      const send = async (ids: number[], title: string, body: string) => {
+        const users = ids.map(userOf).filter(ok);
+        if (users.length === 0) return;
+        total += await sendToUsers(supabase, users, {
+          title,
+          body,
+          url: "/schedule",
+          tag: `sched-${eid}`,
+        });
+      };
+
+      await send(added, "TLight — ты в расписании", `${when}.${who}`);
+      await send(removed, "TLight — тебя сняли со служения", when || "Служение изменилось");
+      if (moved) await send(stayed, "TLight — служение перенесено", `Теперь: ${when}.`);
+    } catch (err) {
+      console.error("notify schedule error:", eid, err);
+    }
+  }
+
+  return total;
+}
+
 export async function POST(request: NextRequest) {
   const secret = process.env.NOTIFY_SECRET;
   const given = request.headers.get("x-notify-secret");
@@ -276,21 +330,26 @@ export async function POST(request: NextRequest) {
   const adminSet = new Set(admins);
   const includeActor = process.env.NOTIFY_INCLUDE_ACTOR === "1";
 
-  const newSchedules = new Set(
-    queue.filter((r) => r.kind === "sched_new").map((r) => str(r.payload.id)),
-  );
+  const { data: muteRows } = await supabase.from("notify_mutes").select("user_id, category");
+  const mutes = new Map<string, Set<string>>();
+  for (const m of muteRows ?? []) {
+    const c = String(m.category);
+    if (!mutes.has(c)) mutes.set(c, new Set());
+    mutes.get(c)!.add(String(m.user_id));
+  }
 
-  let total = 0;
+  let total = (await handleSchedules(supabase, queue, mutes, includeActor)) ?? 0;
 
   for (const row of queue) {
     try {
-      const msg = await build(supabase, row, newSchedules);
+      const msg = await build(supabase, row);
       if (!msg) continue;
 
       const recipients = subscribed.filter((id) => {
         if (!includeActor && id === row.actor) return false;
         if (msg.audience === "admins" && !adminSet.has(id)) return false;
         if (msg.respectMute && muted.has(id)) return false;
+        if (mutes.get(CATEGORY[row.kind] ?? "")?.has(id)) return false;
         return true;
       });
 
