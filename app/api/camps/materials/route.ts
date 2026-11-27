@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { BUCKET, getCampStaff, getTeamUser, randomId, safeExt } from "@/lib/campsServer";
+import { BUCKET, getCampStaff, getTeamUser, inScope, randomId, safeExt } from "@/lib/campsServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,9 +13,11 @@ const CATEGORIES = ["program", "lessons", "slides", "docs", "music", "games", "o
 
 /* Материалы лагеря видят все служители */
 export async function GET(req: Request) {
-  if (!(await getTeamUser(req))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  const user = await getTeamUser(req);
+  if (!user) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const campId = Number(new URL(req.url).searchParams.get("camp_id"));
   if (!campId) return NextResponse.json({ error: "bad" }, { status: 400 });
+  if (!(await inScope(user, [{ camp: campId }]))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const sb = getSupabaseAdmin();
   const { data, error } = await sb.from("camp_materials").select("*").eq("camp_id", campId).order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: "db" }, { status: 500 });
@@ -34,10 +36,21 @@ export async function GET(req: Request) {
 
 /* Добавлять и менять могут организаторы лагеря */
 export async function POST(req: Request) {
-  if (!(await getCampStaff(req))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  const staff = await getCampStaff(req);
+  if (!staff) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: "bad" }, { status: 400 });
   const sb = getSupabaseAdmin();
+
+  if (staff.guestCamps) {
+    const id = Number(body.id) || 0;
+    const checks: Array<{ camp?: number; table?: string; ids?: number[] }> = [];
+    if (body.camp_id !== undefined) checks.push({ camp: Number(body.camp_id) });
+    if (id) checks.push({ table: "camp_materials", ids: [id] });
+    if ((!id && body.camp_id === undefined) || !(await inScope(staff, checks))) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+  }
 
   if (body.action === "material_save") {
     const title = txt(body.title, 120);

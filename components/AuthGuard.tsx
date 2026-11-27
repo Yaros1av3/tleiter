@@ -42,6 +42,7 @@ export default function AuthGuard({
   const pathname = usePathname();
 
   if (
+    pathname.startsWith("/camp-join") ||
     pathname.startsWith("/f/") ||
     pathname === "/t" ||
     pathname.startsWith("/t/")
@@ -123,6 +124,25 @@ function AuthGuardInner({
        */
       if (isPublicRoute) {
         router.replace("/");
+        return;
+      }
+
+      /*
+       * Гость лагеря (пришёл по ссылке-приглашению) видит только T-Camps и настройки.
+       */
+      const { data: isGuest } = await supabase.rpc("is_camp_guest");
+
+      if (!mounted) {
+        return;
+      }
+
+      if (
+        isGuest === true &&
+        pathname !== "/camps" &&
+        !pathname.startsWith("/camps/") &&
+        pathname !== "/settings"
+      ) {
+        router.replace("/camps");
         return;
       }
 

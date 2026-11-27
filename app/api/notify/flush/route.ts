@@ -326,6 +326,16 @@ export async function POST(request: NextRequest) {
     new Set((subRows ?? []).map((r) => r.user_id as string).filter(Boolean)),
   );
 
+  /* гости лагеря не получают командные уведомления */
+  const [{ data: accessRows }, { data: cardRows }] = await Promise.all([
+    supabase.from("camp_access").select("user_id"),
+    supabase.from("team_members").select("user_id").not("user_id", "is", null),
+  ]);
+  const withCard = new Set((cardRows ?? []).map((r) => r.user_id as string));
+  const guestIds = new Set(
+    (accessRows ?? []).map((r) => r.user_id as string).filter((id) => !withCard.has(id)),
+  );
+
   const [admins, muted] = await Promise.all([getAdminIds(supabase), getMutedIds(supabase)]);
   const adminSet = new Set(admins);
   const includeActor = process.env.NOTIFY_INCLUDE_ACTOR === "1";
@@ -346,6 +356,7 @@ export async function POST(request: NextRequest) {
       if (!msg) continue;
 
       const recipients = subscribed.filter((id) => {
+        if (guestIds.has(id)) return false;
         if (!includeActor && id === row.actor) return false;
         if (msg.audience === "admins" && !adminSet.has(id)) return false;
         if (msg.respectMute && muted.has(id)) return false;

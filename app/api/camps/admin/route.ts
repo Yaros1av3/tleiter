@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { BUCKET, getCampStaff, randomId, safeExt } from "@/lib/campsServer";
+import { BUCKET, getCampStaff, inScope, randomId, safeExt } from "@/lib/campsServer";
 import { REG_FIELDS } from "@/lib/campReg";
 
 export const runtime = "nodejs";
@@ -13,13 +13,15 @@ const txt = (v: unknown, max: number) => {
 
 /* Настройки регистрации, документы и заявки лагеря (для служителей с правом «T-Camps») */
 export async function GET(req: Request) {
-  if (!(await getCampStaff(req))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  const staff = await getCampStaff(req);
+  if (!staff) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const sb = getSupabaseAdmin();
   const url = new URL(req.url);
 
   // детали одной заявки: загруженные файлы
   const regId = Number(url.searchParams.get("reg_id"));
   if (regId) {
+    if (!(await inScope(staff, [{ table: "camp_registrations", ids: [regId] }]))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
     const { data: files } = await sb
       .from("camp_registration_files")
       .select("id, document_id, file_path, file_name, created_at")
@@ -38,6 +40,7 @@ export async function GET(req: Request) {
 
   const campId = Number(url.searchParams.get("camp_id"));
   if (!campId) return NextResponse.json({ error: "bad" }, { status: 400 });
+  if (!(await inScope(staff, [{ camp: campId }]))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
   const [campR, docsR, regsR] = await Promise.all([
     sb.from("camps").select("id, reg_open, reg_deadline, reg_intro_ru, reg_intro_de, reg_slug").eq("id", campId).maybeSingle(),
@@ -77,11 +80,29 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  if (!(await getCampStaff(req))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  const staff = await getCampStaff(req);
+  if (!staff) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: "bad" }, { status: 400 });
   const sb = getSupabaseAdmin();
   const action = String(body.action ?? "");
+
+  /* гость лагеря: все действия только внутри его лагеря */
+  if (staff.guestCamps) {
+    const id = Number(body.id) || 0;
+    const checks: Array<{ camp?: number; table?: string; ids?: number[] }> = [];
+    if (body.camp_id !== undefined) checks.push({ camp: Number(body.camp_id) });
+    if (id && action.startsWith("doc_")) checks.push({ table: "camp_documents", ids: [id] });
+    if (id && (action.startsWith("reg_") || action === "checkin")) checks.push({ table: "camp_registrations", ids: [id] });
+    if (action === "assign") {
+      const ids = (Array.isArray(body.ids) ? body.ids : []).map(Number).filter(Boolean);
+      checks.push({ table: "camp_registrations", ids });
+    }
+    const needsCamp = action === "settings_save" || action === "doc_save" || (action === "reg_save" && !id);
+    if ((needsCamp && body.camp_id === undefined) || !(await inScope(staff, checks))) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+  }
 
   if (action === "settings_save") {
     const { error } = await sb

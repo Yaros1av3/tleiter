@@ -11,6 +11,7 @@ import {
 
 import { useLanguage } from "@/components/LanguageProvider";
 import { translations } from "@/lib/translations";
+import { useCampGuest } from "@/lib/useCampGuest";
 
 const publicRoutes = [
   "/login",
@@ -21,9 +22,10 @@ const publicRoutes = [
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const isGuest = useCampGuest();
   const { language } = useLanguage();
 
-  if (publicRoutes.includes(pathname)) {
+  if (isGuest || publicRoutes.includes(pathname)) {
     return null;
   }
 

@@ -20,6 +20,7 @@ import {
   Gamepad2,
   Home,
   HeartHandshake,
+  KeyRound,
   Loader2,
   MapPin,
   FolderOpen,
@@ -46,6 +47,8 @@ import CampRegistration from "@/components/CampRegistration";
 import CampGroups from "@/components/CampGroups";
 import CampMaterials from "@/components/CampMaterials";
 import CampCheckin from "@/components/CampCheckin";
+import CampAccess from "@/components/CampAccess";
+import { useCampGuest } from "@/lib/useCampGuest";
 
 /* ===================== ТИПЫ ===================== */
 
@@ -412,6 +415,7 @@ export default function CampsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canManage, setCanManage] = useState(false);
+  const isGuest = useCampGuest();
 
   const [camps, setCamps] = useState<Camp[]>([]);
   const [campId, setCampId] = useState<number | null>(null);
@@ -419,7 +423,7 @@ export default function CampsPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
 
-  const [tab, setTab] = useState<"overview" | "team" | "schedule" | "reg" | "groups" | "materials" | "checkin">("overview");
+  const [tab, setTab] = useState<"overview" | "team" | "schedule" | "reg" | "groups" | "materials" | "checkin" | "access">("overview");
   const [campForm, setCampForm] = useState<Partial<Camp> | null>(null);
   const [teamForm, setTeamForm] = useState<Partial<TeamRow> | null>(null);
   const [itemForm, setItemForm] = useState<Partial<Item> | null>(null);
@@ -720,6 +724,7 @@ export default function CampsPage() {
           <button
             type="button"
             onClick={() => router.push("/")}
+            hidden={isGuest}
             aria-label={t("Назад", "Zurück")}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-white ring-1 ring-[#ece6d3]"
           >
@@ -729,7 +734,7 @@ export default function CampsPage() {
             <h1 className="text-[22px] font-extrabold leading-tight tracking-[-0.02em]">T-Camps</h1>
             <p className="text-[13px] text-[#8a8678]">{t("Подготовка подросткового лагеря", "Vorbereitung des Teen-Camps")}</p>
           </div>
-          {canManage && (
+          {canManage && !isGuest && (
             <button
               type="button"
               onClick={() => setCampForm({ status: "planning" })}
@@ -797,6 +802,7 @@ export default function CampsPage() {
                   ["groups", t("Отряды", "Gruppen"), Home],
                   ["materials", t("Материалы", "Material"), FolderOpen],
                   ["checkin", t("Заезд", "Anreise"), UserCheck],
+                  ...(canManage && !isGuest ? [["access", t("Доступ", "Zugang"), KeyRound]] : []),
                 ] as [typeof tab, string, LucideIcon][]
               ).map(([key, label, Icon]) => (
                 <button
@@ -985,6 +991,8 @@ export default function CampsPage() {
             {camp && tab === "checkin" && (
               <CampCheckin campId={camp.id} campStart={camp.start_date} price={camp.price} canManage={canManage} isRu={isRu} />
             )}
+
+            {camp && tab === "access" && canManage && !isGuest && <CampAccess campId={camp.id} isRu={isRu} />}
 
             {camp && tab === "schedule" && (
               <div className="mt-4 space-y-3">
@@ -1184,7 +1192,7 @@ export default function CampsPage() {
             <PrimaryButton onClick={saveCamp} busy={busy} disabled={!campForm.title?.trim()}>
               {t("Сохранить", "Speichern")}
             </PrimaryButton>
-            {campForm.id && (
+            {campForm.id && !isGuest && (
               <button type="button" onClick={deleteCamp} className="flex h-11 w-full items-center justify-center gap-2 text-[14px] font-semibold text-red-600">
                 <Trash2 size={16} />
                 {t("Удалить лагерь", "Camp löschen")}
